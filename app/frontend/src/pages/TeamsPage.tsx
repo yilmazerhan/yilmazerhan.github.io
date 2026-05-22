@@ -172,7 +172,7 @@ function TeamForm({
   isPending,
 }: {
   initial: TeamFormData
-  onSave: (data: TeamFormData) => void
+  onSave: (data: TeamFormData) => Promise<void>
   onCancel: () => void
   isPending: boolean
 }) {
@@ -186,11 +186,15 @@ function TeamForm({
     setForm((prev) => ({ ...prev, [field]: value }))
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     if (!form.name.trim()) { setError('Takım adı zorunludur.'); return }
-    onSave(form)
+    try {
+      await onSave(form)
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || err?.message || 'Bir hata oluştu.')
+    }
   }
 
   const isEdit = !!initial.name
