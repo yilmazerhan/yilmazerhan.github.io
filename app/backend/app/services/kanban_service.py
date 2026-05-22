@@ -2,7 +2,7 @@ import uuid
 from typing import Optional
 from datetime import date
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, update as sa_update
+from sqlalchemy import select, func, update as sa_update, or_
 from sqlalchemy.orm import selectinload
 
 from app.models.kanban import KanbanColumn, Task
@@ -74,6 +74,7 @@ class KanbanService:
         self,
         requester: User,
         assignee_id: Optional[uuid.UUID] = None,
+        team_id: Optional[uuid.UUID] = None,
         column_id: Optional[uuid.UUID] = None,
         priority: Optional[str] = None,
         due_before: Optional[date] = None,
@@ -81,6 +82,9 @@ class KanbanService:
         skip: int = 0,
         limit: int = 200,
     ) -> tuple[list[Task], int]:
+        # Alias for joining users table on assignee
+        Assignee = User.__table__.alias("assignee_user")
+
         q = (
             select(Task)
             .options(selectinload(Task.assignee), selectinload(Task.creator), selectinload(Task.column))
@@ -88,8 +92,32 @@ class KanbanService:
 
         if not include_archived:
             q = q.where(Task.is_archived == False)
-        if assignee_id:
-            q = q.where(Task.assignee_id == assignee_id)
+
+        # ── Role-based scoping ────────────────────────────────────────────────
+        if requester.role == "superadmin":
+            # Superadmin sees everything; optional team filter
+            if team_id:
+                q = (
+                    q.join(Assignee, Task.assignee_id == Assignee.c.id)
+                    .where(Assignee.c.team_id == team_id)
+                )
+            elif assignee_id:
+                q = q.where(Task.assignee_id == assignee_id)
+        elif requester.team_id is not None:
+            # Team member / manager: scope to own team's tasks
+            q = q.outerjoin(Assignee, Task.assignee_id == Assignee.c.id).where(
+                or_(
+                    Assignee.c.team_id == requester.team_id,
+                    Task.assignee_id.is_(None),
+                )
+            )
+            if assignee_id:
+                q = q.where(Task.assignee_id == assignee_id)
+        else:
+            # User without a team: only their own assigned tasks
+            q = q.where(Task.assignee_id == requester.id)
+
+        # ── Extra filters ─────────────────────────────────────────────────────
         if column_id:
             q = q.where(Task.column_id == column_id)
         if priority:

@@ -59,6 +59,7 @@ export function useColumns() {
 
 export function useTasks(params?: {
   assignee_id?: string
+  team_id?: string
   column_id?: string
   priority?: string
   include_archived?: boolean

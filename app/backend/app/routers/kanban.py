@@ -78,6 +78,7 @@ async def list_tasks(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     assignee_id: Optional[uuid.UUID] = Query(None),
+    team_id: Optional[uuid.UUID] = Query(None),
     column_id: Optional[uuid.UUID] = Query(None),
     priority: Optional[str] = Query(None),
     due_before: Optional[date] = Query(None),
@@ -89,6 +90,7 @@ async def list_tasks(
     items, total = await svc.list_tasks(
         requester=current_user,
         assignee_id=assignee_id,
+        team_id=team_id,
         column_id=column_id,
         priority=priority,
         due_before=due_before,

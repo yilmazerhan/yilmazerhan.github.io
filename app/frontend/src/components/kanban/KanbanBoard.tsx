@@ -19,12 +19,13 @@ import TaskModal from './TaskModal'
 
 interface Props {
   onAddTask?: (columnId: string) => void
+  taskParams?: { assignee_id?: string; team_id?: string }
 }
 
-export default function KanbanBoard() {
+export default function KanbanBoard({ taskParams }: Props) {
   const { t } = useTranslation()
   const { data: columns = [], isLoading: colLoading } = useColumns()
-  const { data: tasksData, isLoading: taskLoading } = useTasks()
+  const { data: tasksData, isLoading: taskLoading } = useTasks(taskParams)
   const moveTask = useMoveTask()
 
   const [activeTask, setActiveTask] = useState<Task | null>(null)
