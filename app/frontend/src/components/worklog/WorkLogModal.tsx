@@ -30,8 +30,8 @@ export default function WorkLogModal({ log, onClose }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    if (!workTypeId) { setError('İş tipi seçiniz.'); return }
-    if (description.trim().length < 5) { setError('Açıklama en az 5 karakter olmalıdır.'); return }
+    if (!workTypeId) { setError(t('worklog.work_type_required')); return }
+    if (description.trim().length < 5) { setError(t('worklog.description_min_length')); return }
 
     try {
       if (isEdit) {
@@ -98,7 +98,7 @@ export default function WorkLogModal({ log, onClose }: Props) {
                 className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
               >
                 {DURATION_OPTIONS.map((d) => (
-                  <option key={d} value={d}>{d} saat</option>
+                  <option key={d} value={d}>{d} {t('worklog.hours_unit')}</option>
                 ))}
               </select>
             </div>
@@ -139,7 +139,7 @@ export default function WorkLogModal({ log, onClose }: Props) {
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               required
-              placeholder="Bugün ne yaptınız?"
+              placeholder={t('worklog.description_placeholder')}
               className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
             />
           </div>

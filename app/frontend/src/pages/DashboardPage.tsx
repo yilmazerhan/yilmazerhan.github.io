@@ -41,6 +41,17 @@ export default function DashboardPage() {
     .filter((t) => !t.is_archived && t.due_date && isPast(parseISO(t.due_date)) && !isToday(parseISO(t.due_date)))
     .slice(0, 5)
 
+  const hourAbbr = t('dashboard.hours_abbr')
+
+  const statCards = [
+    { label: t('dashboard.total_tasks'), value: stats.total, icon: ListTodo, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/20' },
+    { label: t('dashboard.my_tasks'), value: stats.myTasks, icon: CheckCircle2, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/20' },
+    { label: t('dashboard.due_this_week'), value: stats.dueThisWeek, icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+    { label: t('dashboard.overdue'), value: stats.overdue, icon: AlertTriangle, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/20' },
+    { label: t('dashboard.today_hours'), value: `${stats.todayHours.toFixed(1)}${hourAbbr}`, icon: TrendingUp, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-900/20' },
+    { label: t('dashboard.weekly_hours'), value: `${stats.totalHours.toFixed(1)}${hourAbbr}`, icon: TrendingUp, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-900/20' },
+  ]
+
   return (
     <div className="space-y-6">
       <div>
@@ -52,16 +63,8 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        {[
-          { label: 'Toplam Görev', value: stats.total, icon: ListTodo, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/20' },
-          { label: 'Benim Görevlerim', value: stats.myTasks, icon: CheckCircle2, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/20' },
-          { label: 'Bu Hafta Bitiyor', value: stats.dueThisWeek, icon: Clock, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20' },
-          { label: 'Gecikmiş', value: stats.overdue, icon: AlertTriangle, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/20' },
-          { label: "Bugünkü Saat", value: `${stats.todayHours.toFixed(1)}s`, icon: TrendingUp, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-900/20' },
-          { label: '7 Günlük Saat', value: `${stats.totalHours.toFixed(1)}s`, icon: TrendingUp, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-900/20' },
-        ].map(({ label, value, icon: Icon, color, bg }) => (
+        {statCards.map(({ label, value, icon: Icon, color, bg }) => (
           <div key={label} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
             <div className={`inline-flex p-2 rounded-lg ${bg} mb-2`}>
               <Icon className={`h-4 w-4 ${color}`} />
@@ -73,13 +76,12 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Overdue tasks */}
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
           <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-red-500" /> Gecikmiş Görevler
+            <AlertTriangle className="h-4 w-4 text-red-500" /> {t('dashboard.overdue_section')}
           </h2>
           {urgentTasks.length === 0 ? (
-            <p className="text-sm text-gray-400 py-4 text-center">Gecikmiş görev yok 🎉</p>
+            <p className="text-sm text-gray-400 py-4 text-center">{t('dashboard.no_overdue')}</p>
           ) : (
             <div className="space-y-2">
               {urgentTasks.map((task) => (
@@ -101,13 +103,12 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Recent work logs */}
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
           <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-            <Clock className="h-4 w-4 text-blue-500" /> Son İş Günlüğü Kayıtları (7 gün)
+            <Clock className="h-4 w-4 text-blue-500" /> {t('dashboard.recent_logs')}
           </h2>
           {recentLogs.length === 0 ? (
-            <p className="text-sm text-gray-400 py-4 text-center">Bu hafta kayıt yok.</p>
+            <p className="text-sm text-gray-400 py-4 text-center">{t('dashboard.no_logs')}</p>
           ) : (
             <div className="space-y-2">
               {recentLogs.map((log) => (
@@ -123,7 +124,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">{log.duration_hours}s</p>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{log.duration_hours}{hourAbbr}</p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       {format(parseISO(log.log_date + 'T12:00:00'), 'd MMM', { locale })}
                     </p>

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { format, subDays } from 'date-fns'
 import { tr, enUS } from 'date-fns/locale'
 import { Plus, Pencil, Trash2, Clock, AlertTriangle } from 'lucide-react'
-import { useWorkLogs, useWorkTypes, useCreateWorkLog, useUpdateWorkLog, useDeleteWorkLog, type WorkLog } from '@/api/worklog'
+import { useWorkLogs, useDeleteWorkLog, type WorkLog } from '@/api/worklog'
 import { useAuthStore } from '@/store/authStore'
 import WorkLogModal from '@/components/worklog/WorkLogModal'
 
@@ -40,7 +40,6 @@ export default function WorkLogPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('worklog.title')}</h1>
         <button
@@ -52,10 +51,9 @@ export default function WorkLogPage() {
         </button>
       </div>
 
-      {/* Date filters */}
       <div className="flex gap-3 flex-wrap">
         <div>
-          <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('worklog.date')} (başlangıç)</label>
+          <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('worklog.date_from')}</label>
           <input
             type="date"
             value={dateFrom}
@@ -64,7 +62,7 @@ export default function WorkLogPage() {
           />
         </div>
         <div>
-          <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('worklog.date')} (bitiş)</label>
+          <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('worklog.date_to')}</label>
           <input
             type="date"
             value={dateTo}
@@ -75,19 +73,21 @@ export default function WorkLogPage() {
         {data && (
           <div className="flex items-end">
             <span className="text-sm text-gray-500 dark:text-gray-400 pb-2">
-              {data.total} kayıt · Toplam {data.items.reduce((s, l) => s + l.duration_hours, 0).toFixed(1)} saat
+              {t('worklog.record_count', {
+                count: data.total,
+                total: data.items.reduce((s, l) => s + l.duration_hours, 0).toFixed(1),
+              })}
             </span>
           </div>
         )}
       </div>
 
-      {/* Table */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
               <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('worklog.date')}</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">Kişi</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('worklog.person')}</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('worklog.work_type')}</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('worklog.duration')}</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('worklog.description')}</th>
@@ -98,7 +98,7 @@ export default function WorkLogPage() {
             {isLoading ? (
               <tr><td colSpan={6} className="text-center py-8 text-gray-400">{t('common.loading')}</td></tr>
             ) : data?.items.length === 0 ? (
-              <tr><td colSpan={6} className="text-center py-8 text-gray-400">Bu tarih aralığında kayıt bulunamadı.</td></tr>
+              <tr><td colSpan={6} className="text-center py-8 text-gray-400">{t('worklog.no_records')}</td></tr>
             ) : data?.items.map((log) => {
               const editable = canEditLog(log, user?.id || '', user?.role || '')
               const ageDays = Math.floor((Date.now() - new Date(log.log_date).getTime()) / 86400000)
@@ -121,7 +121,7 @@ export default function WorkLogPage() {
                   <td className="px-4 py-3">
                     <span className="flex items-center gap-1 text-gray-700 dark:text-gray-300">
                       <Clock className="h-3.5 w-3.5 text-gray-400" />
-                      {log.duration_hours}s
+                      {log.duration_hours}{t('worklog.hours_abbr')}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400 max-w-xs truncate" title={log.description}>
@@ -139,12 +139,14 @@ export default function WorkLogPage() {
                           <button
                             onClick={() => setEditLog(log)}
                             className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                            title={t('common.edit')}
                           >
                             <Pencil className="h-4 w-4" />
                           </button>
                           <button
                             onClick={() => handleDelete(log)}
                             className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                            title={t('common.delete')}
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>

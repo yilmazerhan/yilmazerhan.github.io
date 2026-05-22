@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useCreateUser, useUpdateUser, type User } from '@/api/users'
 
 interface Props {
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export default function UserFormModal({ user, onClose }: Props) {
+  const { t } = useTranslation()
   const isEdit = !!user
   const [email, setEmail] = useState(user?.email || '')
   const [fullName, setFullName] = useState(user?.full_name || '')
@@ -29,7 +31,7 @@ export default function UserFormModal({ user, onClose }: Props) {
       }
       onClose()
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Bir hata oluştu.')
+      setError(err.response?.data?.detail || t('common.error'))
     }
   }
 
@@ -40,7 +42,7 @@ export default function UserFormModal({ user, onClose }: Props) {
       <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md shadow-xl">
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {isEdit ? 'Kullanıcıyı Düzenle' : 'Kullanıcı Davet Et'}
+            {isEdit ? t('users.edit_user') : t('users.invite_user')}
           </h2>
           <button onClick={onClose} className="p-1 rounded text-gray-400 hover:text-gray-600">
             <X className="h-5 w-5" />
@@ -56,7 +58,7 @@ export default function UserFormModal({ user, onClose }: Props) {
 
           {!isEdit && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('auth.email')}</label>
               <input
                 type="email"
                 value={email}
@@ -68,7 +70,7 @@ export default function UserFormModal({ user, onClose }: Props) {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ad Soyad</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('auth.full_name')}</label>
             <input
               type="text"
               value={fullName}
@@ -79,15 +81,15 @@ export default function UserFormModal({ user, onClose }: Props) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Rol</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('users.role')}</label>
             <select
               value={role}
               onChange={(e) => setRole(e.target.value)}
               className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
-              <option value="user">Kullanıcı</option>
-              <option value="team_manager">Takım Yöneticisi</option>
-              <option value="superadmin">Süper Admin</option>
+              <option value="user">{t('users.role_user')}</option>
+              <option value="team_manager">{t('users.role_team_manager')}</option>
+              <option value="superadmin">{t('users.role_superadmin')}</option>
             </select>
           </div>
 
@@ -100,7 +102,7 @@ export default function UserFormModal({ user, onClose }: Props) {
                 onChange={(e) => setIsActive(e.target.checked)}
                 className="rounded"
               />
-              <label htmlFor="is_active" className="text-sm text-gray-700 dark:text-gray-300">Aktif</label>
+              <label htmlFor="is_active" className="text-sm text-gray-700 dark:text-gray-300">{t('common.active')}</label>
             </div>
           )}
 
@@ -110,14 +112,14 @@ export default function UserFormModal({ user, onClose }: Props) {
               onClick={onClose}
               className="flex-1 py-2 px-4 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800"
             >
-              İptal
+              {t('common.cancel')}
             </button>
             <button
               type="submit"
               disabled={loading}
               className="flex-1 py-2 px-4 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium disabled:opacity-50"
             >
-              {loading ? 'Kaydediliyor...' : 'Kaydet'}
+              {loading ? t('common.saving') : t('common.save')}
             </button>
           </div>
         </form>

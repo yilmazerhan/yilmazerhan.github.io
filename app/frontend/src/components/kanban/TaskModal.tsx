@@ -45,7 +45,7 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose }: P
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    if (!title.trim()) { setError('Başlık zorunludur.'); return }
+    if (!title.trim()) { setError(t('kanban.title_required')); return }
 
     try {
       if (isEdit && task) {
@@ -133,7 +133,7 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose }: P
 
           {/* Column */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sütun</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('kanban.column')}</label>
             <select
               value={columnId}
               onChange={(e) => setColumnId(e.target.value)}
@@ -205,7 +205,7 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose }: P
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               disabled={!canEdit}
-              placeholder="İsteğe bağlı açıklama..."
+              placeholder={t('kanban.optional_description')}
               className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none disabled:opacity-60"
             />
           </div>

@@ -61,7 +61,7 @@ export default function UsersPage() {
           onChange={(e) => setRoleFilter(e.target.value)}
           className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
         >
-          <option value="">{t('users.role')} — Tümü</option>
+          <option value="">{t('users.role')} — {t('users.role_all')}</option>
           <option value="superadmin">{t('users.role_superadmin')}</option>
           <option value="team_manager">{t('users.role_team_manager')}</option>
           <option value="user">{t('users.role_user')}</option>
@@ -85,7 +85,7 @@ export default function UsersPage() {
             {isLoading ? (
               <tr><td colSpan={6} className="text-center py-8 text-gray-400">{t('common.loading')}</td></tr>
             ) : data?.items.length === 0 ? (
-              <tr><td colSpan={6} className="text-center py-8 text-gray-400">Kullanıcı bulunamadı.</td></tr>
+              <tr><td colSpan={6} className="text-center py-8 text-gray-400">{t('users.not_found')}</td></tr>
             ) : data?.items.map((user) => (
               <tr key={user.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30">
                 <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{user.full_name}</td>
@@ -114,7 +114,7 @@ export default function UsersPage() {
                     <button
                       onClick={() => setPermUser(user)}
                       className="p-1.5 rounded text-gray-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20"
-                      title="Yetkiler"
+                      title={t('users.permissions')}
                     >
                       <ShieldCheck className="h-4 w-4" />
                     </button>
@@ -140,7 +140,7 @@ export default function UsersPage() {
         </table>
         {data && (
           <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400">
-            {data.total} kullanıcı
+            {t('users.user_count', { count: data.total })}
           </div>
         )}
       </div>

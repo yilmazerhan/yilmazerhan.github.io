@@ -1,23 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { X, Save } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useEffectivePermissions, useSetPermissions, type User } from '@/api/users'
-
-const MODULES = [
-  { key: 'worklog', label: 'İş Günlüğü' },
-  { key: 'kanban', label: 'Kanban' },
-  { key: 'user_management', label: 'Kullanıcı Yönetimi' },
-  { key: 'email_workflows', label: 'Email Workflow' },
-  { key: 'jira_config', label: 'Jira Yapılandırması' },
-  { key: 'ssl_management', label: 'SSL Yönetimi' },
-  { key: 'branding', label: 'Marka Ayarları' },
-]
-
-const ACTIONS = [
-  { key: 'view', label: 'Görüntüle' },
-  { key: 'create', label: 'Oluştur' },
-  { key: 'edit', label: 'Düzenle' },
-  { key: 'delete', label: 'Sil' },
-]
 
 interface Props {
   user: User
@@ -27,10 +11,27 @@ interface Props {
 type Override = { module: string; action: string; is_allowed: boolean }
 
 export default function PermissionMatrixModal({ user, onClose }: Props) {
+  const { t } = useTranslation()
   const { data: effectivePerms } = useEffectivePermissions(user.id)
   const setPermissions = useSetPermissions(user.id)
 
-  // Local overrides state: null = inherit role default, true = grant, false = deny
+  const MODULES = [
+    { key: 'worklog', label: t('permissions.module_worklog') },
+    { key: 'kanban', label: t('permissions.module_kanban') },
+    { key: 'user_management', label: t('permissions.module_user_management') },
+    { key: 'email_workflows', label: t('permissions.module_email_workflows') },
+    { key: 'jira_config', label: t('permissions.module_jira_config') },
+    { key: 'ssl_management', label: t('permissions.module_ssl_management') },
+    { key: 'branding', label: t('permissions.module_branding') },
+  ]
+
+  const ACTIONS = [
+    { key: 'view', label: t('permissions.action_view') },
+    { key: 'create', label: t('permissions.action_create') },
+    { key: 'edit', label: t('permissions.action_edit') },
+    { key: 'delete', label: t('permissions.action_delete') },
+  ]
+
   const [overrides, setOverrides] = useState<Map<string, boolean | null>>(new Map())
   const [saved, setSaved] = useState(false)
 
@@ -74,9 +75,9 @@ export default function PermissionMatrixModal({ user, onClose }: Props) {
   }
 
   const cellLabel = (state: boolean | null, defaultAllow: boolean) => {
-    if (state === true) return '✓ Ver'
-    if (state === false) return '✗ Reddet'
-    return defaultAllow ? '○ Varsayılan (İzinli)' : '○ Varsayılan (Yok)'
+    if (state === true) return t('permissions.cell_grant')
+    if (state === false) return t('permissions.cell_deny')
+    return defaultAllow ? t('permissions.cell_default_allowed') : t('permissions.cell_default_denied')
   }
 
   return (
@@ -84,7 +85,7 @@ export default function PermissionMatrixModal({ user, onClose }: Props) {
       <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-4xl shadow-xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Yetki Düzenle</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('permissions.edit_title')}</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{user.full_name} · <span className="capitalize">{user.role}</span></p>
           </div>
           <button onClick={onClose} className="p-1 rounded text-gray-400 hover:text-gray-600">
@@ -94,13 +95,13 @@ export default function PermissionMatrixModal({ user, onClose }: Props) {
 
         <div className="flex-1 overflow-auto p-6">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-            Hücreye tıklayarak: <span className="text-blue-600">Varsayılan</span> → <span className="text-green-600">Ver</span> → <span className="text-red-600">Reddet</span> → Varsayılan
+            {t('permissions.click_cycle_hint')} <span className="text-blue-600">{t('permissions.default_label')}</span> → <span className="text-green-600">{t('permissions.grant_label')}</span> → <span className="text-red-600">{t('permissions.deny_label')}</span> → {t('permissions.default_label')}
           </p>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr>
-                  <th className="text-left pb-3 text-gray-600 dark:text-gray-400 font-medium">Modül</th>
+                  <th className="text-left pb-3 text-gray-600 dark:text-gray-400 font-medium">{t('permissions.module_label')}</th>
                   {ACTIONS.map((a) => (
                     <th key={a.key} className="pb-3 text-center text-gray-600 dark:text-gray-400 font-medium px-2">
                       {a.label}
@@ -118,12 +119,12 @@ export default function PermissionMatrixModal({ user, onClose }: Props) {
                       return (
                         <td key={act.key} className="py-2 px-2 text-center">
                           {user.role === 'superadmin' ? (
-                            <span className="text-xs text-gray-400">Süper Admin</span>
+                            <span className="text-xs text-gray-400">{t('permissions.superadmin_note')}</span>
                           ) : (
                             <button
                               onClick={() => cycle(mod.key, act.key)}
                               className={`text-xs px-2 py-1 rounded-md font-medium transition-all ${cellClass(state, defaultAllow)}`}
-                              title="Tıkla: Varsayılan → Ver → Reddet"
+                              title={`${t('permissions.click_cycle_hint')} ${t('permissions.default_label')} → ${t('permissions.grant_label')} → ${t('permissions.deny_label')}`}
                             >
                               {cellLabel(state, defaultAllow)}
                             </button>
@@ -139,9 +140,9 @@ export default function PermissionMatrixModal({ user, onClose }: Props) {
         </div>
 
         <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-800">
-          {saved && <span className="text-sm text-green-600 dark:text-green-400">Kaydedildi!</span>}
+          {saved && <span className="text-sm text-green-600 dark:text-green-400">{t('permissions.saved')}</span>}
           <button onClick={onClose} className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800">
-            Kapat
+            {t('common.close')}
           </button>
           {user.role !== 'superadmin' && (
             <button
@@ -150,7 +151,7 @@ export default function PermissionMatrixModal({ user, onClose }: Props) {
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium disabled:opacity-50"
             >
               <Save className="h-4 w-4" />
-              {setPermissions.isPending ? 'Kaydediliyor...' : 'Kaydet'}
+              {setPermissions.isPending ? t('common.saving') : t('common.save')}
             </button>
           )}
         </div>
