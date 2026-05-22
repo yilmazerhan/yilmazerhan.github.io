@@ -99,6 +99,69 @@ async def _mark_log_failed(db, log_id: str, error: str):
     )
 
 
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=30)
+def send_activation_email_task(self, to_email: str, full_name: str, activation_token: str):
+    try:
+        _run_async(_send_auth_email_async(
+            to_email=to_email,
+            template_slug="account_activation",
+            variables={
+                "full_name": full_name,
+                "activation_url": _build_url(f"/activate/{activation_token}"),
+                "expires_in": _get_setting("ACCOUNT_ACTIVATION_TOKEN_EXPIRE_HOURS", 48),
+            },
+        ))
+    except Exception as exc:
+        raise self.retry(exc=exc)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=30)
+def send_password_reset_email_task(self, to_email: str, full_name: str, reset_token: str):
+    try:
+        _run_async(_send_auth_email_async(
+            to_email=to_email,
+            template_slug="password_reset",
+            variables={
+                "full_name": full_name,
+                "reset_url": _build_url(f"/reset-password?token={reset_token}"),
+                "expires_in": _get_setting("PASSWORD_RESET_TOKEN_EXPIRE_HOURS", 1),
+            },
+        ))
+    except Exception as exc:
+        raise self.retry(exc=exc)
+
+
+def _build_url(path: str) -> str:
+    from app.config import settings
+    return f"{settings.FRONTEND_URL.rstrip('/')}{path}"
+
+
+def _get_setting(attr: str, default):
+    from app.config import settings
+    return getattr(settings, attr, default)
+
+
+async def _send_auth_email_async(to_email: str, template_slug: str, variables: dict):
+    from app.database import AsyncSessionLocal
+    from app.services.email_service import EmailService
+
+    async with AsyncSessionLocal() as db:
+        svc = EmailService(db)
+        template = await svc.get_template_by_slug(template_slug)
+        if not template:
+            return
+        subject, html_body = svc.render_template(template, variables)
+        log = await svc.create_log_entry(
+            to_email=to_email,
+            subject=subject,
+            template_id=template.id,
+        )
+        await db.commit()
+
+    # Delegate actual SMTP delivery to the generic send task
+    send_email_task.delay(to_email=to_email, subject=subject, html_body=html_body, log_id=str(log.id))
+
+
 @celery_app.task(bind=True, max_retries=2)
 def send_teams_message_task(
     self,

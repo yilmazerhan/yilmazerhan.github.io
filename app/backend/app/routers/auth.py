@@ -44,7 +44,12 @@ async def register(
 ):
     svc = AuthService(db)
     user, activation_token = await svc.register(body.email, body.password, body.full_name, body.preferred_language)
-    # TODO: Enqueue activation email via Celery
+    from app.tasks.email_tasks import send_activation_email_task
+    send_activation_email_task.delay(
+        to_email=user.email,
+        full_name=user.full_name,
+        activation_token=activation_token,
+    )
     return {"message": "Kayıt başarılı. Email adresinize aktivasyon bağlantısı gönderildi."}
 
 
@@ -120,7 +125,12 @@ async def forgot_password(
     result = await svc.forgot_password(body.email)
     if result:
         user, raw_token = result
-        # TODO: Enqueue password reset email via Celery
+        from app.tasks.email_tasks import send_password_reset_email_task
+        send_password_reset_email_task.delay(
+            to_email=user.email,
+            full_name=user.full_name,
+            reset_token=raw_token,
+        )
 
     # Always return success message to prevent user enumeration
     return {"message": "Şifre sıfırlama bağlantısı email adresinize gönderildi (eğer kayıtlıysa)."}

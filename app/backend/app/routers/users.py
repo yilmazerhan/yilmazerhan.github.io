@@ -57,7 +57,12 @@ async def create_user(
         team_id=body.team_id,
         preferred_language=body.preferred_language,
     )
-    # TODO: enqueue activation email
+    from app.tasks.email_tasks import send_activation_email_task
+    send_activation_email_task.delay(
+        to_email=user.email,
+        full_name=user.full_name,
+        activation_token=activation_token,
+    )
     return user
 
 
@@ -143,5 +148,10 @@ async def resend_activation(
 ):
     svc = UserService(db)
     user, token = await svc.resend_activation(user_id)
-    # TODO: enqueue activation email
+    from app.tasks.email_tasks import send_activation_email_task
+    send_activation_email_task.delay(
+        to_email=user.email,
+        full_name=user.full_name,
+        activation_token=token,
+    )
     return {"message": "Aktivasyon emaili yeniden gönderildi."}
