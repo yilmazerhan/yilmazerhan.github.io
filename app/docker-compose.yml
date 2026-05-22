@@ -106,17 +106,22 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ssl_certs:/etc/nginx/ssl
     depends_on:
-      - frontend
-      - backend
+      ssl_init:
+        condition: service_completed_successfully
+      frontend:
+        condition: service_started
+      backend:
+        condition: service_started
     networks:
       - web
 
   ssl_init:
     image: alpine/openssl:latest
+    entrypoint: ["sh"]
     volumes:
       - ssl_certs:/ssl
       - ./nginx/init-ssl.sh:/init-ssl.sh:ro
-    command: sh /init-ssl.sh
+    command: ["/init-ssl.sh"]
     restart: "no"
 
 volumes:
