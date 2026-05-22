@@ -1,23 +1,23 @@
 # ─── Development stage ───────────────────────────────────────────────────────
 FROM node:22-alpine AS development
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /workspace
-COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* ./
-RUN pnpm install --frozen-lockfile 2>/dev/null || pnpm install --no-frozen-lockfile
+COPY package.json ./
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+RUN npm install
 
 ENV NODE_ENV=development
-CMD ["pnpm", "dev", "--host", "0.0.0.0"]
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
 # ─── Build stage ─────────────────────────────────────────────────────────────
 FROM node:22-alpine AS build
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /app
-COPY package.json pnpm-lock.yaml* pnpm-workspace.yaml* ./
-RUN pnpm install --frozen-lockfile 2>/dev/null || pnpm install --no-frozen-lockfile
+COPY package.json ./
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+RUN npm install
 COPY . .
-RUN pnpm build
+RUN npm run build
 
 # ─── Production stage ────────────────────────────────────────────────────────
 FROM nginx:1.25-alpine AS production
