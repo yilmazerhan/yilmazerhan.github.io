@@ -1,0 +1,95 @@
+{
+  "app": {
+    "name": "Team Management",
+    "loading": "Loading..."
+  },
+  "auth": {
+    "login": "Sign In",
+    "logout": "Sign Out",
+    "register": "Register",
+    "email": "Email",
+    "password": "Password",
+    "full_name": "Full Name",
+    "forgot_password": "Forgot Password",
+    "reset_password": "Reset Password",
+    "new_password": "New Password",
+    "login_success": "Successfully signed in.",
+    "logout_success": "Successfully signed out."
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "worklog": "Work Log",
+    "kanban": "Task Board",
+    "users": "Users",
+    "teams": "Teams",
+    "permissions": "Permissions",
+    "settings": "Settings",
+    "email": "Email",
+    "reports": "Reports"
+  },
+  "worklog": {
+    "title": "Work Log",
+    "add": "Add Entry",
+    "edit": "Edit",
+    "delete": "Delete",
+    "date": "Date",
+    "work_type": "Work Type",
+    "duration": "Duration (Hours)",
+    "description": "Description",
+    "save": "Save",
+    "cancel": "Cancel",
+    "old_record_warning": "Records older than 3 days can only be edited by a manager."
+  },
+  "kanban": {
+    "title": "Task Board",
+    "add_task": "Add Task",
+    "task_title": "Task Title",
+    "description": "Description",
+    "assignee": "Assignee",
+    "due_date": "Due Date",
+    "priority": "Priority",
+    "jira_ticket": "Jira Ticket",
+    "jira_status": "Jira Status",
+    "priority_low": "Low",
+    "priority_medium": "Medium",
+    "priority_high": "High",
+    "priority_critical": "Critical"
+  },
+  "users": {
+    "title": "Users",
+    "invite": "Invite User",
+    "role": "Role",
+    "team": "Team",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "role_superadmin": "Super Admin",
+    "role_team_manager": "Team Manager",
+    "role_user": "User"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "search": "Search...",
+    "loading": "Loading...",
+    "error": "An error occurred.",
+    "success": "Operation successful.",
+    "confirm_delete": "Are you sure you want to delete?",
+    "yes": "Yes",
+    "no": "No",
+    "close": "Close",
+    "actions": "Actions"
+  },
+  "theme": {
+    "light": "Light Mode",
+    "dark": "Dark Mode",
+    "toggle": "Toggle Theme"
+  },
+  "language": {
+    "tr": "Turkish",
+    "en": "English"
+  }
+}

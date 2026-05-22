@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Dynamic primary color via CSS variables (set from branding API) */
+:root {
+  --color-primary: #3b82f6;
+  --color-primary-50: #eff6ff;
+  --color-primary-100: #dbeafe;
+  --color-primary-600: #2563eb;
+  --color-primary-700: #1d4ed8;
+}
+
+/* Dark mode overrides */
+.dark {
+  --color-primary: #60a5fa;
+  --color-primary-50: #1e3a5f;
+  --color-primary-100: #1e40af;
+  --color-primary-600: #93c5fd;
+  --color-primary-700: #bfdbfe;
+}
+
+@layer base {
+  body {
+    @apply bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100;
+    font-family: system-ui, -apple-system, sans-serif;
+  }
+}

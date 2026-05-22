@@ -1,0 +1,95 @@
+{
+  "app": {
+    "name": "Ekip Yönetimi",
+    "loading": "Yükleniyor..."
+  },
+  "auth": {
+    "login": "Giriş Yap",
+    "logout": "Çıkış Yap",
+    "register": "Kayıt Ol",
+    "email": "E-posta",
+    "password": "Şifre",
+    "full_name": "Ad Soyad",
+    "forgot_password": "Şifremi Unuttum",
+    "reset_password": "Şifremi Sıfırla",
+    "new_password": "Yeni Şifre",
+    "login_success": "Başarıyla giriş yapıldı.",
+    "logout_success": "Başarıyla çıkış yapıldı."
+  },
+  "nav": {
+    "dashboard": "Gösterge Paneli",
+    "worklog": "İş Günlüğü",
+    "kanban": "Görev Panosu",
+    "users": "Kullanıcılar",
+    "teams": "Takımlar",
+    "permissions": "Yetkiler",
+    "settings": "Ayarlar",
+    "email": "E-posta",
+    "reports": "Raporlar"
+  },
+  "worklog": {
+    "title": "İş Günlüğü",
+    "add": "Kayıt Ekle",
+    "edit": "Düzenle",
+    "delete": "Sil",
+    "date": "Tarih",
+    "work_type": "İş Tipi",
+    "duration": "Süre (Saat)",
+    "description": "Açıklama",
+    "save": "Kaydet",
+    "cancel": "İptal",
+    "old_record_warning": "3 günden eski kayıtlar yalnızca yönetici düzenleyebilir."
+  },
+  "kanban": {
+    "title": "Görev Panosu",
+    "add_task": "Görev Ekle",
+    "task_title": "Görev Başlığı",
+    "description": "Açıklama",
+    "assignee": "Atanan",
+    "due_date": "Bitiş Tarihi",
+    "priority": "Öncelik",
+    "jira_ticket": "Jira Ticket",
+    "jira_status": "Jira Durumu",
+    "priority_low": "Düşük",
+    "priority_medium": "Orta",
+    "priority_high": "Yüksek",
+    "priority_critical": "Kritik"
+  },
+  "users": {
+    "title": "Kullanıcılar",
+    "invite": "Kullanıcı Davet Et",
+    "role": "Rol",
+    "team": "Takım",
+    "status": "Durum",
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "role_superadmin": "Süper Admin",
+    "role_team_manager": "Takım Yöneticisi",
+    "role_user": "Kullanıcı"
+  },
+  "common": {
+    "save": "Kaydet",
+    "cancel": "İptal",
+    "delete": "Sil",
+    "edit": "Düzenle",
+    "add": "Ekle",
+    "search": "Ara...",
+    "loading": "Yükleniyor...",
+    "error": "Bir hata oluştu.",
+    "success": "İşlem başarılı.",
+    "confirm_delete": "Silmek istediğinizden emin misiniz?",
+    "yes": "Evet",
+    "no": "Hayır",
+    "close": "Kapat",
+    "actions": "İşlemler"
+  },
+  "theme": {
+    "light": "Aydınlık Mod",
+    "dark": "Karanlık Mod",
+    "toggle": "Tema Değiştir"
+  },
+  "language": {
+    "tr": "Türkçe",
+    "en": "İngilizce"
+  }
+}

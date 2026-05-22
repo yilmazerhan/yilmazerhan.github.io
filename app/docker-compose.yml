@@ -1,0 +1,149 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-teamapp}
+      POSTGRES_USER: ${POSTGRES_USER:-teamapp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-teamapp}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
+  migration:
+    build:
+      context: ./backend
+      target: production
+    command: alembic upgrade head
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-teamapp}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-teamapp}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - internal
+
+  backend:
+    build:
+      context: ./backend
+      target: production
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-teamapp}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-teamapp}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migration:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-fk", "https://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - internal
+      - web
+
+  celery_worker:
+    build:
+      context: ./backend
+      target: production
+    restart: unless-stopped
+    command: celery -A app.tasks.celery_app worker --loglevel=info --concurrency=4
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-teamapp}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-teamapp}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+
+  celery_beat:
+    build:
+      context: ./backend
+      target: production
+    restart: unless-stopped
+    command: celery -A app.tasks.celery_app beat --loglevel=info
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-teamapp}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-teamapp}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+
+  frontend:
+    build:
+      context: ./frontend
+      target: production
+    restart: unless-stopped
+    networks:
+      - web
+
+  nginx:
+    image: nginx:1.25-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ssl_certs:/etc/nginx/ssl
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - web
+
+  ssl_init:
+    image: alpine/openssl:latest
+    volumes:
+      - ssl_certs:/ssl
+      - ./nginx/init-ssl.sh:/init-ssl.sh:ro
+    command: sh /init-ssl.sh
+    restart: "no"
+
+volumes:
+  postgres_data:
+  redis_data:
+  ssl_certs:
+
+networks:
+  internal:
+    driver: bridge
+  web:
+    driver: bridge

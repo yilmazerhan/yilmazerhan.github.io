@@ -1,0 +1,82 @@
+import { NavLink } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import { useQuery } from '@tanstack/react-query'
+import axios from 'axios'
+import { useAuthStore } from '@/store/authStore'
+import {
+  LayoutDashboard, ClipboardList, Kanban, Users, Users2,
+  ShieldCheck, Mail, Settings
+} from 'lucide-react'
+
+interface SidebarProps {
+  open: boolean
+}
+
+interface NavItem {
+  to: string
+  icon: React.ComponentType<{ className?: string }>
+  labelKey: string
+  requiredRole?: string[]
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { to: '/', icon: LayoutDashboard, labelKey: 'nav.dashboard' },
+  { to: '/worklog', icon: ClipboardList, labelKey: 'nav.worklog' },
+  { to: '/kanban', icon: Kanban, labelKey: 'nav.kanban' },
+  { to: '/users', icon: Users, labelKey: 'nav.users', requiredRole: ['superadmin'] },
+  { to: '/teams', icon: Users2, labelKey: 'nav.teams', requiredRole: ['superadmin'] },
+  { to: '/permissions', icon: ShieldCheck, labelKey: 'nav.permissions', requiredRole: ['superadmin'] },
+  { to: '/settings/email/workflows', icon: Mail, labelKey: 'nav.email', requiredRole: ['superadmin'] },
+  { to: '/settings', icon: Settings, labelKey: 'nav.settings', requiredRole: ['superadmin'] },
+]
+
+export default function Sidebar({ open }: SidebarProps) {
+  const { t } = useTranslation()
+  const user = useAuthStore((s) => s.user)
+
+  const { data: branding } = useQuery({
+    queryKey: ['branding'],
+    queryFn: () => axios.get('/api/v1/public/branding').then((r) => r.data),
+    staleTime: Infinity,
+  })
+
+  if (!open) return null
+
+  return (
+    <aside className="w-64 flex-shrink-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col">
+      {/* Logo / Company name */}
+      <div className="h-16 flex items-center gap-3 px-4 border-b border-gray-200 dark:border-gray-800">
+        {branding?.company_logo && (
+          <img src={branding.company_logo} alt="Logo" className="h-8 w-8 object-contain" />
+        )}
+        <span className="font-semibold text-gray-900 dark:text-white truncate">
+          {branding?.company_name || t('app.name')}
+        </span>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1">
+        {NAV_ITEMS.map(({ to, icon: Icon, labelKey, requiredRole }) => {
+          if (requiredRole && user && !requiredRole.includes(user.role)) return null
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/'}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  isActive
+                    ? 'bg-primary-50 dark:bg-primary-100 text-primary-700 dark:text-primary-600'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                }`
+              }
+            >
+              <Icon className="h-5 w-5 flex-shrink-0" />
+              <span>{t(labelKey)}</span>
+            </NavLink>
+          )
+        })}
+      </nav>
+    </aside>
+  )
+}
