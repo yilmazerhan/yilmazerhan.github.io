@@ -5,6 +5,7 @@ from app.models.user import User
 from app.models.worklog import WorkType
 from app.models.kanban import KanbanColumn
 from app.models.app_setting import AppSetting
+from app.models.email_template import EmailTemplate
 from app.core.security import hash_password
 from app.config import settings
 
@@ -41,6 +42,7 @@ async def seed_initial_data(db: AsyncSession) -> None:
     await _seed_work_types(db)
     await _seed_kanban_columns(db)
     await _seed_app_settings(db)
+    await _seed_email_templates(db)
     await db.commit()
 
 
@@ -85,3 +87,75 @@ async def _seed_app_settings(db: AsyncSession) -> None:
         result = await db.execute(select(AppSetting).where(AppSetting.key == key))
         if not result.scalar_one_or_none():
             db.add(AppSetting(key=key, value=value))
+
+
+SYSTEM_EMAIL_TEMPLATES = [
+    {
+        "name": "Hesap Aktivasyonu",
+        "slug": "account_activation",
+        "subject": "Hesabınızı Aktive Edin",
+        "html_body": """<h2>Merhaba {{ full_name }},</h2>
+<p>Hesabınız oluşturuldu. Aşağıdaki bağlantıya tıklayarak hesabınızı aktive edin:</p>
+<p><a href="{{ activation_url }}" style="background:#3b82f6;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Hesabı Aktive Et</a></p>
+<p>Bu bağlantı {{ expires_in }} saat geçerlidir.</p>""",
+        "available_vars": {"full_name": "Kullanıcı adı", "activation_url": "Aktivasyon URL", "expires_in": "Süre (saat)"},
+        "is_system": True,
+    },
+    {
+        "name": "Şifre Sıfırlama",
+        "slug": "password_reset",
+        "subject": "Şifrenizi Sıfırlayın",
+        "html_body": """<h2>Merhaba {{ full_name }},</h2>
+<p>Şifrenizi sıfırlamak için aşağıdaki bağlantıya tıklayın:</p>
+<p><a href="{{ reset_url }}" style="background:#3b82f6;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Şifremi Sıfırla</a></p>
+<p>Bu bağlantı {{ expires_in }} saat geçerlidir. Bu isteği siz yapmadıysanız bu e-postayı görmezden gelin.</p>""",
+        "available_vars": {"full_name": "Kullanıcı adı", "reset_url": "Sıfırlama URL", "expires_in": "Süre (saat)"},
+        "is_system": True,
+    },
+    {
+        "name": "Görev Yaklaşan Bitiş",
+        "slug": "task_due_soon",
+        "subject": "Görev Bitiş Tarihi Yaklaşıyor: {{ task_title }}",
+        "html_body": """<h2>Merhaba {{ assignee_name }},</h2>
+<p><strong>{{ task_title }}</strong> görevi <strong>{{ due_date }}</strong> tarihinde bitiyor.</p>
+<p>Öncelik: {{ priority }}</p>""",
+        "available_vars": {"task_title": "Görev başlığı", "due_date": "Bitiş tarihi", "assignee_name": "Atanan adı", "priority": "Öncelik"},
+        "is_system": False,
+    },
+    {
+        "name": "Görev Gecikti",
+        "slug": "task_overdue",
+        "subject": "Gecikmiş Görev: {{ task_title }}",
+        "html_body": """<h2>Merhaba {{ assignee_name }},</h2>
+<p><strong>{{ task_title }}</strong> görevi <strong>{{ due_date }}</strong> tarihinde bitmesi gerekiyordu ancak henüz tamamlanmadı.</p>""",
+        "available_vars": {"task_title": "Görev başlığı", "due_date": "Bitiş tarihi", "assignee_name": "Atanan adı"},
+        "is_system": False,
+    },
+    {
+        "name": "İş Günlüğü Hatırlatıcı",
+        "slug": "worklog_reminder",
+        "subject": "Bugünkü İş Günlüğünüzü Girmeyi Unutmayın",
+        "html_body": """<h2>Merhaba {{ user_name }},</h2>
+<p>{{ date }} tarihli iş günlüğünüzü henüz girmediniz. Lütfen bugün yaptığınız çalışmaları kaydedin.</p>""",
+        "available_vars": {"user_name": "Kullanıcı adı", "date": "Tarih"},
+        "is_system": False,
+    },
+    {
+        "name": "Görev Atandı",
+        "slug": "task_assigned",
+        "subject": "Size Yeni Bir Görev Atandı: {{ task_title }}",
+        "html_body": """<h2>Merhaba {{ assignee_name }},</h2>
+<p>Size <strong>{{ task_title }}</strong> görevi atandı.</p>
+{% if due_date %}<p>Bitiş Tarihi: {{ due_date }}</p>{% endif %}
+<p>Öncelik: {{ priority }}</p>""",
+        "available_vars": {"task_title": "Görev başlığı", "assignee_name": "Atanan adı", "due_date": "Bitiş tarihi (isteğe bağlı)", "priority": "Öncelik"},
+        "is_system": False,
+    },
+]
+
+
+async def _seed_email_templates(db: AsyncSession) -> None:
+    for tmpl_data in SYSTEM_EMAIL_TEMPLATES:
+        result = await db.execute(select(EmailTemplate).where(EmailTemplate.slug == tmpl_data["slug"]))
+        if not result.scalar_one_or_none():
+            db.add(EmailTemplate(**tmpl_data))
