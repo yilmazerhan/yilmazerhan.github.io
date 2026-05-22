@@ -35,7 +35,7 @@ def upgrade() -> None:
         sa.Column('role', sa.Enum('superadmin', 'team_manager', 'user', name='user_role'), nullable=False, server_default='user'),
         sa.Column('team_id', postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column('preferred_language', sa.String(10), nullable=False, server_default='tr'),
-        sa.Column('preferred_theme', sa.Enum('light', 'dark', name='theme_type'), nullable=False, server_default='light'),
+        sa.Column('preferred_theme', sa.Enum('light', 'dark', name='theme_preference'), nullable=False, server_default='light'),
         sa.Column('is_active', sa.Boolean, nullable=False, server_default='false'),
         sa.Column('is_deleted', sa.Boolean, nullable=False, server_default='false'),
         sa.Column('last_login_at', sa.DateTime(timezone=True), nullable=True),
@@ -52,8 +52,9 @@ def upgrade() -> None:
     op.create_table('refresh_tokens',
         sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column('token_hash', sa.String(64), nullable=False, unique=True, index=True),
+        sa.Column('token_hash', sa.String(255), nullable=False, unique=True, index=True),
         sa.Column('expires_at', sa.DateTime(timezone=True), nullable=False),
+        sa.Column('revoked', sa.Boolean, nullable=False, server_default='false'),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
         sa.PrimaryKeyConstraint('id'),
         sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
@@ -62,10 +63,9 @@ def upgrade() -> None:
     op.create_table('password_reset_tokens',
         sa.Column('id', postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column('token_hash', sa.String(64), nullable=False, unique=True, index=True),
-        sa.Column('token_type', sa.Enum('activation', 'password_reset', name='token_type'), nullable=False, server_default='password_reset'),
+        sa.Column('token_hash', sa.String(255), nullable=False, unique=True, index=True),
         sa.Column('expires_at', sa.DateTime(timezone=True), nullable=False),
-        sa.Column('is_used', sa.Boolean, nullable=False, server_default='false'),
+        sa.Column('used', sa.Boolean, nullable=False, server_default='false'),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
         sa.PrimaryKeyConstraint('id'),
         sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
@@ -80,7 +80,7 @@ def upgrade() -> None:
         sa.Column('created_by', postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
         sa.PrimaryKeyConstraint('id'),
-        sa.UniqueConstraint('user_id', 'module', 'action', name='uq_permission_override'),
+        sa.UniqueConstraint('user_id', 'module', 'action', name='uq_permission_user_module_action'),
         sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
         sa.ForeignKeyConstraint(['created_by'], ['users.id'], ondelete='SET NULL'),
     )
@@ -275,10 +275,10 @@ def upgrade() -> None:
         sa.Column('user_id', postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column('action', sa.Enum('create', 'update', 'delete', name='audit_action'), nullable=False),
         sa.Column('table_name', sa.String(100), nullable=False),
-        sa.Column('record_id', postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column('record_id', sa.String(100), nullable=False),
         sa.Column('old_data', postgresql.JSONB, nullable=True),
         sa.Column('new_data', postgresql.JSONB, nullable=True),
-        sa.Column('ip_address', postgresql.INET, nullable=True),
+        sa.Column('ip_address', sa.String(45), nullable=True),
         sa.Column('user_agent', sa.Text, nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
         sa.PrimaryKeyConstraint('id'),
@@ -308,7 +308,6 @@ def downgrade() -> None:
     op.drop_constraint('fk_teams_manager_id', 'teams', type_='foreignkey')
     op.drop_table('users')
     op.drop_table('teams')
-    # Drop enums
-    for enum_name in ['user_role', 'theme_type', 'token_type', 'permission_module', 'permission_action',
+    for enum_name in ['user_role', 'theme_preference', 'permission_module', 'permission_action',
                       'task_priority', 'email_trigger_type', 'recipient_type', 'email_status', 'audit_action']:
         sa.Enum(name=enum_name).drop(op.get_bind(), checkfirst=True)
