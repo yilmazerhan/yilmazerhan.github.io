@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Pencil, Trash2, CheckCircle, XCircle, Loader2, ExternalLink } from 'lucide-react'
+import { Plus, Pencil, Trash2, CheckCircle, XCircle, Loader2, ShieldCheck, Upload, Building2 } from 'lucide-react'
 import {
   useJiraConfigs,
   useCreateJiraConfig,
@@ -9,10 +9,71 @@ import {
   useTestJiraConnection,
   type JiraConfig,
 } from '@/api/jira'
+import {
+  useSslCertificates,
+  useUploadPem,
+  useUploadJks,
+  useActivateCertificate,
+  useDeleteCertificate,
+  useBranding,
+  useUpdateBranding,
+  useUploadLogo,
+} from '@/api/admin'
+import { format } from 'date-fns'
+import { tr } from 'date-fns/locale'
 
 export default function SettingsPage() {
   const { t } = useTranslation()
   const { data: configs = [], isLoading } = useJiraConfigs()
+  const { data: sslCerts = [] } = useSslCertificates()
+  const { data: branding } = useBranding()
+  const activateCert = useActivateCertificate()
+  const deleteCert = useDeleteCertificate()
+  const uploadPem = useUploadPem()
+  const uploadJks = useUploadJks()
+  const updateBranding = useUpdateBranding()
+  const uploadLogo = useUploadLogo()
+  const logoInputRef = useRef<HTMLInputElement>(null)
+
+  const [sslUploadType, setSslUploadType] = useState<'pem' | 'jks'>('pem')
+  const [sslName, setSslName] = useState('')
+  const [certFile, setCertFile] = useState<File | null>(null)
+  const [keyFile, setKeyFile] = useState<File | null>(null)
+  const [jksFile, setJksFile] = useState<File | null>(null)
+  const [jksPassword, setJksPassword] = useState('')
+  const [sslError, setSslError] = useState('')
+
+  const [companyName, setCompanyName] = useState(branding?.company_name ?? '')
+  const [primaryColor, setPrimaryColor] = useState(branding?.primary_color ?? '#3b82f6')
+  const [brandingError, setBrandingError] = useState('')
+
+  async function handleSslUpload(e: React.FormEvent) {
+    e.preventDefault(); setSslError('')
+    try {
+      if (sslUploadType === 'pem') {
+        if (!certFile || !keyFile) { setSslError('Sertifika ve anahtar dosyaları gereklidir.'); return }
+        await uploadPem.mutateAsync({ name: sslName, certFile, keyFile })
+      } else {
+        if (!jksFile) { setSslError('JKS dosyası gereklidir.'); return }
+        await uploadJks.mutateAsync({ name: sslName, jksFile, password: jksPassword })
+      }
+      setSslName(''); setCertFile(null); setKeyFile(null); setJksFile(null); setJksPassword('')
+    } catch (err: any) { setSslError(err.response?.data?.detail || 'Yükleme başarısız.') }
+  }
+
+  async function handleBrandingSave(e: React.FormEvent) {
+    e.preventDefault(); setBrandingError('')
+    try {
+      await updateBranding.mutateAsync({ company_name: companyName, primary_color: primaryColor })
+    } catch (err: any) { setBrandingError(err.response?.data?.detail || 'Kayıt başarısız.') }
+  }
+
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try { await uploadLogo.mutateAsync(file) }
+    catch (err: any) { alert(err.response?.data?.detail || 'Logo yüklenemedi.') }
+  }
   const createConfig = useCreateJiraConfig()
   const updateConfig = useUpdateJiraConfig()
   const deleteConfig = useDeleteJiraConfig()
@@ -170,6 +231,148 @@ export default function SettingsPage() {
             ))}
           </div>
         )}
+      </section>
+
+      {/* ─── Branding ──────────────────────────────────────────────── */}
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <Building2 className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Kurumsal Kimlik</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Şirket adı, logosu ve ana rengini yönetin.</p>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 space-y-4">
+          {/* Logo */}
+          <div className="flex items-center gap-4">
+            {branding?.company_logo ? (
+              <img src={branding.company_logo} alt="Logo" className="h-12 w-12 object-contain rounded" />
+            ) : (
+              <div className="h-12 w-12 rounded bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400 text-xs">Logo</div>
+            )}
+            <div>
+              <input ref={logoInputRef} type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+              <button onClick={() => logoInputRef.current?.click()} disabled={uploadLogo.isPending} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50">
+                <Upload className="h-3.5 w-3.5" />
+                {uploadLogo.isPending ? 'Yükleniyor...' : 'Logo Yükle'}
+              </button>
+              <p className="text-xs text-gray-400 mt-0.5">PNG, JPEG veya SVG — maks 1MB</p>
+            </div>
+          </div>
+          <form onSubmit={handleBrandingSave} className="space-y-3">
+            {brandingError && <p className="text-sm text-red-600 bg-red-50 dark:bg-red-900/20 p-2 rounded">{brandingError}</p>}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Şirket Adı</label>
+                <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Şirketim A.Ş." className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ana Renk</label>
+                <div className="flex items-center gap-2">
+                  <input type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="h-9 w-14 rounded border border-gray-300 dark:border-gray-700 cursor-pointer" />
+                  <input value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-mono text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <button type="submit" disabled={updateBranding.isPending} className="px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium disabled:opacity-50">
+                {updateBranding.isPending ? 'Kaydediliyor...' : 'Kaydet'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      {/* ─── SSL ───────────────────────────────────────────────────── */}
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <ShieldCheck className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">SSL Sertifikaları</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">PEM veya JKS sertifikası yükleyin ve aktive edin.</p>
+          </div>
+        </div>
+
+        {/* Certificate list */}
+        {sslCerts.length > 0 && (
+          <div className="space-y-2 mb-4">
+            {sslCerts.map((cert) => {
+              const expiresAt = new Date(cert.expires_at)
+              const daysLeft = Math.floor((expiresAt.getTime() - Date.now()) / 86400000)
+              return (
+                <div key={cert.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 flex items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-gray-900 dark:text-white">{cert.name}</span>
+                      {cert.is_active && <span className="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 font-medium">Aktif</span>}
+                    </div>
+                    <p className={`text-xs mt-0.5 ${daysLeft < 30 ? 'text-red-500' : 'text-gray-500 dark:text-gray-400'}`}>
+                      Son kullanma: {format(expiresAt, 'dd MMM yyyy', { locale: tr })} ({daysLeft > 0 ? `${daysLeft} gün kaldı` : 'Süresi doldu'})
+                    </p>
+                  </div>
+                  <div className="flex gap-1">
+                    {!cert.is_active && (
+                      <button onClick={() => activateCert.mutate(cert.id)} className="px-2.5 py-1.5 rounded text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-200 dark:border-gray-700">Aktive Et</button>
+                    )}
+                    {!cert.is_active && (
+                      <button onClick={() => { if (confirm('Sertifikayı silmek istediğinizden emin misiniz?')) deleteCert.mutate(cert.id) }} className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Upload form */}
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Yeni Sertifika Yükle</h3>
+          <div className="flex gap-2 mb-3">
+            {(['pem', 'jks'] as const).map((type) => (
+              <button key={type} type="button" onClick={() => setSslUploadType(type)} className={`px-3 py-1.5 rounded-lg text-sm font-medium border ${sslUploadType === type ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300' : 'border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300'}`}>
+                {type.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          <form onSubmit={handleSslUpload} className="space-y-3">
+            {sslError && <p className="text-sm text-red-600 bg-red-50 dark:bg-red-900/20 p-2 rounded">{sslError}</p>}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ad *</label>
+              <input value={sslName} onChange={(e) => setSslName(e.target.value)} required placeholder="Alan Adı Sertifikası 2025" className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+            </div>
+            {sslUploadType === 'pem' ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sertifika (.crt/.pem)</label>
+                  <input type="file" accept=".crt,.pem,.cer" onChange={(e) => setCertFile(e.target.files?.[0] ?? null)} className="w-full text-sm text-gray-600 dark:text-gray-300" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Özel Anahtar (.key)</label>
+                  <input type="file" accept=".key,.pem" onChange={(e) => setKeyFile(e.target.files?.[0] ?? null)} className="w-full text-sm text-gray-600 dark:text-gray-300" />
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">JKS Dosyası</label>
+                  <input type="file" accept=".jks,.p12,.pfx" onChange={(e) => setJksFile(e.target.files?.[0] ?? null)} className="w-full text-sm text-gray-600 dark:text-gray-300" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Şifre</label>
+                  <input type="password" value={jksPassword} onChange={(e) => setJksPassword(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                </div>
+              </div>
+            )}
+            <div className="flex justify-end">
+              <button type="submit" disabled={uploadPem.isPending || uploadJks.isPending} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium disabled:opacity-50">
+                <Upload className="h-4 w-4" />
+                {uploadPem.isPending || uploadJks.isPending ? 'Yükleniyor...' : 'Yükle'}
+              </button>
+            </div>
+          </form>
+        </div>
       </section>
 
       {/* Jira Config Form Modal */}
