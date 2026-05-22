@@ -6,7 +6,7 @@ from slowapi.errors import RateLimitExceeded
 from app.config import settings
 from app.core.middleware import SecurityHeadersMiddleware
 from app.core.rate_limit import limiter, rate_limit_exceeded_handler
-from app.routers import auth
+from app.routers import auth, users, teams, permissions
 
 
 @asynccontextmanager
@@ -48,6 +48,9 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 # ─── Routers ──────────────────────────────────────────────────────────────
 app.include_router(auth.router, prefix="/api/v1")
+app.include_router(users.router, prefix="/api/v1")
+app.include_router(teams.router, prefix="/api/v1")
+app.include_router(permissions.router, prefix="/api/v1")
 
 
 # ─── Health check ─────────────────────────────────────────────────────────
