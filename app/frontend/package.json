@@ -68,6 +68,6 @@
     "vite": "^6.0.7",
     "vitest": "^2.1.8",
     "@playwright/test": "^1.49.1",
-    "@hey-api/openapi-ts": "^0.56.4"
+    "@hey-api/openapi-ts": "^0.97.2"
   }
 }
