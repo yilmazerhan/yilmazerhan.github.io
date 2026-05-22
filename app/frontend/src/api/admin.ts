@@ -161,11 +161,12 @@ export function useAuditLogs(params: {
   })
 }
 
-export function useDashboardStats() {
+export function useDashboardStats(opts?: { enabled?: boolean }) {
   return useQuery({
     queryKey: adminKeys.dashboardStats,
     queryFn: () =>
       apiClient.get<DashboardStats>('/admin/stats/dashboard').then((r) => r.data),
     staleTime: 60_000,
+    enabled: opts?.enabled ?? true,
   })
 }

@@ -39,7 +39,13 @@
     "overdue_section": "Overdue Tasks",
     "no_overdue": "No overdue tasks 🎉",
     "recent_logs": "Recent Work Logs (7 days)",
-    "no_logs": "No logs this week."
+    "no_logs": "No logs this week.",
+    "db_stats": "Database Statistics",
+    "db_users": "Users (active / total)",
+    "db_tasks": "Tasks (active / total)",
+    "db_worklogs": "Work Logs (7 days)",
+    "db_emails": "Emails Sent (today)",
+    "db_email_failed": "failed"
   },
   "worklog": {
     "title": "Work Log",
@@ -221,6 +227,7 @@
     "yes": "Yes",
     "no": "No",
     "close": "Close",
+    "back": "Back",
     "actions": "Actions",
     "all": "All",
     "active": "Active",
@@ -234,6 +241,28 @@
     "adding": "Adding...",
     "clear_filters": "Clear Filters",
     "required": "is required"
+  },
+  "email": {
+    "templates_title": "Email Templates",
+    "add_template": "Add Template",
+    "new_template": "New Template",
+    "edit_template": "Edit Template",
+    "system_badge": "System",
+    "name_label": "Name",
+    "slug_label": "Slug",
+    "subject_label": "Subject",
+    "subject_placeholder": "Task: {{ task_title }}",
+    "name_placeholder": "Template Name",
+    "html_body_label": "HTML Body",
+    "preview": "Preview",
+    "preview_panel": "Preview",
+    "preview_hint": "Click the 'Preview' button above to render.",
+    "preview_save_first": "Save first, then preview.",
+    "variables_label": "Variables",
+    "confirm_delete": "Are you sure you want to delete this template?",
+    "delete_failed": "Failed to delete.",
+    "name_required": "Name is required.",
+    "slug_required": "Slug is required."
   },
   "theme": {
     "light": "Light Mode",

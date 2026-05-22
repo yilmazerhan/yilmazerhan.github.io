@@ -39,7 +39,13 @@
     "overdue_section": "Gecikmiş Görevler",
     "no_overdue": "Gecikmiş görev yok 🎉",
     "recent_logs": "Son İş Günlüğü Kayıtları (7 gün)",
-    "no_logs": "Bu hafta kayıt yok."
+    "no_logs": "Bu hafta kayıt yok.",
+    "db_stats": "Veritabanı İstatistikleri",
+    "db_users": "Kullanıcılar (aktif / toplam)",
+    "db_tasks": "Görevler (aktif / toplam)",
+    "db_worklogs": "İş Günlüğü (7 gün)",
+    "db_emails": "E-posta Gönderildi (bugün)",
+    "db_email_failed": "başarısız"
   },
   "worklog": {
     "title": "İş Günlüğü",
@@ -221,6 +227,7 @@
     "yes": "Evet",
     "no": "Hayır",
     "close": "Kapat",
+    "back": "Geri",
     "actions": "İşlemler",
     "all": "Tümü",
     "active": "Aktif",
@@ -234,6 +241,28 @@
     "adding": "Ekleniyor...",
     "clear_filters": "Filtreleri Temizle",
     "required": "zorunludur"
+  },
+  "email": {
+    "templates_title": "E-posta Şablonları",
+    "add_template": "Şablon Ekle",
+    "new_template": "Yeni Şablon",
+    "edit_template": "Şablonu Düzenle",
+    "system_badge": "Sistem",
+    "name_label": "Ad",
+    "slug_label": "Slug",
+    "subject_label": "Konu",
+    "subject_placeholder": "Görev: {{ task_title }}",
+    "name_placeholder": "Şablon Adı",
+    "html_body_label": "HTML Gövde",
+    "preview": "Önizle",
+    "preview_panel": "Önizleme",
+    "preview_hint": "Önizlemek için yukarıdaki 'Önizle' butonuna tıklayın.",
+    "preview_save_first": "Önce kaydedin, sonra önizleyebilirsiniz.",
+    "variables_label": "Değişkenler",
+    "confirm_delete": "Bu şablonu silmek istediğinizden emin misiniz?",
+    "delete_failed": "Silinemedi.",
+    "name_required": "Ad zorunludur.",
+    "slug_required": "Slug zorunludur."
   },
   "theme": {
     "light": "Aydınlık Mod",

@@ -2,10 +2,11 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format, subDays, isToday, isPast, parseISO } from 'date-fns'
 import { tr, enUS } from 'date-fns/locale'
-import { Clock, AlertTriangle, CheckCircle2, ListTodo, TrendingUp } from 'lucide-react'
+import { Clock, AlertTriangle, CheckCircle2, ListTodo, TrendingUp, Users, Database, Mail } from 'lucide-react'
 import { useTasks } from '@/api/kanban'
 import { useWorkLogs } from '@/api/worklog'
 import { useAuthStore } from '@/store/authStore'
+import { useDashboardStats } from '@/api/admin'
 
 export default function DashboardPage() {
   const { t, i18n } = useTranslation()
@@ -13,9 +14,11 @@ export default function DashboardPage() {
   const locale = i18n.language === 'tr' ? tr : enUS
   const today = format(new Date(), 'yyyy-MM-dd')
   const weekAgo = format(subDays(new Date(), 7), 'yyyy-MM-dd')
+  const isSuperAdmin = user?.role === 'superadmin'
 
   const { data: tasksData } = useTasks({ limit: 500 })
   const { data: logsData } = useWorkLogs({ date_from: weekAgo, date_to: today })
+  const { data: dbStats } = useDashboardStats({ enabled: isSuperAdmin })
 
   const stats = useMemo(() => {
     const tasks = tasksData?.items ?? []
@@ -74,6 +77,58 @@ export default function DashboardPage() {
           </div>
         ))}
       </div>
+
+      {isSuperAdmin && dbStats && (
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+          <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
+            <Database className="h-4 w-4 text-gray-400" />
+            {t('dashboard.db_stats')}
+          </h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20">
+                <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <p className="text-lg font-bold text-gray-900 dark:text-white">{dbStats.active_users} <span className="text-sm font-normal text-gray-400">/ {dbStats.total_users}</span></p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t('dashboard.db_users')}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/20">
+                <ListTodo className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <div>
+                <p className="text-lg font-bold text-gray-900 dark:text-white">{dbStats.active_tasks} <span className="text-sm font-normal text-gray-400">/ {dbStats.total_tasks}</span></p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t('dashboard.db_tasks')}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-green-50 dark:bg-green-900/20">
+                <Clock className="h-4 w-4 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <p className="text-lg font-bold text-gray-900 dark:text-white">{dbStats.worklogs_this_week}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t('dashboard.db_worklogs')}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-900/20">
+                <Mail className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <p className="text-lg font-bold text-gray-900 dark:text-white">
+                  {dbStats.emails_sent_today}
+                  {dbStats.emails_failed_today > 0 && (
+                    <span className="text-sm font-normal text-red-400 ml-1">({dbStats.emails_failed_today} {t('dashboard.db_email_failed')})</span>
+                  )}
+                </p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">{t('dashboard.db_emails')}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
