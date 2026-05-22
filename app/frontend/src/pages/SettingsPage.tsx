@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Pencil, Trash2, CheckCircle, XCircle, Loader2, ShieldCheck, Upload, Building2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, CheckCircle, XCircle, Loader2, ShieldCheck, Upload, Building2, MessageSquare } from 'lucide-react'
 import {
   useJiraConfigs,
   useCreateJiraConfig,
@@ -19,6 +19,11 @@ import {
   useUpdateBranding,
   useUploadLogo,
 } from '@/api/admin'
+import {
+  useTeamsWebhooks,
+  useCreateTeamsWebhook,
+  useDeleteTeamsWebhook,
+} from '@/api/email'
 import { format } from 'date-fns'
 import { tr } from 'date-fns/locale'
 
@@ -34,6 +39,21 @@ export default function SettingsPage() {
   const updateBranding = useUpdateBranding()
   const uploadLogo = useUploadLogo()
   const logoInputRef = useRef<HTMLInputElement>(null)
+
+  const { data: teamsWebhooks = [] } = useTeamsWebhooks()
+  const createWebhook = useCreateTeamsWebhook()
+  const deleteWebhook = useDeleteTeamsWebhook()
+  const [webhookName, setWebhookName] = useState('')
+  const [webhookUrl, setWebhookUrl] = useState('')
+  const [webhookError, setWebhookError] = useState('')
+
+  async function handleWebhookCreate(e: React.FormEvent) {
+    e.preventDefault(); setWebhookError('')
+    try {
+      await createWebhook.mutateAsync({ name: webhookName, webhook_url: webhookUrl })
+      setWebhookName(''); setWebhookUrl('')
+    } catch (err: any) { setWebhookError(err.response?.data?.detail || 'Oluşturma başarısız.') }
+  }
 
   const [sslUploadType, setSslUploadType] = useState<'pem' | 'jks'>('pem')
   const [sslName, setSslName] = useState('')
@@ -369,6 +389,83 @@ export default function SettingsPage() {
               <button type="submit" disabled={uploadPem.isPending || uploadJks.isPending} className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium disabled:opacity-50">
                 <Upload className="h-4 w-4" />
                 {uploadPem.isPending || uploadJks.isPending ? 'Yükleniyor...' : 'Yükle'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      {/* ─── Teams Webhooks ────────────────────────────────────────── */}
+      <section>
+        <div className="flex items-center gap-2 mb-4">
+          <MessageSquare className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Microsoft Teams Webhook'ları</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">E-posta workflow'larına paralel Teams bildirimleri gönderin.</p>
+          </div>
+        </div>
+
+        {/* Existing webhooks */}
+        {teamsWebhooks.length > 0 && (
+          <div className="space-y-2 mb-4">
+            {teamsWebhooks.map((wh) => (
+              <div key={wh.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 flex items-center justify-between gap-4">
+                <div>
+                  <span className="font-medium text-gray-900 dark:text-white">{wh.name}</span>
+                  <span className={`ml-2 text-xs px-1.5 py-0.5 rounded font-medium ${wh.is_active ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500'}`}>
+                    {wh.is_active ? 'Aktif' : 'Pasif'}
+                  </span>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {format(new Date(wh.created_at), 'dd MMM yyyy', { locale: tr })}
+                  </p>
+                </div>
+                <button
+                  onClick={() => { if (confirm('Bu webhook\'u silmek istediğinizden emin misiniz?')) deleteWebhook.mutate(wh.id) }}
+                  className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Add form */}
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Yeni Webhook Ekle</h3>
+          <form onSubmit={handleWebhookCreate} className="space-y-3">
+            {webhookError && <p className="text-sm text-red-600 bg-red-50 dark:bg-red-900/20 p-2 rounded">{webhookError}</p>}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ad *</label>
+                <input
+                  value={webhookName}
+                  onChange={(e) => setWebhookName(e.target.value)}
+                  required
+                  placeholder="Geliştirici Kanalı"
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Webhook URL *</label>
+                <input
+                  type="url"
+                  value={webhookUrl}
+                  onChange={(e) => setWebhookUrl(e.target.value)}
+                  required
+                  placeholder="https://outlook.office.com/webhook/..."
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={createWebhook.isPending}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium disabled:opacity-50"
+              >
+                <Plus className="h-4 w-4" />
+                {createWebhook.isPending ? 'Ekleniyor...' : 'Ekle'}
               </button>
             </div>
           </form>
