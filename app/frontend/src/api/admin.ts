@@ -16,9 +16,40 @@ export interface BrandingData {
   primary_color: string
 }
 
+export interface AuditLog {
+  id: string
+  user_id: string | null
+  action: 'create' | 'update' | 'delete'
+  table_name: string
+  record_id: string
+  ip_address: string | null
+  user_agent: string | null
+  created_at: string
+}
+
+export interface AuditLogListResponse {
+  items: AuditLog[]
+  total: number
+  skip: number
+  limit: number
+}
+
+export interface DashboardStats {
+  total_users: number
+  active_users: number
+  total_tasks: number
+  active_tasks: number
+  overdue_tasks: number
+  worklogs_this_week: number
+  emails_sent_today: number
+  emails_failed_today: number
+}
+
 const adminKeys = {
   ssl: ['admin', 'ssl'] as const,
   branding: ['admin', 'branding'] as const,
+  auditLogs: (p: Record<string, unknown>) => ['admin', 'audit-logs', p] as const,
+  dashboardStats: ['admin', 'stats', 'dashboard'] as const,
 }
 
 export function useSslCertificates() {
@@ -109,5 +140,32 @@ export function useUploadLogo() {
       qc.invalidateQueries({ queryKey: adminKeys.branding })
       qc.invalidateQueries({ queryKey: ['branding'] })
     },
+  })
+}
+
+export function useAuditLogs(params: {
+  user_id?: string
+  action?: string
+  table_name?: string
+  date_from?: string
+  date_to?: string
+  skip?: number
+  limit?: number
+}) {
+  return useQuery({
+    queryKey: adminKeys.auditLogs(params as Record<string, unknown>),
+    queryFn: () =>
+      apiClient
+        .get<AuditLogListResponse>('/admin/audit-logs', { params })
+        .then((r) => r.data),
+  })
+}
+
+export function useDashboardStats() {
+  return useQuery({
+    queryKey: adminKeys.dashboardStats,
+    queryFn: () =>
+      apiClient.get<DashboardStats>('/admin/stats/dashboard').then((r) => r.data),
+    staleTime: 60_000,
   })
 }

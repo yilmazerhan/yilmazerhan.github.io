@@ -25,7 +25,8 @@
     "permissions": "Permissions",
     "settings": "Settings",
     "email": "Email",
-    "reports": "Reports"
+    "reports": "Reports",
+    "auditLogs": "Audit Log"
   },
   "worklog": {
     "title": "Work Log",

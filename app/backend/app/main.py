@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
-from app.core.middleware import SecurityHeadersMiddleware
+from app.core.middleware import SecurityHeadersMiddleware, AuditLogMiddleware
 from app.core.rate_limit import limiter, rate_limit_exceeded_handler
 from app.routers import auth, users, teams, permissions, worklog, kanban, jira, email, admin
 
@@ -44,6 +44,9 @@ app.add_middleware(
 
 # Security headers
 app.add_middleware(SecurityHeadersMiddleware)
+
+# Audit log (runs after security headers; fire-and-forget DB write)
+app.add_middleware(AuditLogMiddleware)
 
 
 # ─── Routers ──────────────────────────────────────────────────────────────

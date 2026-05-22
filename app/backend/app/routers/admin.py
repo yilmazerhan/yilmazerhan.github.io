@@ -1,13 +1,22 @@
 import uuid
 import base64
-from typing import Annotated
+from datetime import date, timedelta
+from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.user import User
-from app.schemas.admin import SslCertificateResponse, BrandingResponse, BrandingUpdate
+from app.models.audit_log import AuditLog
+from app.models.kanban import Task
+from app.models.worklog import WorkLog
+from app.models.email_log import EmailLog
+from app.schemas.admin import (
+    SslCertificateResponse, BrandingResponse, BrandingUpdate,
+    AuditLogResponse, AuditLogListResponse, DashboardStats,
+)
 from app.schemas.auth import MessageResponse
 from app.services.ssl_service import SslService
 from app.services.branding_service import get_branding, update_branding, update_logo
@@ -112,3 +121,94 @@ async def upload_logo(
     b64 = base64.b64encode(data).decode()
     logo_url = f"data:{logo.content_type};base64,{b64}"
     return await update_logo(db, current_user.id, logo_url)
+
+
+# ─── Audit Logs ───────────────────────────────────────────────────────────────
+
+@router.get("/audit-logs", response_model=AuditLogListResponse)
+async def list_audit_logs(
+    _: Annotated[User, Depends(require_superadmin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    user_id: Optional[uuid.UUID] = Query(None),
+    action: Optional[str] = Query(None),
+    table_name: Optional[str] = Query(None),
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+):
+    q = select(AuditLog)
+    if user_id:
+        q = q.where(AuditLog.user_id == user_id)
+    if action:
+        q = q.where(AuditLog.action == action)
+    if table_name:
+        q = q.where(AuditLog.table_name.ilike(f"%{table_name}%"))
+    if date_from:
+        q = q.where(AuditLog.created_at >= date_from)
+    if date_to:
+        q = q.where(AuditLog.created_at < date_to + timedelta(days=1))
+
+    total_result = await db.execute(select(func.count()).select_from(q.subquery()))
+    total = total_result.scalar_one()
+
+    items_result = await db.execute(q.order_by(AuditLog.created_at.desc()).offset(skip).limit(limit))
+    items = items_result.scalars().all()
+
+    return {"items": items, "total": total, "skip": skip, "limit": limit}
+
+
+# ─── Dashboard Stats ──────────────────────────────────────────────────────────
+
+@router.get("/stats/dashboard", response_model=DashboardStats)
+async def dashboard_stats(
+    _: Annotated[User, Depends(require_superadmin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    today = date.today()
+    week_ago = today - timedelta(days=7)
+
+    total_users = (await db.execute(
+        select(func.count()).select_from(User).where(User.is_deleted == False)
+    )).scalar_one()
+
+    active_users = (await db.execute(
+        select(func.count()).select_from(User).where(User.is_active == True, User.is_deleted == False)
+    )).scalar_one()
+
+    total_tasks = (await db.execute(
+        select(func.count()).select_from(Task)
+    )).scalar_one()
+
+    active_tasks = (await db.execute(
+        select(func.count()).select_from(Task).where(Task.is_archived == False)
+    )).scalar_one()
+
+    overdue_tasks = (await db.execute(
+        select(func.count()).select_from(Task).where(Task.is_archived == False, Task.due_date < today)
+    )).scalar_one()
+
+    worklogs_this_week = (await db.execute(
+        select(func.count()).select_from(WorkLog).where(WorkLog.log_date >= week_ago)
+    )).scalar_one()
+
+    emails_sent_today = (await db.execute(
+        select(func.count()).select_from(EmailLog)
+        .where(EmailLog.status == "sent", func.date(EmailLog.sent_at) == today)
+    )).scalar_one()
+
+    emails_failed_today = (await db.execute(
+        select(func.count()).select_from(EmailLog)
+        .where(EmailLog.status == "failed", func.date(EmailLog.created_at) == today)
+    )).scalar_one()
+
+    return DashboardStats(
+        total_users=total_users,
+        active_users=active_users,
+        total_tasks=total_tasks,
+        active_tasks=active_tasks,
+        overdue_tasks=overdue_tasks,
+        worklogs_this_week=worklogs_this_week,
+        emails_sent_today=emails_sent_today,
+        emails_failed_today=emails_failed_today,
+    )

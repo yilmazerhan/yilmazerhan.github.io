@@ -25,7 +25,8 @@
     "permissions": "Yetkiler",
     "settings": "Ayarlar",
     "email": "E-posta",
-    "reports": "Raporlar"
+    "reports": "Raporlar",
+    "auditLogs": "Audit Log"
   },
   "worklog": {
     "title": "İş Günlüğü",
