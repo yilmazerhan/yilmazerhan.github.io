@@ -1,9 +1,11 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Menu, Moon, Sun, Globe, LogOut, User } from 'lucide-react'
+import { Menu, Moon, Sun, Globe, LogOut, User, KeyRound } from 'lucide-react'
 import { useThemeStore } from '@/store/themeStore'
 import { useAuthStore } from '@/store/authStore'
 import apiClient from '@/api/client'
 import i18n from '@/i18n'
+import ChangePasswordModal from '@/components/users/ChangePasswordModal'
 
 interface TopbarProps {
   onMenuToggle: () => void
@@ -13,6 +15,7 @@ export default function Topbar({ onMenuToggle }: TopbarProps) {
   const { t } = useTranslation()
   const { theme, toggleTheme } = useThemeStore()
   const { user, logout } = useAuthStore()
+  const [changePwOpen, setChangePwOpen] = useState(false)
 
   async function handleLogout() {
     await apiClient.post('/auth/logout').catch(() => {})
@@ -27,6 +30,7 @@ export default function Topbar({ onMenuToggle }: TopbarProps) {
   }
 
   return (
+    <>
     <header className="h-16 flex items-center justify-between px-4 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
       <button
         onClick={onMenuToggle}
@@ -69,6 +73,13 @@ export default function Topbar({ onMenuToggle }: TopbarProps) {
             </div>
           </div>
           <button
+            onClick={() => setChangePwOpen(true)}
+            className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+            title={t('auth.change_password')}
+          >
+            <KeyRound className="h-5 w-5" />
+          </button>
+          <button
             onClick={handleLogout}
             className="p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-red-600"
             aria-label={t('auth.logout')}
@@ -79,5 +90,8 @@ export default function Topbar({ onMenuToggle }: TopbarProps) {
         </div>
       </div>
     </header>
+
+    {changePwOpen && <ChangePasswordModal onClose={() => setChangePwOpen(false)} />}
+  </>
   )
 }

@@ -123,6 +123,20 @@ export function useEffectivePermissions(userId: string, enabled = true) {
   })
 }
 
+export function useChangeOwnPassword() {
+  return useMutation({
+    mutationFn: (data: { old_password: string; new_password: string }) =>
+      apiClient.post<{ message: string }>('/users/me/change-password', data).then((r) => r.data),
+  })
+}
+
+export function useSetUserPassword() {
+  return useMutation({
+    mutationFn: ({ userId, new_password }: { userId: string; new_password: string }) =>
+      apiClient.post<{ message: string }>(`/users/${userId}/set-password`, { new_password }).then((r) => r.data),
+  })
+}
+
 export function useSetPermissions(userId: string) {
   const qc = useQueryClient()
   return useMutation({

@@ -179,11 +179,31 @@ class UserService:
         if not verify_password(old_password, user.hashed_password):
             raise ForbiddenError("Mevcut şifre hatalı.")
         user.hashed_password = hash_password(new_password)
-        # Revoke all refresh tokens
         from sqlalchemy import update as sa_update
         from app.models.user import RefreshToken
         await self.db.execute(
             sa_update(RefreshToken).where(RefreshToken.user_id == user.id).values(revoked=True)
+        )
+        await self.db.flush()
+
+    async def admin_set_password(self, target_user_id: uuid.UUID, new_password: str, requester: User) -> None:
+        target = await self.get_by_id(target_user_id)
+        if requester.role == "superadmin":
+            pass  # full access
+        elif requester.role == "team_manager":
+            if (
+                target.team_id is None
+                or target.team_id != requester.team_id
+                or target.role in ("superadmin", "team_manager")
+            ):
+                raise ForbiddenError("Bu kullanıcının şifresini değiştirme yetkiniz yok.")
+        else:
+            raise ForbiddenError("Bu işlem için yetkiniz yok.")
+        target.hashed_password = hash_password(new_password)
+        from sqlalchemy import update as sa_update
+        from app.models.user import RefreshToken
+        await self.db.execute(
+            sa_update(RefreshToken).where(RefreshToken.user_id == target.id).values(revoked=True)
         )
         await self.db.flush()
 

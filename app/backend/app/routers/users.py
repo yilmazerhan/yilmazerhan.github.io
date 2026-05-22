@@ -8,7 +8,7 @@ from app.database import get_db
 from app.models.user import User
 from app.schemas.user import (
     UserCreate, UserUpdate, UserResponse, UserListResponse,
-    ProfileUpdate, ChangePasswordRequest
+    ProfileUpdate, ChangePasswordRequest, AdminSetPasswordRequest
 )
 from app.schemas.auth import MessageResponse
 from app.services.user_service import UserService
@@ -138,6 +138,18 @@ async def delete_user(
     svc = UserService(db)
     await svc.soft_delete_user(user_id, current_user)
     return {"message": "Kullanıcı başarıyla silindi."}
+
+
+@router.post("/{user_id}/set-password", response_model=MessageResponse)
+async def admin_set_password(
+    user_id: uuid.UUID,
+    body: AdminSetPasswordRequest,
+    current_user: Annotated[User, Depends(require_manager_or_above)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = UserService(db)
+    await svc.admin_set_password(user_id, body.new_password, current_user)
+    return {"message": "Kullanıcının şifresi başarıyla güncellendi."}
 
 
 @router.patch("/{user_id}/resend-activation", response_model=MessageResponse)

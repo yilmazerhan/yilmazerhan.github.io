@@ -1,20 +1,37 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Search, Pencil, Trash2, RefreshCw, ShieldCheck } from 'lucide-react'
-import { useUsers, useCreateUser, useUpdateUser, useDeleteUser, type User } from '@/api/users'
+import { Plus, Search, Pencil, Trash2, ShieldCheck, KeyRound } from 'lucide-react'
+import { useUsers, useDeleteUser, type User } from '@/api/users'
+import { useAuthStore } from '@/store/authStore'
 import UserFormModal from '@/components/users/UserFormModal'
 import PermissionMatrixModal from '@/components/users/PermissionMatrixModal'
+import SetPasswordModal from '@/components/users/SetPasswordModal'
 
 export default function UsersPage() {
   const { t } = useTranslation()
+  const currentUser = useAuthStore((s) => s.user)
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
   const [editUser, setEditUser] = useState<User | null>(null)
   const [permUser, setPermUser] = useState<User | null>(null)
+  const [setPwUser, setSetPwUser] = useState<User | null>(null)
 
   const { data, isLoading } = useUsers({ search: search || undefined, role: roleFilter || undefined })
   const deleteUser = useDeleteUser()
+
+  function canSetPassword(target: User): boolean {
+    if (!currentUser) return false
+    if (currentUser.role === 'superadmin') return true
+    if (currentUser.role === 'team_manager') {
+      return (
+        target.team_id !== null &&
+        target.team_id === currentUser.team_id &&
+        target.role === 'user'
+      )
+    }
+    return false
+  }
 
   async function handleDelete(user: User) {
     if (!confirm(t('common.confirm_delete'))) return
@@ -118,6 +135,15 @@ export default function UsersPage() {
                     >
                       <ShieldCheck className="h-4 w-4" />
                     </button>
+                    {canSetPassword(user) && (
+                      <button
+                        onClick={() => setSetPwUser(user)}
+                        className="p-1.5 rounded text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                        title={t('users.set_password')}
+                      >
+                        <KeyRound className="h-4 w-4" />
+                      </button>
+                    )}
                     <button
                       onClick={() => setEditUser(user)}
                       className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
@@ -149,6 +175,7 @@ export default function UsersPage() {
       {createOpen && <UserFormModal onClose={() => setCreateOpen(false)} />}
       {editUser && <UserFormModal user={editUser} onClose={() => setEditUser(null)} />}
       {permUser && <PermissionMatrixModal user={permUser} onClose={() => setPermUser(null)} />}
+      {setPwUser && <SetPasswordModal user={setPwUser} onClose={() => setSetPwUser(null)} />}
     </div>
   )
 }

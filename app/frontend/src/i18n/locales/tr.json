@@ -14,7 +14,18 @@
     "reset_password": "Şifremi Sıfırla",
     "new_password": "Yeni Şifre",
     "login_success": "Başarıyla giriş yapıldı.",
-    "logout_success": "Başarıyla çıkış yapıldı."
+    "logout_success": "Başarıyla çıkış yapıldı.",
+    "change_password": "Şifremi Değiştir",
+    "current_password": "Mevcut Şifre",
+    "confirm_password": "Şifre Tekrarı",
+    "password_changed": "Şifreniz başarıyla değiştirildi.",
+    "password_set": "Şifre başarıyla güncellendi.",
+    "password_mismatch": "Şifreler eşleşmiyor.",
+    "password_min_length": "Şifre en az 8 karakter olmalıdır.",
+    "password_uppercase": "En az bir büyük harf gereklidir.",
+    "password_lowercase": "En az bir küçük harf gereklidir.",
+    "password_digit": "En az bir rakam gereklidir.",
+    "password_rules": "En az 8 karakter, bir büyük harf, bir küçük harf ve bir rakam içermelidir."
   },
   "nav": {
     "dashboard": "Gösterge Paneli",
@@ -110,6 +121,7 @@
     "team_name": "Takım Adı",
     "manager": "Yönetici",
     "member_count": "Üye",
+    "set_password": "Şifre Belirle",
     "not_assigned": "Atanmadı",
     "confirm_delete": "Bu takımı silmek istediğinizden emin misiniz?",
     "remove_member": "Üyeyi çıkar",
