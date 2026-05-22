@@ -39,9 +39,6 @@ dependencies = [
     # Rate limiting
     "slowapi==0.1.9",
 
-    # JKS certificate handling
-    "jks==0.6.2",
-
     # Utilities
     "python-dateutil==2.9.0",
     "pytz==2024.2",

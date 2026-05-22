@@ -116,24 +116,8 @@ class SslService:
             private_key, certificate, additional_certs = pkcs12.load_key_and_certificates(
                 jks_bytes, password.encode(), default_backend()
             )
-        except Exception:
-            # Try jks library as fallback
-            try:
-                import jks
-                import io
-                ks = jks.KeyStore.loads(jks_bytes, password)
-                for alias in ks.private_keys:
-                    entry = ks.private_keys[alias]
-                    entry.decrypt(password)
-                    from cryptography.hazmat.primitives.serialization import load_der_private_key
-                    key = load_der_private_key(entry.pkey, password=None, backend=default_backend())
-                    certs_der = entry.cert_chain
-                    cert = x509.load_der_x509_certificate(certs_der[0][1], default_backend())
-                    cert_pem = cert.public_bytes(Encoding.PEM)
-                    key_pem = key.private_bytes(Encoding.PEM, PrivateFormat.TraditionalOpenSSL, NoEncryption())
-                    return cert_pem, key_pem
-            except Exception as e2:
-                raise ValidationError(f"JKS/PKCS12 dönüşümü başarısız: {e2}")
+        except Exception as e:
+            raise ValidationError(f"JKS/PKCS12 dönüşümü başarısız: {e}")
 
         if not private_key or not certificate:
             raise ValidationError("JKS dosyasında anahtar veya sertifika bulunamadı.")
