@@ -43,6 +43,7 @@
   "kanban": {
     "title": "Task Board",
     "add_task": "Add Task",
+    "edit_task": "Edit Task",
     "task_title": "Task Title",
     "description": "Description",
     "assignee": "Assignee",
@@ -53,7 +54,17 @@
     "priority_low": "Low",
     "priority_medium": "Medium",
     "priority_high": "High",
-    "priority_critical": "Critical"
+    "priority_critical": "Critical",
+    "no_tasks": "No tasks in this column.",
+    "overdue": "Overdue",
+    "due_today": "Due Today",
+    "archive": "Archive",
+    "archived": "Archived",
+    "unassigned": "Unassigned",
+    "created_by": "Created by",
+    "new_task_placeholder": "Task title...",
+    "add_column": "Add Column",
+    "column_name": "Column Name"
   },
   "users": {
     "title": "Users",

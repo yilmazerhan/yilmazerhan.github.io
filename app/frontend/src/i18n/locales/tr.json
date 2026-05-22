@@ -43,6 +43,7 @@
   "kanban": {
     "title": "Görev Panosu",
     "add_task": "Görev Ekle",
+    "edit_task": "Görevi Düzenle",
     "task_title": "Görev Başlığı",
     "description": "Açıklama",
     "assignee": "Atanan",
@@ -53,7 +54,17 @@
     "priority_low": "Düşük",
     "priority_medium": "Orta",
     "priority_high": "Yüksek",
-    "priority_critical": "Kritik"
+    "priority_critical": "Kritik",
+    "no_tasks": "Bu sütunda görev yok.",
+    "overdue": "Gecikmiş",
+    "due_today": "Bugün bitiyor",
+    "archive": "Arşivle",
+    "archived": "Arşivlendi",
+    "unassigned": "Atanmamış",
+    "created_by": "Oluşturan",
+    "new_task_placeholder": "Görev başlığı...",
+    "add_column": "Sütun Ekle",
+    "column_name": "Sütun Adı"
   },
   "users": {
     "title": "Kullanıcılar",
