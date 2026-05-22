@@ -6,7 +6,7 @@ from slowapi.errors import RateLimitExceeded
 from app.config import settings
 from app.core.middleware import SecurityHeadersMiddleware
 from app.core.rate_limit import limiter, rate_limit_exceeded_handler
-from app.routers import auth, users, teams, permissions, worklog, kanban
+from app.routers import auth, users, teams, permissions, worklog, kanban, jira
 
 
 @asynccontextmanager
@@ -53,6 +53,7 @@ app.include_router(teams.router, prefix="/api/v1")
 app.include_router(permissions.router, prefix="/api/v1")
 app.include_router(worklog.router, prefix="/api/v1")
 app.include_router(kanban.router, prefix="/api/v1")
+app.include_router(jira.router, prefix="/api/v1")
 
 
 # ─── Health check ─────────────────────────────────────────────────────────
