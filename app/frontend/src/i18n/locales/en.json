@@ -99,7 +99,10 @@
     "filter_all_teams": "All Teams",
     "filter_all_users": "All Users",
     "title_required": "Title is required.",
-    "optional_description": "Optional description..."
+    "optional_description": "Optional description...",
+    "log_work_title": "Log Work",
+    "log_work_subtitle": "Task \"{{title}}\" completed. Would you like to add a work log entry?",
+    "log_work_skip": "Skip"
   },
   "teams": {
     "title": "Teams",

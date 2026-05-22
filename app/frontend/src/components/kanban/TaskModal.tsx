@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { X, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { useTranslation } from 'react-i18next'
-import { useCreateTask, useUpdateTask, useDeleteTask, type Task } from '@/api/kanban'
+import { useCreateTask, useUpdateTask, useDeleteTask, useMoveTask, type Task } from '@/api/kanban'
 import type { KanbanColumn } from '@/api/kanban'
 import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
@@ -12,11 +12,12 @@ interface Props {
   defaultColumnId?: string
   columns: KanbanColumn[]
   onClose: () => void
+  onTaskCompleted?: (task: Task) => void
 }
 
 const PRIORITIES = ['low', 'medium', 'high', 'critical'] as const
 
-export default function TaskModal({ task, defaultColumnId, columns, onClose }: Props) {
+export default function TaskModal({ task, defaultColumnId, columns, onClose, onTaskCompleted }: Props) {
   const { t } = useTranslation()
   const user = useAuthStore((s) => s.user)
   const isEdit = !!task
@@ -34,7 +35,8 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose }: P
   const createTask = useCreateTask()
   const updateTask = useUpdateTask()
   const deleteTask = useDeleteTask()
-  const loading = createTask.isPending || updateTask.isPending
+  const moveTask = useMoveTask()
+  const loading = createTask.isPending || updateTask.isPending || moveTask.isPending
 
   const canEdit = !isEdit ||
     user?.role === 'superadmin' ||
@@ -58,6 +60,18 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose }: P
           due_date: dueDate || null,
           jira_ticket: jiraTicket.trim() || null,
         })
+
+        let finalTask: Task = task
+        if (columnId !== task.column_id) {
+          finalTask = await moveTask.mutateAsync({ id: task.id, column_id: columnId, sort_order: task.sort_order })
+        }
+
+        const sourceCol = columns.find((c) => c.id === task.column_id)
+        const targetCol = columns.find((c) => c.id === columnId)
+        if (targetCol?.is_terminal && !sourceCol?.is_terminal && onTaskCompleted) {
+          onTaskCompleted(finalTask)
+          return
+        }
       } else {
         await createTask.mutateAsync({
           title: title.trim(),

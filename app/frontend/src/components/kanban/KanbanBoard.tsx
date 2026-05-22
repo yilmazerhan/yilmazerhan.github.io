@@ -16,6 +16,7 @@ import { useColumns, useTasks, useMoveTask, type Task, type KanbanColumn } from 
 import KanbanColumnComp from './KanbanColumn'
 import TaskCard from './TaskCard'
 import TaskModal from './TaskModal'
+import WorkLogFromTaskModal from './WorkLogFromTaskModal'
 
 interface Props {
   onAddTask?: (columnId: string) => void
@@ -31,6 +32,7 @@ export default function KanbanBoard({ taskParams }: Props) {
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [addColumnId, setAddColumnId] = useState<string | null>(null)
+  const [completedTask, setCompletedTask] = useState<Task | null>(null)
 
   // Local optimistic task state for smooth DnD
   const [localTasks, setLocalTasks] = useState<Task[] | null>(null)
@@ -98,12 +100,15 @@ export default function KanbanBoard({ taskParams }: Props) {
 
     const activeId = active.id as string
     const overId = over.id as string
-    const activeTask = localTasks.find((t) => t.id === activeId)
-    if (!activeTask) { setLocalTasks(null); return }
+    const draggedTask = localTasks.find((t) => t.id === activeId)
+    if (!draggedTask) { setLocalTasks(null); return }
 
     const overTask = localTasks.find((t) => t.id === overId)
     const overCol = sortedColumns.find((c) => c.id === overId)
-    const targetColumnId = overTask ? overTask.column_id : overCol?.id ?? activeTask.column_id
+    const targetColumnId = overTask ? overTask.column_id : overCol?.id ?? draggedTask.column_id
+
+    const sourceColumn = sortedColumns.find((c) => c.id === draggedTask.column_id)
+    const targetColumn = sortedColumns.find((c) => c.id === targetColumnId)
 
     // Determine new sort order
     const colTasks = localTasks
@@ -121,7 +126,10 @@ export default function KanbanBoard({ taskParams }: Props) {
     setLocalTasks(null)
 
     try {
-      await moveTask.mutateAsync({ id: activeId, column_id: targetColumnId, sort_order: newSortOrder })
+      const movedTask = await moveTask.mutateAsync({ id: activeId, column_id: targetColumnId, sort_order: newSortOrder })
+      if (targetColumn?.is_terminal && !sourceColumn?.is_terminal) {
+        setCompletedTask(movedTask)
+      }
     } catch {
       // mutation failure — query will refetch to correct state
     }
@@ -169,6 +177,14 @@ export default function KanbanBoard({ taskParams }: Props) {
           defaultColumnId={addColumnId ?? undefined}
           columns={sortedColumns}
           onClose={() => { setSelectedTask(null); setAddColumnId(null) }}
+          onTaskCompleted={(task) => { setSelectedTask(null); setAddColumnId(null); setCompletedTask(task) }}
+        />
+      )}
+
+      {completedTask && (
+        <WorkLogFromTaskModal
+          task={completedTask}
+          onClose={() => setCompletedTask(null)}
         />
       )}
     </>

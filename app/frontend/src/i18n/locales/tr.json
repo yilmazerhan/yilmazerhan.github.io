@@ -99,7 +99,10 @@
     "filter_all_teams": "Tüm Takımlar",
     "filter_all_users": "Tüm Kullanıcılar",
     "title_required": "Başlık zorunludur.",
-    "optional_description": "İsteğe bağlı açıklama..."
+    "optional_description": "İsteğe bağlı açıklama...",
+    "log_work_title": "İş Günlüğüne Ekle",
+    "log_work_subtitle": "\"{{title}}\" görevi tamamlandı. Çalışma kaydı eklemek ister misiniz?",
+    "log_work_skip": "Geç"
   },
   "teams": {
     "title": "Takımlar",
