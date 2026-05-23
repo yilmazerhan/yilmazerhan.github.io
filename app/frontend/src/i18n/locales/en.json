@@ -27,7 +27,15 @@
     "password_uppercase": "At least one uppercase letter is required.",
     "password_lowercase": "At least one lowercase letter is required.",
     "password_digit": "At least one digit is required.",
-    "password_rules": "Must be at least 8 characters with one uppercase, one lowercase, and one digit."
+    "password_rules": "Must be at least 8 characters with one uppercase, one lowercase, and one digit.",
+    "forgot_password_sent": "Password reset link sent to your email address (if registered).",
+    "back_to_login": "Back to Login",
+    "send": "Send",
+    "reset_failed": "Password reset failed. The link may be invalid or expired.",
+    "password_updated_title": "Password Updated!",
+    "redirecting": "You will be redirected to the login page in 3 seconds...",
+    "invalid_link": "Invalid link. Please use the link from your email.",
+    "update_password": "Update Password"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -167,6 +175,7 @@
     "not_found": "No users found.",
     "user_count": "{{count}} users",
     "permissions": "Permissions",
+    "set_password": "Set Password",
     "role_all": "All",
     "role_superadmin": "Super Admin",
     "role_team_manager": "Team Manager",
@@ -305,7 +314,9 @@
     "upload": "Upload",
     "adding": "Adding...",
     "clear_filters": "Clear Filters",
-    "required": "is required"
+    "required": "is required",
+    "previous": "Previous",
+    "next": "Next"
   },
   "email": {
     "templates_title": "Email Templates",
@@ -327,7 +338,43 @@
     "confirm_delete": "Are you sure you want to delete this template?",
     "delete_failed": "Failed to delete.",
     "name_required": "Name is required.",
-    "slug_required": "Slug is required."
+    "slug_required": "Slug is required.",
+    "workflows_title": "Email Workflows",
+    "add_workflow": "Add Workflow",
+    "edit_workflow": "Edit Workflow",
+    "no_workflows": "No workflows yet.",
+    "trigger_label": "Trigger",
+    "template_label": "Template",
+    "template_label_form": "Email Template",
+    "select_template": "Select template...",
+    "recipient_type_label": "Recipient Type",
+    "send_to_teams": "Also send to Teams channel",
+    "teams_webhook_label": "Teams Webhook",
+    "select_placeholder": "Select...",
+    "last_run": "Last run:",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "days_before_label": "How many days before to warn?",
+    "status_sent": "Sent",
+    "status_failed": "Failed",
+    "status_pending": "Pending",
+    "all_statuses": "All Statuses",
+    "total_records": "Total {{count}} records",
+    "recipient": "Recipient",
+    "sent_at": "Sent At",
+    "no_logs": "No records found.",
+    "logs_title": "Email Logs",
+    "trigger_task_due_soon": "Task Due Soon",
+    "trigger_task_overdue": "Task Overdue",
+    "trigger_task_status_changed": "Task Status Changed",
+    "trigger_worklog_reminder": "Work Log Reminder",
+    "trigger_task_assigned": "Task Assigned",
+    "trigger_account_activation": "Account Activation",
+    "trigger_password_reset": "Password Reset",
+    "recipient_assignee": "Assignee",
+    "recipient_team_manager": "Team Manager",
+    "recipient_all_managers": "All Managers",
+    "recipient_creator": "Creator"
   },
   "reports": {
     "title": "Reports",
@@ -342,7 +389,12 @@
     "user_col": "User",
     "total_col": "Total",
     "grand_total": "Grand Total",
-    "export_csv": "Export CSV"
+    "export_csv": "Export CSV",
+    "csv_date": "Date",
+    "csv_user": "User",
+    "csv_work_type": "Work Type",
+    "csv_duration": "Duration (h)",
+    "csv_description": "Description"
   },
   "history": {
     "title": "History",
@@ -394,6 +446,24 @@
     "downloading": "Preparing...",
     "error_no_pgdump": "pg_dump is not available on this server.",
     "error_failed": "Backup failed. Please try again."
+  },
+  "audit": {
+    "action_create": "Create",
+    "action_update": "Update",
+    "action_delete": "Delete",
+    "record_count": "({{count}} records)",
+    "action_type": "Action Type",
+    "table": "Table",
+    "table_placeholder": "e.g.: users, tasks",
+    "action_label": "Action",
+    "record_id": "Record ID",
+    "user_id": "User ID",
+    "ip": "IP",
+    "no_records": "No records found.",
+    "page_of": "Page {{current}} / {{total}}"
+  },
+  "kanban_tabs": {
+    "details": "Details"
   },
   "notifications": {
     "title": "Notifications",

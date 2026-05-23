@@ -27,7 +27,15 @@
     "password_uppercase": "En az bir büyük harf gereklidir.",
     "password_lowercase": "En az bir küçük harf gereklidir.",
     "password_digit": "En az bir rakam gereklidir.",
-    "password_rules": "En az 8 karakter, bir büyük harf, bir küçük harf ve bir rakam içermelidir."
+    "password_rules": "En az 8 karakter, bir büyük harf, bir küçük harf ve bir rakam içermelidir.",
+    "forgot_password_sent": "Şifre sıfırlama bağlantısı email adresinize gönderildi (eğer kayıtlıysa).",
+    "back_to_login": "Giriş sayfasına dön",
+    "send": "Gönder",
+    "reset_failed": "Şifre sıfırlama başarısız. Bağlantı geçersiz veya süresi dolmuş olabilir.",
+    "password_updated_title": "Şifre Güncellendi!",
+    "redirecting": "3 saniye içinde giriş sayfasına yönlendiriliyorsunuz...",
+    "invalid_link": "Geçersiz bağlantı. Lütfen e-postanızdaki bağlantıyı kullanın.",
+    "update_password": "Şifreyi Güncelle"
   },
   "nav": {
     "dashboard": "Gösterge Paneli",
@@ -167,6 +175,7 @@
     "not_found": "Kullanıcı bulunamadı.",
     "user_count": "{{count}} kullanıcı",
     "permissions": "Yetkiler",
+    "set_password": "Şifre Belirle",
     "role_all": "Tümü",
     "role_superadmin": "Süper Admin",
     "role_team_manager": "Takım Yöneticisi",
@@ -305,7 +314,9 @@
     "upload": "Yükle",
     "adding": "Ekleniyor...",
     "clear_filters": "Filtreleri Temizle",
-    "required": "zorunludur"
+    "required": "zorunludur",
+    "previous": "Önceki",
+    "next": "Sonraki"
   },
   "email": {
     "templates_title": "E-posta Şablonları",
@@ -327,7 +338,43 @@
     "confirm_delete": "Bu şablonu silmek istediğinizden emin misiniz?",
     "delete_failed": "Silinemedi.",
     "name_required": "Ad zorunludur.",
-    "slug_required": "Slug zorunludur."
+    "slug_required": "Slug zorunludur.",
+    "workflows_title": "E-posta İş Akışları",
+    "add_workflow": "Akış Ekle",
+    "edit_workflow": "İş Akışını Düzenle",
+    "no_workflows": "Henüz iş akışı yok.",
+    "trigger_label": "Tetikleyici",
+    "template_label": "Şablon",
+    "template_label_form": "E-posta Şablonu",
+    "select_template": "Şablon seçin...",
+    "recipient_type_label": "Alıcı Tipi",
+    "send_to_teams": "Teams kanalına da gönder",
+    "teams_webhook_label": "Teams Webhook",
+    "select_placeholder": "Seçin...",
+    "last_run": "Son çalışma:",
+    "activate": "Aktife Al",
+    "deactivate": "Pasife Al",
+    "days_before_label": "Kaç gün önce uyar?",
+    "status_sent": "Gönderildi",
+    "status_failed": "Hata",
+    "status_pending": "Bekliyor",
+    "all_statuses": "Tüm Durumlar",
+    "total_records": "Toplam {{count}} kayıt",
+    "recipient": "Alıcı",
+    "sent_at": "Gönderim Zamanı",
+    "no_logs": "Kayıt bulunamadı.",
+    "logs_title": "E-posta Kayıtları",
+    "trigger_task_due_soon": "Görev Bitiş Yaklaşıyor",
+    "trigger_task_overdue": "Görev Gecikti",
+    "trigger_task_status_changed": "Görev Durumu Değişti",
+    "trigger_worklog_reminder": "İş Günlüğü Hatırlatıcısı",
+    "trigger_task_assigned": "Görev Atandı",
+    "trigger_account_activation": "Hesap Aktivasyonu",
+    "trigger_password_reset": "Şifre Sıfırlama",
+    "recipient_assignee": "Atanan Kişi",
+    "recipient_team_manager": "Takım Yöneticisi",
+    "recipient_all_managers": "Tüm Yöneticiler",
+    "recipient_creator": "Oluşturan"
   },
   "reports": {
     "title": "Raporlar",
@@ -342,7 +389,12 @@
     "user_col": "Kullanıcı",
     "total_col": "Toplam",
     "grand_total": "Genel Toplam",
-    "export_csv": "CSV İndir"
+    "export_csv": "CSV İndir",
+    "csv_date": "Tarih",
+    "csv_user": "Kullanıcı",
+    "csv_work_type": "İş Tipi",
+    "csv_duration": "Süre (s)",
+    "csv_description": "Açıklama"
   },
   "history": {
     "title": "Geçmiş",
@@ -394,6 +446,24 @@
     "downloading": "Hazırlanıyor...",
     "error_no_pgdump": "Bu sunucuda pg_dump mevcut değil.",
     "error_failed": "Yedek alınamadı. Lütfen tekrar deneyin."
+  },
+  "audit": {
+    "action_create": "Oluşturma",
+    "action_update": "Güncelleme",
+    "action_delete": "Silme",
+    "record_count": "({{count}} kayıt)",
+    "action_type": "İşlem Tipi",
+    "table": "Tablo",
+    "table_placeholder": "örn: users, tasks",
+    "action_label": "İşlem",
+    "record_id": "Kayıt ID",
+    "user_id": "Kullanıcı ID",
+    "ip": "IP",
+    "no_records": "Kayıt bulunamadı.",
+    "page_of": "Sayfa {{current}} / {{total}}"
+  },
+  "kanban_tabs": {
+    "details": "Detaylar"
   },
   "notifications": {
     "title": "Bildirimler",

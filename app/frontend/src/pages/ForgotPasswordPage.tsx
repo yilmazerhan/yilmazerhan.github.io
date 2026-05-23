@@ -31,9 +31,9 @@ export default function ForgotPasswordPage() {
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">{t('auth.forgot_password')}</h2>
           {sent ? (
             <div className="text-sm text-gray-600 dark:text-gray-300 space-y-4">
-              <p>Şifre sıfırlama bağlantısı email adresinize gönderildi (eğer kayıtlıysa).</p>
+              <p>{t('auth.forgot_password_sent')}</p>
               <Link to="/login" className="text-primary-600 dark:text-primary-400 hover:underline block">
-                Giriş sayfasına dön
+                {t('auth.back_to_login')}
               </Link>
             </div>
           ) : (
@@ -54,10 +54,10 @@ export default function ForgotPasswordPage() {
                 disabled={loading}
                 className="w-full py-2 px-4 bg-primary-500 hover:bg-primary-600 text-white font-medium rounded-lg text-sm transition-colors disabled:opacity-50"
               >
-                {loading ? t('common.loading') : 'Gönder'}
+                {loading ? t('common.loading') : t('auth.send')}
               </button>
               <Link to="/login" className="block text-center text-sm text-primary-600 dark:text-primary-400 hover:underline">
-                Giriş sayfasına dön
+                {t('auth.back_to_login')}
               </Link>
             </form>
           )}

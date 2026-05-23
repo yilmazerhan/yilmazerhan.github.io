@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { format, subDays, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isSameMonth } from 'date-fns'
+import { format, subDays, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isSameMonth, startOfWeek, addDays } from 'date-fns'
 import { tr, enUS, type Locale } from 'date-fns/locale'
 import { Plus, Pencil, Trash2, Clock, AlertTriangle, List, CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useWorkLogs, useDeleteWorkLog, type WorkLog } from '@/api/worklog'
@@ -32,7 +32,9 @@ function CalendarView({ logs, locale }: { logs: WorkLog[]; locale: Locale }) {
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd })
   const startDow = (getDay(monthStart) + 6) % 7 // Monday=0
 
-  const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+  const DOW = Array.from({ length: 7 }, (_, i) =>
+    format(addDays(startOfWeek(new Date(), { weekStartsOn: 1 }), i), 'EEE', { locale })
+  )
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">

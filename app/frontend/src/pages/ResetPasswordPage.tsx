@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useSearchParams, Link, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { KeyRound, CheckCircle } from 'lucide-react'
 import apiClient from '@/api/client'
 
 export default function ResetPasswordPage() {
+  const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const token = searchParams.get('token') ?? ''
@@ -17,8 +19,8 @@ export default function ResetPasswordPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    if (password.length < 8) { setError('Şifre en az 8 karakter olmalıdır.'); return }
-    if (password !== confirm) { setError('Şifreler eşleşmiyor.'); return }
+    if (password.length < 8) { setError(t('auth.password_min_length')); return }
+    if (password !== confirm) { setError(t('auth.password_mismatch')); return }
 
     setLoading(true)
     try {
@@ -26,7 +28,7 @@ export default function ResetPasswordPage() {
       setDone(true)
       setTimeout(() => navigate('/login'), 3000)
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Şifre sıfırlama başarısız. Bağlantı geçersiz veya süresi dolmuş olabilir.')
+      setError(err.response?.data?.detail || t('auth.reset_failed'))
     } finally {
       setLoading(false)
     }
@@ -38,8 +40,8 @@ export default function ResetPasswordPage() {
         {done ? (
           <div className="text-center space-y-3">
             <CheckCircle className="h-12 w-12 text-green-500 mx-auto" />
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Şifre Güncellendi!</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">3 saniye içinde giriş sayfasına yönlendiriliyorsunuz...</p>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{t('auth.password_updated_title')}</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{t('auth.redirecting')}</p>
           </div>
         ) : (
           <>
@@ -47,13 +49,13 @@ export default function ResetPasswordPage() {
               <div className="inline-flex p-3 bg-primary-50 dark:bg-primary-900/20 rounded-full mb-3">
                 <KeyRound className="h-7 w-7 text-primary-600 dark:text-primary-400" />
               </div>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">Yeni Şifre Belirle</h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">En az 8 karakterli güçlü bir şifre seçin.</p>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">{t('auth.reset_password')}</h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('auth.password_rules')}</p>
             </div>
 
             {!token && (
               <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3">
-                <p className="text-sm text-red-600 dark:text-red-400">Geçersiz bağlantı. Lütfen e-postanızdaki bağlantıyı kullanın.</p>
+                <p className="text-sm text-red-600 dark:text-red-400">{t('auth.invalid_link')}</p>
               </div>
             )}
 
@@ -62,7 +64,7 @@ export default function ResetPasswordPage() {
                 <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">{error}</p>
               )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Yeni Şifre</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('auth.new_password')}</label>
                 <input
                   type="password"
                   value={password}
@@ -73,7 +75,7 @@ export default function ResetPasswordPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Şifre Tekrar</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('auth.confirm_password')}</label>
                 <input
                   type="password"
                   value={confirm}
@@ -87,13 +89,13 @@ export default function ResetPasswordPage() {
                 disabled={loading || !token}
                 className="w-full py-2.5 px-4 rounded-lg bg-primary-500 hover:bg-primary-600 text-white font-medium disabled:opacity-50"
               >
-                {loading ? 'Kaydediliyor...' : 'Şifreyi Güncelle'}
+                {loading ? t('common.saving') : t('auth.update_password')}
               </button>
             </form>
 
             <div className="text-center">
               <Link to="/login" className="text-sm text-primary-600 dark:text-primary-400 hover:underline">
-                Giriş sayfasına dön
+                {t('auth.back_to_login')}
               </Link>
             </div>
           </>

@@ -6,8 +6,8 @@ import { useWorkLogs } from '@/api/worklog'
 import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
 
-function exportCSV(logs: any[], dateFrom: string, dateTo: string) {
-  const header = ['Date', 'User', 'Work Type', 'Duration (h)', 'Description']
+function exportCSV(logs: any[], dateFrom: string, dateTo: string, t: (key: string) => string) {
+  const header = [t('reports.csv_date'), t('reports.csv_user'), t('reports.csv_work_type'), t('reports.csv_duration'), t('reports.csv_description')]
   const rows = logs.map((l) => [
     l.log_date,
     l.user.full_name,
@@ -100,7 +100,7 @@ export default function ReportsPage() {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('reports.title')}</h1>
         {logs.length > 0 && (
           <button
-            onClick={() => exportCSV(logs, dateFrom, dateTo)}
+            onClick={() => exportCSV(logs, dateFrom, dateTo, t)}
             className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
           >
             <Download className="h-4 w-4" />
