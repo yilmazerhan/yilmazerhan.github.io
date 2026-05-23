@@ -3,7 +3,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { format, isToday, isPast, parseISO } from 'date-fns'
 import { tr, enUS } from 'date-fns/locale'
 import { useTranslation } from 'react-i18next'
-import { GripVertical, AlertCircle, Clock, Link } from 'lucide-react'
+import { AlertCircle, Clock, Link } from 'lucide-react'
 import type { Task } from '@/api/kanban'
 
 const PRIORITY_CONFIG = {
@@ -54,23 +54,15 @@ export default function TaskCard({ task, onClick, isDragOverlay = false }: Props
     <div
       ref={setNodeRef}
       style={style}
-      className={`group relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 shadow-sm cursor-pointer select-none
+      {...attributes}
+      {...listeners}
+      className={`relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 shadow-sm cursor-grab active:cursor-grabbing select-none
         ${isDragging ? 'opacity-40' : ''}
-        ${isDragOverlay ? 'shadow-xl rotate-1 opacity-95' : 'hover:border-primary-300 dark:hover:border-primary-600'}
+        ${isDragOverlay ? 'shadow-xl rotate-1 opacity-95 cursor-grabbing' : 'hover:border-primary-300 dark:hover:border-primary-600'}
       `}
-      onClick={() => onClick(task)}
+      onClick={() => !isDragging && onClick(task)}
     >
-      {/* Drag handle */}
-      <div
-        {...attributes}
-        {...listeners}
-        className="absolute right-2 top-2 p-0.5 rounded text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <GripVertical className="h-4 w-4" />
-      </div>
-
-      <div className="pr-5 space-y-2">
+      <div className="space-y-2">
         {/* Title */}
         <p className="text-sm font-medium text-gray-900 dark:text-white leading-snug line-clamp-2">
           {task.title}
@@ -117,7 +109,7 @@ export default function TaskCard({ task, onClick, isDragOverlay = false }: Props
 
         {/* Overdue indicator */}
         {dueDateStatus === 'overdue' && (
-          <AlertCircle className="h-3.5 w-3.5 text-red-500 absolute bottom-2 right-2" />
+          <AlertCircle className="h-3.5 w-3.5 text-red-500" />
         )}
       </div>
     </div>
