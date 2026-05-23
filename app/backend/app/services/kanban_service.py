@@ -178,7 +178,7 @@ class KanbanService:
         )
         self.db.add(task)
         await self.db.flush()
-        await self.db.refresh(task, ["assignee", "creator", "column"])
+        await self.db.refresh(task, ["created_at", "updated_at", "assignee", "creator", "column"])
         return task
 
     async def update_task(
@@ -213,7 +213,7 @@ class KanbanService:
             task.is_archived = is_archived
 
         await self.db.flush()
-        await self.db.refresh(task, ["assignee", "creator", "column"])
+        await self.db.refresh(task, ["updated_at", "assignee", "creator", "column"])
         return task
 
     async def move_task(
@@ -234,7 +234,7 @@ class KanbanService:
         task.column_id = column_id
         task.sort_order = sort_order
         await self.db.flush()
-        await self.db.refresh(task, ["assignee", "creator", "column"])
+        await self.db.refresh(task, ["updated_at", "assignee", "creator", "column"])
         return task
 
     async def delete_task(self, task_id: uuid.UUID, requester: User) -> None:
