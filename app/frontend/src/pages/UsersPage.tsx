@@ -91,6 +91,7 @@ export default function UsersPage() {
           <thead>
             <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
               <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('auth.full_name')}</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('auth.username')}</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('auth.email')}</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('users.role')}</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('users.team')}</th>
@@ -100,12 +101,13 @@ export default function UsersPage() {
           </thead>
           <tbody>
             {isLoading ? (
-              <tr><td colSpan={6} className="text-center py-8 text-gray-400">{t('common.loading')}</td></tr>
+              <tr><td colSpan={7} className="text-center py-8 text-gray-400">{t('common.loading')}</td></tr>
             ) : data?.items.length === 0 ? (
-              <tr><td colSpan={6} className="text-center py-8 text-gray-400">{t('users.not_found')}</td></tr>
+              <tr><td colSpan={7} className="text-center py-8 text-gray-400">{t('users.not_found')}</td></tr>
             ) : data?.items.map((user) => (
               <tr key={user.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30">
                 <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{user.full_name}</td>
+                <td className="px-4 py-3 text-gray-600 dark:text-gray-400 font-mono text-xs">{user.username}</td>
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{user.email}</td>
                 <td className="px-4 py-3">
                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${

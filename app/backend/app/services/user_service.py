@@ -113,9 +113,11 @@ class UserService:
         # Generate unique username
         final_username = await self._generate_unique_username(email, hint=username)
 
-        # Check if requested username is already taken
-        if username and final_username != username.lower():
-            raise ConflictError("Bu kullanıcı adı zaten kullanımda.")
+        # Check if requested username is already taken (normalize hint the same way _generate_unique_username does)
+        if username:
+            normalized_hint = re.sub(r'[^a-z0-9_]', '', username.lower().replace('.', '_').replace('-', '_'))[:30] or 'user'
+            if final_username != normalized_hint:
+                raise ConflictError("Bu kullanıcı adı zaten kullanımda.")
 
         temp_password = _generate_strong_password()
         user = User(
