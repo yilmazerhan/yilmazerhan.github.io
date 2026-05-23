@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { format, startOfMonth, subDays } from 'date-fns'
+import { format, startOfMonth } from 'date-fns'
 import { Clock, Users, FileText, TrendingUp } from 'lucide-react'
-import { useWorkLogs, useWorkTypes } from '@/api/worklog'
+import { useWorkLogs } from '@/api/worklog'
 import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
 
@@ -22,8 +22,6 @@ export default function ReportsPage() {
     ? { team_id: user.team_id, is_active: true, limit: 200 }
     : { is_active: true, limit: 200 }
   const { data: usersData } = useUsers(canFilterByUser ? usersParams : undefined)
-  const { data: workTypesData } = useWorkTypes(false) // include inactive
-
   const { data, isLoading } = useWorkLogs({
     date_from: dateFrom,
     date_to: dateTo,

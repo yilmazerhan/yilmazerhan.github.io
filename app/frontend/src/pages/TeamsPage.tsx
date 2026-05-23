@@ -322,7 +322,7 @@ export default function TeamsPage() {
     await updateTeam.mutateAsync({
       name: form.name,
       description: form.description || undefined,
-      manager_id: form.manager_id || null,
+      manager_id: form.manager_id || undefined,
       is_active: form.is_active,
     })
     handleClose()

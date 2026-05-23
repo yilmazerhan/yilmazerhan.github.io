@@ -59,7 +59,7 @@ export default function PermissionMatrixModal({ user, onClose }: Props) {
     const payload: Override[] = []
     overrides.forEach((is_allowed, k) => {
       const [module, action] = k.split(':')
-      payload.push({ module, action, is_allowed })
+      payload.push({ module, action, is_allowed: is_allowed as boolean })
     })
     await setPermissions.mutateAsync(payload)
     setSaved(true)

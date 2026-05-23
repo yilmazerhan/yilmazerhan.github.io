@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Pencil, Trash2, Play, ToggleLeft, ToggleRight } from 'lucide-react'
+import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight } from 'lucide-react'
 import {
   useEmailWorkflows,
   useEmailTemplates,

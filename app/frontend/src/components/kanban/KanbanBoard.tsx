@@ -11,7 +11,7 @@ import {
   closestCorners,
 } from '@dnd-kit/core'
 import { useTranslation } from 'react-i18next'
-import { useColumns, useTasks, useMoveTask, type Task, type KanbanColumn } from '@/api/kanban'
+import { useColumns, useTasks, useMoveTask, type Task } from '@/api/kanban'
 import KanbanColumnComp from './KanbanColumn'
 import TaskCard from './TaskCard'
 import TaskModal from './TaskModal'

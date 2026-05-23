@@ -1,8 +1,7 @@
-import { useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useTranslation } from 'react-i18next'
-import { Plus, MoreVertical } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import type { KanbanColumn as ColType, Task } from '@/api/kanban'
 import TaskCard from './TaskCard'
 

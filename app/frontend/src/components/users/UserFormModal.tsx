@@ -107,7 +107,7 @@ export default function UserFormModal({ user, onClose }: Props) {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('users.role')}</label>
             <select
               value={role}
-              onChange={(e) => setRole(e.target.value)}
+              onChange={(e) => setRole(e.target.value as 'superadmin' | 'team_manager' | 'user')}
               className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               <option value="user">{t('users.role_user')}</option>
