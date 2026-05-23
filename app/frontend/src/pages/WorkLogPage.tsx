@@ -4,6 +4,7 @@ import { format, subDays } from 'date-fns'
 import { tr, enUS } from 'date-fns/locale'
 import { Plus, Pencil, Trash2, Clock, AlertTriangle } from 'lucide-react'
 import { useWorkLogs, useDeleteWorkLog, type WorkLog } from '@/api/worklog'
+import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
 import WorkLogModal from '@/components/worklog/WorkLogModal'
 
@@ -23,10 +24,21 @@ export default function WorkLogPage() {
 
   const [dateFrom, setDateFrom] = useState(monthAgo)
   const [dateTo, setDateTo] = useState(today)
+  const [selectedUserId, setSelectedUserId] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
   const [editLog, setEditLog] = useState<WorkLog | null>(null)
 
-  const { data, isLoading } = useWorkLogs({ date_from: dateFrom, date_to: dateTo })
+  const canFilterByUser = user?.role === 'superadmin' || user?.role === 'team_manager'
+  const usersParams = user?.role === 'team_manager' && user.team_id
+    ? { team_id: user.team_id, limit: 200 }
+    : { limit: 200 }
+  const { data: usersData } = useUsers(canFilterByUser ? usersParams : undefined)
+
+  const { data, isLoading } = useWorkLogs({
+    date_from: dateFrom,
+    date_to: dateTo,
+    user_id: selectedUserId || undefined,
+  })
   const deleteLog = useDeleteWorkLog()
 
   async function handleDelete(log: WorkLog) {
@@ -70,6 +82,21 @@ export default function WorkLogPage() {
             className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
+        {canFilterByUser && (
+          <div>
+            <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('worklog.person')}</label>
+            <select
+              value={selectedUserId}
+              onChange={(e) => setSelectedUserId(e.target.value)}
+              className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="">{t('worklog.filter_all_users')}</option>
+              {usersData?.items.map((u) => (
+                <option key={u.id} value={u.id}>{u.full_name}</option>
+              ))}
+            </select>
+          </div>
+        )}
         {data && (
           <div className="flex items-end">
             <span className="text-sm text-gray-500 dark:text-gray-400 pb-2">

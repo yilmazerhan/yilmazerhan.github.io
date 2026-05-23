@@ -81,7 +81,8 @@
     "hours_unit": "hours",
     "hours_abbr": "h",
     "work_type_required": "Please select a work type.",
-    "description_min_length": "Description must be at least 5 characters."
+    "description_min_length": "Description must be at least 5 characters.",
+    "filter_all_users": "All Users"
   },
   "kanban": {
     "title": "Task Board",

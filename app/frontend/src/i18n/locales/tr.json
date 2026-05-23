@@ -81,7 +81,8 @@
     "hours_unit": "saat",
     "hours_abbr": "s",
     "work_type_required": "İş tipi seçiniz.",
-    "description_min_length": "Açıklama en az 5 karakter olmalıdır."
+    "description_min_length": "Açıklama en az 5 karakter olmalıdır.",
+    "filter_all_users": "Tüm Kullanıcılar"
   },
   "kanban": {
     "title": "Görev Panosu",
