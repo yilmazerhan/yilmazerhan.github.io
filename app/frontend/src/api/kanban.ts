@@ -197,3 +197,31 @@ export function useDeleteComment(taskId: string) {
     onSuccess: () => qc.invalidateQueries({ queryKey: commentKeys.list(taskId) }),
   })
 }
+
+export interface TaskHistoryChange {
+  field: string
+  old: string | null
+  new: string | null
+}
+
+export interface TaskHistoryEntry {
+  id: string
+  task_id: string
+  action: string
+  changes: TaskHistoryChange[] | null
+  actor: TaskUser | null
+  created_at: string
+}
+
+export const historyKeys = {
+  list: (taskId: string) => [...kanbanKeys.all, 'history', taskId] as const,
+}
+
+export function useTaskHistory(taskId: string | undefined) {
+  return useQuery({
+    queryKey: historyKeys.list(taskId ?? ''),
+    queryFn: () =>
+      apiClient.get<TaskHistoryEntry[]>(`/kanban/tasks/${taskId}/history`).then((r) => r.data),
+    enabled: !!taskId,
+  })
+}

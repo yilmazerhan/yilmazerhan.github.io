@@ -340,6 +340,17 @@
     "total_col": "Total",
     "grand_total": "Grand Total"
   },
+  "history": {
+    "title": "History",
+    "empty": "No changes recorded yet.",
+    "unknown_actor": "Unknown",
+    "action_created": "created the task",
+    "action_updated": "updated the task",
+    "action_moved": "moved the task",
+    "action_archived": "archived the task",
+    "action_comment_added": "added a comment",
+    "action_comment_deleted": "deleted a comment"
+  },
   "profile": {
     "title": "My Profile",
     "saved": "Profile updated.",

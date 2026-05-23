@@ -340,6 +340,17 @@
     "total_col": "Toplam",
     "grand_total": "Genel Toplam"
   },
+  "history": {
+    "title": "Geçmiş",
+    "empty": "Henüz değişiklik kaydı yok.",
+    "unknown_actor": "Bilinmeyen",
+    "action_created": "görevi oluşturdu",
+    "action_updated": "görevi güncelledi",
+    "action_moved": "görevi taşıdı",
+    "action_archived": "görevi arşivledi",
+    "action_comment_added": "yorum ekledi",
+    "action_comment_deleted": "yorumu sildi"
+  },
   "profile": {
     "title": "Profilim",
     "saved": "Profil güncellendi.",

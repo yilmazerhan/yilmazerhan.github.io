@@ -7,6 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from app.models.kanban import KanbanColumn, Task
 from app.models.task_comment import TaskComment
+from app.models.task_history import TaskHistory
 from app.models.user import User
 from app.core.permissions import can_edit_task, can_delete_task
 from app.core.exceptions import NotFoundError, ForbiddenError, ValidationError
@@ -15,6 +16,21 @@ from app.core.exceptions import NotFoundError, ForbiddenError, ValidationError
 class KanbanService:
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    async def _write_history(
+        self,
+        task_id: uuid.UUID,
+        actor_id: Optional[uuid.UUID],
+        action: str,
+        changes: Optional[list[dict]] = None,
+    ) -> None:
+        entry = TaskHistory(
+            task_id=task_id,
+            changed_by=actor_id,
+            action=action,
+            changes=changes,
+        )
+        self.db.add(entry)
 
     # ─── Columns ─────────────────────────────────────────────────────────────
     async def list_columns(self) -> list[KanbanColumn]:
@@ -180,6 +196,7 @@ class KanbanService:
         self.db.add(task)
         await self.db.flush()
         await self.db.refresh(task, ["created_at", "updated_at", "assignee", "creator", "column"])
+        await self._write_history(task.id, created_by, "created")
         return task
 
     async def update_task(
@@ -198,23 +215,51 @@ class KanbanService:
         if not can_edit_task(requester, task):
             raise ForbiddenError("Bu görevi düzenleme yetkiniz yok.")
 
-        if title is not None:
+        changes: list[dict] = []
+
+        if title is not None and title != task.title:
+            changes.append({"field": "title", "old": task.title, "new": title})
             task.title = title
-        if description is not None:
+        if description is not None and description != task.description:
+            old_desc = (task.description or "")[:120] or None
+            new_desc = description[:120] or None
+            changes.append({"field": "description", "old": old_desc, "new": new_desc})
             task.description = description
         if assignee_id is not ...:
+            old_id = str(task.assignee_id) if task.assignee_id else None
+            new_id = str(assignee_id) if assignee_id else None
+            if old_id != new_id:
+                old_name = task.assignee.full_name if task.assignee else None
+                changes.append({"field": "assignee", "old": old_name, "new": new_id})
             task.assignee_id = assignee_id  # type: ignore[assignment]
-        if priority is not None:
+        if priority is not None and priority != task.priority:
+            changes.append({"field": "priority", "old": task.priority, "new": priority})
             task.priority = priority
         if due_date is not ...:
+            old_due = task.due_date.isoformat() if task.due_date else None
+            new_due = due_date.isoformat() if due_date else None  # type: ignore[union-attr]
+            if old_due != new_due:
+                changes.append({"field": "due_date", "old": old_due, "new": new_due})
             task.due_date = due_date  # type: ignore[assignment]
         if jira_ticket is not None:
-            task.jira_ticket = jira_ticket.strip() or None
-        if is_archived is not None:
+            new_jira = jira_ticket.strip() or None
+            if new_jira != task.jira_ticket:
+                changes.append({"field": "jira_ticket", "old": task.jira_ticket, "new": new_jira})
+            task.jira_ticket = new_jira
+        if is_archived is not None and is_archived != task.is_archived:
+            changes.append({"field": "archived", "old": str(task.is_archived), "new": str(is_archived)})
             task.is_archived = is_archived
 
         await self.db.flush()
         await self.db.refresh(task, ["updated_at", "assignee", "creator", "column"])
+
+        if changes:
+            # Resolve assignee name for display now that relationships are loaded
+            for ch in changes:
+                if ch["field"] == "assignee" and ch["new"] is not None:
+                    ch["new"] = task.assignee.full_name if task.assignee else ch["new"]
+            await self._write_history(task.id, requester.id, "updated", changes)
+
         return task
 
     async def move_task(
@@ -232,10 +277,17 @@ class KanbanService:
         if not col.scalar_one_or_none():
             raise NotFoundError("Sütun")
 
+        old_col_name = task.column.name if task.column else str(task.column_id)
         task.column_id = column_id
         task.sort_order = sort_order
         await self.db.flush()
         await self.db.refresh(task, ["updated_at", "assignee", "creator", "column"])
+        new_col_name = task.column.name if task.column else str(column_id)
+        if str(old_col_name) != str(new_col_name):
+            await self._write_history(
+                task.id, requester.id, "moved",
+                [{"field": "column", "old": old_col_name, "new": new_col_name}],
+            )
         return task
 
     async def delete_task(self, task_id: uuid.UUID, requester: User) -> None:
@@ -243,6 +295,7 @@ class KanbanService:
         if not can_delete_task(requester, task):
             raise ForbiddenError("Bu görevi silme yetkiniz yok.")
         task.is_archived = True
+        await self._write_history(task.id, requester.id, "archived")
         await self.db.flush()
 
     # ─── Comments ─────────────────────────────────────────────────────────────
@@ -263,6 +316,10 @@ class KanbanService:
         self.db.add(comment)
         await self.db.flush()
         await self.db.refresh(comment, ["created_at", "updated_at", "author"])
+        await self._write_history(
+            task_id, user_id, "comment_added",
+            [{"field": "comment", "old": None, "new": content[:120]}],
+        )
         return comment
 
     async def delete_comment(self, comment_id: uuid.UUID, requester: User) -> None:
@@ -274,5 +331,16 @@ class KanbanService:
             raise NotFoundError("Yorum")
         if requester.role != "superadmin" and comment.user_id != requester.id:
             raise ForbiddenError("Bu yorumu silme yetkiniz yok.")
+        task_id = comment.task_id
         await self.db.delete(comment)
+        await self._write_history(task_id, requester.id, "comment_deleted")
         await self.db.flush()
+
+    async def list_history(self, task_id: uuid.UUID) -> list[TaskHistory]:
+        result = await self.db.execute(
+            select(TaskHistory)
+            .options(selectinload(TaskHistory.actor))
+            .where(TaskHistory.task_id == task_id)
+            .order_by(TaskHistory.created_at.desc())
+        )
+        return list(result.scalars().all())

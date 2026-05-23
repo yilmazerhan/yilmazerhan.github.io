@@ -137,3 +137,19 @@ class TaskCommentResponse(BaseModel):
     content: str
     created_at: datetime
     model_config = {"from_attributes": True}
+
+
+class TaskHistoryChange(BaseModel):
+    field: str
+    old: Optional[str]
+    new: Optional[str]
+
+
+class TaskHistoryEntry(BaseModel):
+    id: uuid.UUID
+    task_id: uuid.UUID
+    action: str
+    changes: Optional[list[TaskHistoryChange]]
+    actor: Optional[UserBasic]
+    created_at: datetime
+    model_config = {"from_attributes": True}

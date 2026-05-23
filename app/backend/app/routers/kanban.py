@@ -10,7 +10,7 @@ from app.models.user import User
 from app.schemas.kanban import (
     ColumnCreate, ColumnUpdate, ColumnReorderItem, ColumnResponse,
     TaskCreate, TaskUpdate, TaskMoveRequest, TaskResponse, TaskListResponse,
-    TaskCommentCreate, TaskCommentResponse,
+    TaskCommentCreate, TaskCommentResponse, TaskHistoryEntry,
 )
 from app.schemas.auth import MessageResponse
 from app.services.kanban_service import KanbanService
@@ -173,6 +173,18 @@ async def delete_task(
     svc = KanbanService(db)
     await svc.delete_task(task_id, current_user)
     return {"message": "Görev arşivlendi."}
+
+
+# ─── History ─────────────────────────────────────────────────────────────────
+
+@router.get("/tasks/{task_id}/history", response_model=list[TaskHistoryEntry])
+async def get_task_history(
+    task_id: uuid.UUID,
+    _: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = KanbanService(db)
+    return await svc.list_history(task_id)
 
 
 # ─── Comments ────────────────────────────────────────────────────────────────
