@@ -26,6 +26,8 @@ import BackupPage from '@/pages/BackupPage'
 import UserActivityPage from '@/pages/UserActivityPage'
 import GanttPage from '@/pages/GanttPage'
 import TimelinePage from '@/pages/TimelinePage'
+import LeavePage from '@/pages/LeavePage'
+import LeaveCalendarPage from '@/pages/LeaveCalendarPage'
 
 function BrandingInit() {
   const { data: branding } = useQuery({
@@ -75,6 +77,8 @@ export default function App() {
             <Route path="/kanban" element={<KanbanPage />} />
             <Route path="/gantt" element={<GanttPage />} />
             <Route path="/timeline" element={<TimelinePage />} />
+            <Route path="/leave" element={<LeavePage />} />
+            <Route path="/leave/calendar" element={<LeaveCalendarPage />} />
             <Route path="/users" element={<UsersPage />} />
             <Route path="/teams" element={<TeamsPage />} />
             <Route path="/permissions" element={<PermissionsPage />} />

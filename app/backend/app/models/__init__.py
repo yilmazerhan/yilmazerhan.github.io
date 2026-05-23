@@ -19,3 +19,4 @@ from app.models.task_subtask import TaskSubtask  # noqa: F401
 from app.models.notification import Notification  # noqa: F401
 from app.models.task_attachment import TaskAttachment  # noqa: F401
 from app.models.report_schedule import ReportSchedule  # noqa: F401
+from app.models.leave_request import LeaveRequest  # noqa: F401
