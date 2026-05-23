@@ -3,8 +3,9 @@ import { CSS } from '@dnd-kit/utilities'
 import { format, isToday, isPast, parseISO } from 'date-fns'
 import { tr, enUS } from 'date-fns/locale'
 import { useTranslation } from 'react-i18next'
-import { AlertCircle, Clock, Link } from 'lucide-react'
+import { AlertCircle, Clock, Link, CheckSquare, Square, ListChecks } from 'lucide-react'
 import type { Task } from '@/api/kanban'
+import { useTaskSubtasks } from '@/api/kanban'
 
 const PRIORITY_CONFIG = {
   low: { label: 'priority_low', cls: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' },
@@ -17,11 +18,18 @@ interface Props {
   task: Task
   onClick: (task: Task) => void
   isDragOverlay?: boolean
+  selectionMode?: boolean
+  isSelected?: boolean
+  onToggleSelect?: (id: string) => void
 }
 
-export default function TaskCard({ task, onClick, isDragOverlay = false }: Props) {
+export default function TaskCard({ task, onClick, isDragOverlay = false, selectionMode, isSelected, onToggleSelect }: Props) {
   const { t, i18n } = useTranslation()
   const locale = i18n.language === 'tr' ? tr : enUS
+
+  const { data: subtasks = [] } = useTaskSubtasks(isDragOverlay ? null : task.id)
+  const subtasksTotal = subtasks.length
+  const subtasksDone = subtasks.filter((s) => s.is_completed).length
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
@@ -56,15 +64,34 @@ export default function TaskCard({ task, onClick, isDragOverlay = false }: Props
       style={style}
       {...attributes}
       {...listeners}
-      className={`relative bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 shadow-sm cursor-grab active:cursor-grabbing select-none
+      className={`relative bg-white dark:bg-gray-800 rounded-lg border p-3 shadow-sm select-none
         ${isDragging ? 'opacity-40' : ''}
-        ${isDragOverlay ? 'shadow-xl rotate-1 opacity-95 cursor-grabbing' : 'hover:border-primary-300 dark:hover:border-primary-600'}
+        ${isDragOverlay ? 'shadow-xl rotate-1 opacity-95 cursor-grabbing' : 'cursor-grab active:cursor-grabbing'}
+        ${isSelected
+          ? 'border-primary-400 dark:border-primary-500 ring-2 ring-primary-300 dark:ring-primary-700'
+          : 'border-gray-200 dark:border-gray-700 hover:border-primary-300 dark:hover:border-primary-600'}
       `}
-      onClick={() => !isDragging && onClick(task)}
+      onClick={() => {
+        if (isDragging) return
+        if (selectionMode && onToggleSelect) {
+          onToggleSelect(task.id)
+        } else {
+          onClick(task)
+        }
+      }}
     >
+      {/* Selection checkbox */}
+      {selectionMode && (
+        <div className="absolute top-2 right-2 z-10">
+          {isSelected
+            ? <CheckSquare className="h-4 w-4 text-primary-500" />
+            : <Square className="h-4 w-4 text-gray-400" />}
+        </div>
+      )}
+
       <div className="space-y-2">
         {/* Title */}
-        <p className="text-sm font-medium text-gray-900 dark:text-white leading-snug line-clamp-2">
+        <p className={`text-sm font-medium text-gray-900 dark:text-white leading-snug line-clamp-2 ${selectionMode ? 'pr-6' : ''}`}>
           {task.title}
         </p>
 
@@ -104,6 +131,20 @@ export default function TaskCard({ task, onClick, isDragOverlay = false }: Props
             <span className="text-xs text-gray-500 dark:text-gray-400 truncate">
               {task.assignee.full_name}
             </span>
+          </div>
+        )}
+
+        {/* Subtasks progress */}
+        {subtasksTotal > 0 && (
+          <div className="flex items-center gap-1.5">
+            <ListChecks className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+            <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+              <div
+                className="bg-primary-500 h-1.5 rounded-full transition-all"
+                style={{ width: `${Math.round((subtasksDone / subtasksTotal) * 100)}%` }}
+              />
+            </div>
+            <span className="text-xs text-gray-500 dark:text-gray-400">{subtasksDone}/{subtasksTotal}</span>
           </div>
         )}
 

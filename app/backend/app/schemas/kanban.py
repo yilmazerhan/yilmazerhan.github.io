@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime
 from typing import Optional
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ColumnCreate(BaseModel):
@@ -153,3 +153,26 @@ class TaskHistoryEntry(BaseModel):
     actor: Optional[UserBasic]
     created_at: datetime
     model_config = {"from_attributes": True}
+
+
+# ─── Subtask schemas ──────────────────────────────────────────────────────────
+
+class SubtaskCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255)
+    sort_order: int = 0
+
+
+class SubtaskUpdate(BaseModel):
+    title: Optional[str] = Field(None, min_length=1, max_length=255)
+    is_completed: Optional[bool] = None
+    sort_order: Optional[int] = None
+
+
+class SubtaskResponse(BaseModel):
+    id: uuid.UUID
+    task_id: uuid.UUID
+    title: str
+    is_completed: bool
+    sort_order: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)

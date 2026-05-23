@@ -70,7 +70,9 @@
     "db_email_failed": "başarısız",
     "hours_by_type": "Bu Hafta İş Tipi Dağılımı",
     "hours_by_person": "Bu Hafta Kişi Başı Saat",
-    "no_hours": "Bu hafta kayıt yok"
+    "no_hours": "Bu hafta kayıt yok",
+    "edit_widgets": "Widget'ları Düzenle",
+    "done_editing": "Tamam"
   },
   "worklog": {
     "title": "İş Günlüğü",
@@ -139,7 +141,17 @@
     "add_comment": "Yorum ekle...",
     "no_comments": "Henüz yorum yok",
     "delete_comment": "Yorumu Sil",
-    "comment_count": "{{count}} yorum"
+    "comment_count": "{{count}} yorum",
+    "subtasks": "Alt Görevler",
+    "subtasks_progress": "{{done}}/{{total}}",
+    "subtask_placeholder": "Alt görev ekle...",
+    "no_subtasks": "Henüz alt görev yok.",
+    "search_tasks": "Görev ara...",
+    "selected": "seçili",
+    "bulk_move_to": "Taşı...",
+    "bulk_archive": "Seçilileri arşivle",
+    "selection_mode": "Seçim Modu",
+    "empty_column": "+ Görev ekle"
   },
   "teams": {
     "title": "Takımlar",

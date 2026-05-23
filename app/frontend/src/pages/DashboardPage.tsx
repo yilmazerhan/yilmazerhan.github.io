@@ -1,15 +1,42 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format, subDays, isToday, isPast, parseISO } from 'date-fns'
 import { tr, enUS } from 'date-fns/locale'
-import { Clock, AlertTriangle, CheckCircle2, ListTodo, TrendingUp, Users, Database, Mail } from 'lucide-react'
+import { Clock, AlertTriangle, CheckCircle2, ListTodo, TrendingUp, Users, Database, Mail, Settings2, Eye, EyeOff, Check } from 'lucide-react'
 import { useTasks } from '@/api/kanban'
 import { useWorkLogs } from '@/api/worklog'
 import { useAuthStore } from '@/store/authStore'
 import { useDashboardStats } from '@/api/admin'
 
+const WIDGET_KEYS = ['db_stats', 'charts', 'overdue', 'recent_logs'] as const
+type WidgetKey = typeof WIDGET_KEYS[number]
+
+function loadHiddenWidgets(): Set<WidgetKey> {
+  try {
+    const raw = localStorage.getItem('dashboard_hidden_widgets')
+    if (raw) return new Set(JSON.parse(raw) as WidgetKey[])
+  } catch { /* ignore */ }
+  return new Set()
+}
+
+function saveHiddenWidgets(set: Set<WidgetKey>) {
+  localStorage.setItem('dashboard_hidden_widgets', JSON.stringify([...set]))
+}
+
 export default function DashboardPage() {
   const { t, i18n } = useTranslation()
+  const [editMode, setEditMode] = useState(false)
+  const [hiddenWidgets, setHiddenWidgets] = useState<Set<WidgetKey>>(loadHiddenWidgets)
+
+  const toggleWidget = useCallback((key: WidgetKey) => {
+    setHiddenWidgets((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      saveHiddenWidgets(next)
+      return next
+    })
+  }, [])
   const user = useAuthStore((s) => s.user)
   const locale = i18n.language === 'tr' ? tr : enUS
   const today = format(new Date(), 'yyyy-MM-dd')
@@ -80,15 +107,30 @@ export default function DashboardPage() {
     { label: t('dashboard.weekly_hours'), value: `${stats.totalHours.toFixed(1)}${hourAbbr}`, icon: TrendingUp, color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-50 dark:bg-indigo-900/20' },
   ]
 
+  const isHidden = (key: WidgetKey) => hiddenWidgets.has(key)
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          {t('nav.dashboard')}
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          {format(new Date(), 'EEEE, d MMMM yyyy', { locale })}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            {t('nav.dashboard')}
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            {format(new Date(), 'EEEE, d MMMM yyyy', { locale })}
+          </p>
+        </div>
+        <button
+          onClick={() => setEditMode((v) => !v)}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm border transition-colors ${
+            editMode
+              ? 'bg-primary-500 border-primary-500 text-white'
+              : 'border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+          }`}
+        >
+          {editMode ? <Check className="h-4 w-4" /> : <Settings2 className="h-4 w-4" />}
+          {editMode ? t('dashboard.done_editing') : t('dashboard.edit_widgets')}
+        </button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -103,11 +145,16 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {isSuperAdmin && dbStats && (
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+      {isSuperAdmin && dbStats && (!isHidden('db_stats') || editMode) && (
+        <div className={`bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 ${isHidden('db_stats') ? 'opacity-40' : ''}`}>
           <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
             <Database className="h-4 w-4 text-gray-400" />
             {t('dashboard.db_stats')}
+            {editMode && (
+              <button onClick={() => toggleWidget('db_stats')} className="ml-auto p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+                {isHidden('db_stats') ? <Eye className="h-4 w-4 text-gray-400" /> : <EyeOff className="h-4 w-4 text-gray-400" />}
+              </button>
+            )}
           </h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div className="flex items-center gap-3">
@@ -156,13 +203,18 @@ export default function DashboardPage() {
       )}
 
       {/* Work type breakdown + hours per person */}
-      {workTypeBreakdown.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {workTypeBreakdown.length > 0 && (!isHidden('charts') || editMode) && (
+        <div className={`grid grid-cols-1 lg:grid-cols-2 gap-6 ${isHidden('charts') ? 'opacity-40' : ''}`}>
           {/* Work type bar chart */}
           <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
             <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-indigo-500" />
               {t('dashboard.hours_by_type')}
+              {editMode && (
+                <button onClick={() => toggleWidget('charts')} className="ml-auto p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+                  {isHidden('charts') ? <Eye className="h-4 w-4 text-gray-400" /> : <EyeOff className="h-4 w-4 text-gray-400" />}
+                </button>
+              )}
             </h2>
             <div className="space-y-3">
               {workTypeBreakdown.map((wt) => (
@@ -254,9 +306,15 @@ export default function DashboardPage() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+        {(!isHidden('overdue') || editMode) && (
+        <div className={`bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 ${isHidden('overdue') ? 'opacity-40' : ''}`}>
           <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-red-500" /> {t('dashboard.overdue_section')}
+            {editMode && (
+              <button onClick={() => toggleWidget('overdue')} className="ml-auto p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+                {isHidden('overdue') ? <Eye className="h-4 w-4 text-gray-400" /> : <EyeOff className="h-4 w-4 text-gray-400" />}
+              </button>
+            )}
           </h2>
           {urgentTasks.length === 0 ? (
             <p className="text-sm text-gray-400 py-4 text-center">{t('dashboard.no_overdue')}</p>
@@ -280,10 +338,17 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+        )}
 
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+        {(!isHidden('recent_logs') || editMode) && (
+        <div className={`bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 ${isHidden('recent_logs') ? 'opacity-40' : ''}`}>
           <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
             <Clock className="h-4 w-4 text-blue-500" /> {t('dashboard.recent_logs')}
+            {editMode && (
+              <button onClick={() => toggleWidget('recent_logs')} className="ml-auto p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+                {isHidden('recent_logs') ? <Eye className="h-4 w-4 text-gray-400" /> : <EyeOff className="h-4 w-4 text-gray-400" />}
+              </button>
+            )}
           </h2>
           {recentLogs.length === 0 ? (
             <p className="text-sm text-gray-400 py-4 text-center">{t('dashboard.no_logs')}</p>
@@ -312,6 +377,7 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   )

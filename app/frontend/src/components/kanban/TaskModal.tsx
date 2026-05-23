@@ -1,11 +1,11 @@
 import { useState, useRef } from 'react'
-import { X, Trash2, Send, History, MessageSquare, ClipboardList } from 'lucide-react'
+import { X, Trash2, Send, History, MessageSquare, ClipboardList, CheckSquare, Square, ListChecks, Plus } from 'lucide-react'
 import { format } from 'date-fns'
 import { useTranslation } from 'react-i18next'
 import {
   useCreateTask, useUpdateTask, useDeleteTask, useMoveTask,
   useTaskComments, useCreateComment, useDeleteComment,
-  useTaskHistory,
+  useTaskHistory, useTaskSubtasks, useCreateSubtask, useUpdateSubtask, useDeleteSubtask,
   type Task, type TaskHistoryEntry,
 } from '@/api/kanban'
 import type { KanbanColumn } from '@/api/kanban'
@@ -22,7 +22,7 @@ interface Props {
 
 const PRIORITIES = ['low', 'medium', 'high', 'critical'] as const
 
-type Tab = 'details' | 'comments' | 'history'
+type Tab = 'details' | 'subtasks' | 'comments' | 'history'
 
 // ─── History timeline ─────────────────────────────────────────────────────────
 
@@ -169,6 +169,12 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
   const createComment = useCreateComment(task?.id ?? '')
   const deleteComment = useDeleteComment(task?.id ?? '')
   const [commentText, setCommentText] = useState('')
+
+  const { data: subtasks = [] } = useTaskSubtasks(isEdit ? task?.id : null)
+  const createSubtask = useCreateSubtask(task?.id ?? '')
+  const updateSubtask = useUpdateSubtask(task?.id ?? '')
+  const deleteSubtask = useDeleteSubtask(task?.id ?? '')
+  const [subtaskInput, setSubtaskInput] = useState('')
   const commentInputRef = useRef<HTMLTextAreaElement>(null)
   const [mentionQuery, setMentionQuery] = useState('')
   const [mentionOpen, setMentionOpen] = useState(false)
@@ -265,8 +271,12 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
     }
   }
 
+  const subtasksDone = subtasks.filter((s) => s.is_completed).length
+  const subtasksTotal = subtasks.length
+
   const TABS: { key: Tab; icon: React.ComponentType<{ className?: string }>; labelKey: string; count?: number }[] = [
-    { key: 'details', icon: ClipboardList, labelKey: 'kanban.task_title' },
+    { key: 'details', icon: ClipboardList, labelKey: 'kanban_tabs.details' },
+    { key: 'subtasks', icon: ListChecks, labelKey: 'kanban.subtasks', count: subtasksTotal || undefined },
     { key: 'comments', icon: MessageSquare, labelKey: 'kanban.comments', count: comments.length || undefined },
     { key: 'history', icon: History, labelKey: 'history.title', count: historyEntries.length || undefined },
   ]
@@ -459,6 +469,79 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
                 )}
               </div>
             </form>
+          )}
+
+          {/* ── Subtasks tab ── */}
+          {activeTab === 'subtasks' && isEdit && task && (
+            <div className="p-4 space-y-3 overflow-y-auto flex-1">
+              {subtasksTotal > 0 && (
+                <div className="space-y-1">
+                  <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                    <span>{t('kanban.subtasks_progress', { done: subtasksDone, total: subtasksTotal })}</span>
+                    <span>{Math.round((subtasksDone / subtasksTotal) * 100)}%</span>
+                  </div>
+                  <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-primary-500 rounded-full transition-all"
+                      style={{ width: `${(subtasksDone / subtasksTotal) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+              <div className="space-y-1.5">
+                {subtasks.map((subtask) => (
+                  <div key={subtask.id} className="flex items-center gap-2 group py-0.5">
+                    <button
+                      onClick={() => updateSubtask.mutate({ subtaskId: subtask.id, is_completed: !subtask.is_completed })}
+                      className="flex-shrink-0 text-gray-400 hover:text-primary-500"
+                    >
+                      {subtask.is_completed
+                        ? <CheckSquare className="h-4 w-4 text-primary-500" />
+                        : <Square className="h-4 w-4" />}
+                    </button>
+                    <span className={`flex-1 text-sm ${subtask.is_completed ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                      {subtask.title}
+                    </span>
+                    <button
+                      onClick={() => deleteSubtask.mutate(subtask.id)}
+                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-gray-400 hover:text-red-500 transition-opacity"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              {subtasks.length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-4">{t('kanban.no_subtasks')}</p>
+              )}
+              <div className="flex gap-2 pt-1">
+                <input
+                  type="text"
+                  value={subtaskInput}
+                  onChange={(e) => setSubtaskInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && subtaskInput.trim()) {
+                      createSubtask.mutate({ title: subtaskInput.trim(), sort_order: subtasks.length })
+                      setSubtaskInput('')
+                    }
+                  }}
+                  placeholder={t('kanban.subtask_placeholder')}
+                  className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+                <button
+                  onClick={() => {
+                    if (subtaskInput.trim()) {
+                      createSubtask.mutate({ title: subtaskInput.trim(), sort_order: subtasks.length })
+                      setSubtaskInput('')
+                    }
+                  }}
+                  disabled={!subtaskInput.trim()}
+                  className="px-3 py-1.5 rounded-lg bg-primary-500 text-white disabled:opacity-40 hover:bg-primary-600"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
           )}
 
           {/* ── Comments tab ── */}

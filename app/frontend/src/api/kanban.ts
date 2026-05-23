@@ -63,6 +63,7 @@ export function useTasks(params?: {
   column_id?: string
   priority?: string
   include_archived?: boolean
+  search?: string
   limit?: number
 }) {
   return useQuery({
@@ -223,5 +224,72 @@ export function useTaskHistory(taskId: string | undefined) {
     queryFn: () =>
       apiClient.get<TaskHistoryEntry[]>(`/kanban/tasks/${taskId}/history`).then((r) => r.data),
     enabled: !!taskId,
+  })
+}
+
+// ─── Subtasks ────────────────────────────────────────────────────────────────
+
+export interface Subtask {
+  id: string
+  task_id: string
+  title: string
+  is_completed: boolean
+  sort_order: number
+  created_at: string
+}
+
+export const subtaskKeys = {
+  list: (taskId: string) => [...kanbanKeys.all, 'subtasks', taskId] as const,
+}
+
+export function useTaskSubtasks(taskId: string | null | undefined) {
+  return useQuery({
+    queryKey: subtaskKeys.list(taskId ?? ''),
+    queryFn: () =>
+      apiClient.get<Subtask[]>(`/kanban/tasks/${taskId}/subtasks`).then((r) => r.data),
+    enabled: !!taskId,
+  })
+}
+
+export function useCreateSubtask(taskId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { title: string; sort_order?: number }) =>
+      apiClient.post<Subtask>(`/kanban/tasks/${taskId}/subtasks`, data).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: subtaskKeys.list(taskId) }),
+  })
+}
+
+export function useUpdateSubtask(taskId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ subtaskId, ...data }: { subtaskId: string; title?: string; is_completed?: boolean; sort_order?: number }) =>
+      apiClient.patch<Subtask>(`/kanban/tasks/${taskId}/subtasks/${subtaskId}`, data).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: subtaskKeys.list(taskId) }),
+  })
+}
+
+export function useDeleteSubtask(taskId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (subtaskId: string) =>
+      apiClient.delete(`/kanban/tasks/${taskId}/subtasks/${subtaskId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: subtaskKeys.list(taskId) }),
+  })
+}
+
+// ─── Bulk Operations ─────────────────────────────────────────────────────────
+
+export function useBulkUpdateTasks() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: {
+      task_ids: string[]
+      column_id?: string
+      assignee_id?: string | null
+      priority?: string
+      is_archived?: boolean
+    }) => apiClient.patch<{ updated: number }>('/kanban/tasks/bulk', data).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: kanbanKeys.all }),
   })
 }

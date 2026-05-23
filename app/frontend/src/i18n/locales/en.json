@@ -70,7 +70,9 @@
     "db_email_failed": "failed",
     "hours_by_type": "This Week by Work Type",
     "hours_by_person": "Hours Per Person This Week",
-    "no_hours": "No records this week"
+    "no_hours": "No records this week",
+    "edit_widgets": "Customize Widgets",
+    "done_editing": "Done"
   },
   "worklog": {
     "title": "Work Log",
@@ -139,7 +141,17 @@
     "add_comment": "Add a comment...",
     "no_comments": "No comments yet",
     "delete_comment": "Delete Comment",
-    "comment_count": "{{count}} comment(s)"
+    "comment_count": "{{count}} comment(s)",
+    "subtasks": "Subtasks",
+    "subtasks_progress": "{{done}}/{{total}}",
+    "subtask_placeholder": "Add subtask...",
+    "no_subtasks": "No subtasks yet.",
+    "search_tasks": "Search tasks...",
+    "selected": "selected",
+    "bulk_move_to": "Move to...",
+    "bulk_archive": "Archive selected",
+    "selection_mode": "Selection Mode",
+    "empty_column": "+ Add task"
   },
   "teams": {
     "title": "Teams",

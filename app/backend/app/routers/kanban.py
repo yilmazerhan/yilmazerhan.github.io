@@ -11,7 +11,9 @@ from app.schemas.kanban import (
     ColumnCreate, ColumnUpdate, ColumnReorderItem, ColumnResponse,
     TaskCreate, TaskUpdate, TaskMoveRequest, TaskResponse, TaskListResponse,
     TaskCommentCreate, TaskCommentResponse, TaskHistoryEntry,
+    SubtaskCreate, SubtaskUpdate, SubtaskResponse,
 )
+from pydantic import BaseModel as _BaseModel
 from app.schemas.auth import MessageResponse
 from app.services.kanban_service import KanbanService
 from app.core.dependencies import get_current_user, require_superadmin, require_manager_or_above
@@ -84,6 +86,7 @@ async def list_tasks(
     priority: Optional[str] = Query(None),
     due_before: Optional[date] = Query(None),
     include_archived: bool = Query(False),
+    search: Optional[str] = Query(None, max_length=200),
     skip: int = Query(0, ge=0),
     limit: int = Query(200, ge=1, le=500),
 ):
@@ -96,6 +99,7 @@ async def list_tasks(
         priority=priority,
         due_before=due_before,
         include_archived=include_archived,
+        search=search,
         skip=skip,
         limit=limit,
     )
@@ -119,6 +123,31 @@ async def create_task(
         due_date=body.due_date,
         jira_ticket=body.jira_ticket,
     )
+
+
+class BulkUpdateRequest(_BaseModel):
+    task_ids: list[uuid.UUID]
+    column_id: Optional[uuid.UUID] = None
+    assignee_id: Optional[uuid.UUID] = None
+    priority: Optional[str] = None
+    is_archived: Optional[bool] = None
+
+
+@router.patch("/tasks/bulk", response_model=dict)
+async def bulk_update_tasks(
+    body: BulkUpdateRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = KanbanService(db)
+    count = await svc.bulk_update_tasks(
+        task_ids=body.task_ids,
+        column_id=body.column_id,
+        assignee_id=body.assignee_id,
+        priority=body.priority,
+        is_archived=body.is_archived,
+    )
+    return {"updated": count}
 
 
 @router.get("/tasks/{task_id}", response_model=TaskResponse)
@@ -220,3 +249,49 @@ async def delete_comment(
     svc = KanbanService(db)
     await svc.delete_comment(comment_id, current_user)
     return {"message": "Yorum silindi."}
+
+
+# ─── Subtasks ────────────────────────────────────────────────────────────────
+
+@router.get("/tasks/{task_id}/subtasks", response_model=list[SubtaskResponse])
+async def list_subtasks(
+    task_id: uuid.UUID,
+    _: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = KanbanService(db)
+    return await svc.list_subtasks(task_id)
+
+
+@router.post("/tasks/{task_id}/subtasks", response_model=SubtaskResponse, status_code=201)
+async def create_subtask(
+    task_id: uuid.UUID,
+    body: SubtaskCreate,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = KanbanService(db)
+    return await svc.create_subtask(task_id, body)
+
+
+@router.patch("/tasks/{task_id}/subtasks/{subtask_id}", response_model=SubtaskResponse)
+async def update_subtask(
+    task_id: uuid.UUID,
+    subtask_id: uuid.UUID,
+    body: SubtaskUpdate,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = KanbanService(db)
+    return await svc.update_subtask(task_id, subtask_id, body)
+
+
+@router.delete("/tasks/{task_id}/subtasks/{subtask_id}", status_code=204)
+async def delete_subtask(
+    task_id: uuid.UUID,
+    subtask_id: uuid.UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = KanbanService(db)
+    await svc.delete_subtask(task_id, subtask_id)

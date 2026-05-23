@@ -8,10 +8,12 @@ from sqlalchemy.orm import selectinload
 from app.models.kanban import KanbanColumn, Task
 from app.models.task_comment import TaskComment
 from app.models.task_history import TaskHistory
+from app.models.task_subtask import TaskSubtask
 from app.models.user import User
 from app.core.permissions import can_edit_task, can_delete_task
 from app.core.exceptions import NotFoundError, ForbiddenError, ValidationError
 from app.services.notification_service import NotificationService
+from app.schemas.kanban import SubtaskCreate, SubtaskUpdate
 
 
 class KanbanService:
@@ -97,6 +99,7 @@ class KanbanService:
         priority: Optional[str] = None,
         due_before: Optional[date] = None,
         include_archived: bool = False,
+        search: Optional[str] = None,
         skip: int = 0,
         limit: int = 200,
     ) -> tuple[list[Task], int]:
@@ -142,6 +145,8 @@ class KanbanService:
             q = q.where(Task.priority == priority)
         if due_before:
             q = q.where(Task.due_date <= due_before)
+        if search:
+            q = q.where(Task.title.ilike(f"%{search}%"))
 
         total = (await self.db.execute(select(func.count()).select_from(q.subquery()))).scalar_one()
         q = q.order_by(Task.column_id, Task.sort_order).offset(skip).limit(limit)
@@ -385,3 +390,69 @@ class KanbanService:
             .order_by(TaskHistory.created_at.desc())
         )
         return list(result.scalars().all())
+
+    # ─── Subtasks ─────────────────────────────────────────────────────────────
+
+    async def list_subtasks(self, task_id: uuid.UUID) -> list[TaskSubtask]:
+        result = await self.db.execute(
+            select(TaskSubtask).where(TaskSubtask.task_id == task_id).order_by(TaskSubtask.sort_order)
+        )
+        return list(result.scalars().all())
+
+    async def create_subtask(self, task_id: uuid.UUID, data: SubtaskCreate) -> TaskSubtask:
+        subtask = TaskSubtask(task_id=task_id, **data.model_dump())
+        self.db.add(subtask)
+        await self.db.commit()
+        await self.db.refresh(subtask)
+        return subtask
+
+    async def update_subtask(self, task_id: uuid.UUID, subtask_id: uuid.UUID, data: SubtaskUpdate) -> TaskSubtask:
+        from fastapi import HTTPException
+        result = await self.db.execute(
+            select(TaskSubtask).where(TaskSubtask.id == subtask_id, TaskSubtask.task_id == task_id)
+        )
+        subtask = result.scalar_one_or_none()
+        if not subtask:
+            raise HTTPException(status_code=404, detail="Alt görev bulunamadı.")
+        for k, v in data.model_dump(exclude_none=True).items():
+            setattr(subtask, k, v)
+        await self.db.commit()
+        await self.db.refresh(subtask)
+        return subtask
+
+    async def delete_subtask(self, task_id: uuid.UUID, subtask_id: uuid.UUID) -> None:
+        from fastapi import HTTPException
+        result = await self.db.execute(
+            select(TaskSubtask).where(TaskSubtask.id == subtask_id, TaskSubtask.task_id == task_id)
+        )
+        subtask = result.scalar_one_or_none()
+        if not subtask:
+            raise HTTPException(status_code=404, detail="Alt görev bulunamadı.")
+        await self.db.delete(subtask)
+        await self.db.commit()
+
+    # ─── Bulk Operations ──────────────────────────────────────────────────────
+
+    async def bulk_update_tasks(
+        self,
+        task_ids: list[uuid.UUID],
+        column_id: Optional[uuid.UUID] = None,
+        assignee_id: Optional[uuid.UUID] = None,
+        priority: Optional[str] = None,
+        is_archived: Optional[bool] = None,
+    ) -> int:
+        if not task_ids:
+            return 0
+        result = await self.db.execute(select(Task).where(Task.id.in_(task_ids)))
+        tasks = list(result.scalars().all())
+        for task in tasks:
+            if column_id is not None:
+                task.column_id = column_id
+            if assignee_id is not None:
+                task.assignee_id = assignee_id
+            if priority is not None:
+                task.priority = priority
+            if is_archived is not None:
+                task.is_archived = is_archived
+        await self.db.commit()
+        return len(tasks)

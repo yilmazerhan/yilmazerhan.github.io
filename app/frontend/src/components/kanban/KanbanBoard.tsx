@@ -19,10 +19,13 @@ import WorkLogFromTaskModal from './WorkLogFromTaskModal'
 
 interface Props {
   onAddTask?: (columnId: string) => void
-  taskParams?: { assignee_id?: string; team_id?: string; priority?: string }
+  taskParams?: { assignee_id?: string; team_id?: string; priority?: string; search?: string }
+  selectionMode?: boolean
+  selectedTaskIds?: Set<string>
+  onToggleSelect?: (id: string) => void
 }
 
-export default function KanbanBoard({ taskParams }: Props) {
+export default function KanbanBoard({ taskParams, selectionMode, selectedTaskIds, onToggleSelect }: Props) {
   const { t } = useTranslation()
   const { data: columns = [], isLoading: colLoading } = useColumns()
   const { data: tasksData, isLoading: taskLoading } = useTasks(taskParams)
@@ -168,7 +171,16 @@ export default function KanbanBoard({ taskParams }: Props) {
               column={col}
               tasks={tasksByColumn[col.id] ?? []}
               onAddTask={(colId) => setAddColumnId(colId)}
-              onTaskClick={(task) => setSelectedTask(task)}
+              onTaskClick={(task) => {
+                if (selectionMode && onToggleSelect) {
+                  onToggleSelect(task.id)
+                } else {
+                  setSelectedTask(task)
+                }
+              }}
+              selectionMode={selectionMode}
+              selectedTaskIds={selectedTaskIds}
+              onToggleSelect={onToggleSelect}
             />
           ))}
         </div>

@@ -40,6 +40,9 @@ class WorkLog(Base):
     log_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     duration_hours: Mapped[float] = mapped_column(Numeric(4, 2), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
+    task_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tasks.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -47,3 +50,4 @@ class WorkLog(Base):
 
     user: Mapped["User"] = relationship("User", back_populates="work_logs")
     work_type: Mapped["WorkType"] = relationship("WorkType", back_populates="work_logs")
+    task: Mapped[Optional["Task"]] = relationship("Task", back_populates="work_logs", lazy="selectin")  # type: ignore[name-defined]

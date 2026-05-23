@@ -10,9 +10,12 @@ interface Props {
   tasks: Task[]
   onAddTask: (columnId: string) => void
   onTaskClick: (task: Task) => void
+  selectionMode?: boolean
+  selectedTaskIds?: Set<string>
+  onToggleSelect?: (id: string) => void
 }
 
-export default function KanbanColumnComp({ column, tasks, onAddTask, onTaskClick }: Props) {
+export default function KanbanColumnComp({ column, tasks, onAddTask, onTaskClick, selectionMode, selectedTaskIds, onToggleSelect }: Props) {
   const { t } = useTranslation()
   const { setNodeRef, isOver } = useDroppable({ id: column.id, data: { type: 'Column', column } })
 
@@ -53,12 +56,22 @@ export default function KanbanColumnComp({ column, tasks, onAddTask, onTaskClick
       >
         <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
           {tasks.length === 0 ? (
-            <p className="text-xs text-gray-400 dark:text-gray-600 text-center py-6">
-              {t('kanban.no_tasks')}
-            </p>
+            <button
+              onClick={() => onAddTask(column.id)}
+              className="w-full text-xs text-gray-400 dark:text-gray-600 text-center py-6 hover:text-primary-500 dark:hover:text-primary-400 transition-colors"
+            >
+              {t('kanban.empty_column')}
+            </button>
           ) : (
             tasks.map((task) => (
-              <TaskCard key={task.id} task={task} onClick={onTaskClick} />
+              <TaskCard
+                key={task.id}
+                task={task}
+                onClick={onTaskClick}
+                selectionMode={selectionMode}
+                isSelected={selectedTaskIds?.has(task.id)}
+                onToggleSelect={onToggleSelect}
+              />
             ))
           )}
         </SortableContext>

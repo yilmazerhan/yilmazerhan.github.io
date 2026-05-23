@@ -59,3 +59,5 @@ class Task(Base):
     creator: Mapped["User"] = relationship("User", foreign_keys=[created_by])
     column: Mapped["KanbanColumn"] = relationship("KanbanColumn", back_populates="tasks")
     comments: Mapped[list["TaskComment"]] = relationship("TaskComment", back_populates="task", cascade="all, delete-orphan", order_by="TaskComment.created_at")  # type: ignore[name-defined]
+    subtasks: Mapped[list["TaskSubtask"]] = relationship("TaskSubtask", back_populates="task", cascade="all, delete-orphan", lazy="selectin", order_by="TaskSubtask.sort_order")  # type: ignore[name-defined]
+    work_logs: Mapped[list["WorkLog"]] = relationship("WorkLog", back_populates="task", lazy="selectin")  # type: ignore[name-defined]
