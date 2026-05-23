@@ -1,10 +1,29 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format, startOfMonth } from 'date-fns'
-import { Clock, Users, FileText, TrendingUp } from 'lucide-react'
+import { Clock, Users, FileText, TrendingUp, Download } from 'lucide-react'
 import { useWorkLogs } from '@/api/worklog'
 import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
+
+function exportCSV(logs: any[], dateFrom: string, dateTo: string) {
+  const header = ['Date', 'User', 'Work Type', 'Duration (h)', 'Description']
+  const rows = logs.map((l) => [
+    l.log_date,
+    l.user.full_name,
+    l.work_type.name,
+    l.duration_hours.toString(),
+    `"${(l.description ?? '').replace(/"/g, '""')}"`,
+  ])
+  const csv = [header, ...rows].map((r) => r.join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `worklog_${dateFrom}_${dateTo}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 export default function ReportsPage() {
   const { t } = useTranslation()
@@ -77,7 +96,18 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6 max-w-5xl">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('reports.title')}</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('reports.title')}</h1>
+        {logs.length > 0 && (
+          <button
+            onClick={() => exportCSV(logs, dateFrom, dateTo)}
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
+          >
+            <Download className="h-4 w-4" />
+            {t('reports.export_csv')}
+          </button>
+        )}
+      </div>
 
       {/* Filters */}
       <div className="flex gap-3 flex-wrap items-end">

@@ -39,7 +39,8 @@
     "settings": "Ayarlar",
     "email": "E-posta",
     "reports": "Raporlar",
-    "auditLogs": "Audit Log"
+    "auditLogs": "Audit Log",
+    "backup": "Yedek"
   },
   "dashboard": {
     "total_tasks": "Toplam Görev",
@@ -87,7 +88,9 @@
     "description_min_length": "Açıklama en az 5 karakter olmalıdır.",
     "filter_all_users": "Tüm Kullanıcılar",
     "for_user": "Kişi Adına",
-    "myself": "Kendin"
+    "myself": "Kendin",
+    "view_list": "Liste Görünümü",
+    "view_calendar": "Takvim Görünümü"
   },
   "kanban": {
     "title": "Görev Panosu",
@@ -338,7 +341,8 @@
     "no_data": "Seçilen dönem için veri yok.",
     "user_col": "Kullanıcı",
     "total_col": "Toplam",
-    "grand_total": "Genel Toplam"
+    "grand_total": "Genel Toplam",
+    "export_csv": "CSV İndir"
   },
   "history": {
     "title": "Geçmiş",
@@ -378,5 +382,17 @@
   "language": {
     "tr": "Türkçe",
     "en": "İngilizce"
+  },
+  "backup": {
+    "title": "Veritabanı Yedeği",
+    "section_title": "Veritabanı Yedeğini İndir",
+    "description": "Uygulama veritabanının tam PostgreSQL dump'ını oluşturun ve indirin.",
+    "note_format": ".sql dosyası olarak dışa aktarılır (PostgreSQL dump formatı)",
+    "note_includes": "Tüm tablolar dahildir: kullanıcılar, görevler, iş günlükleri, ayarlar ve daha fazlası",
+    "note_restore": "Geri yüklemek için: psql -U <kullanıcı> -d <veritabanı> < backup.sql",
+    "download": "Yedeği İndir",
+    "downloading": "Hazırlanıyor...",
+    "error_no_pgdump": "Bu sunucuda pg_dump mevcut değil.",
+    "error_failed": "Yedek alınamadı. Lütfen tekrar deneyin."
   }
 }

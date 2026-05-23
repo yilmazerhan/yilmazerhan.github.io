@@ -22,6 +22,7 @@ import AuditLogsPage from '@/pages/AuditLogsPage'
 import ReportsPage from '@/pages/ReportsPage'
 import PermissionsPage from '@/pages/PermissionsPage'
 import ProfilePage from '@/pages/ProfilePage'
+import BackupPage from '@/pages/BackupPage'
 
 function BrandingInit() {
   const { data: branding } = useQuery({
@@ -79,6 +80,7 @@ export default function App() {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/admin/audit-logs" element={<AuditLogsPage />} />
+            <Route path="/admin/backup" element={<BackupPage />} />
           </Route>
         </Route>
 

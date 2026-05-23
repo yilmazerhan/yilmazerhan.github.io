@@ -5,7 +5,7 @@ import axios from 'axios'
 import { useAuthStore } from '@/store/authStore'
 import {
   LayoutDashboard, ClipboardList, Kanban, Users, Users2,
-  Mail, Settings, ScrollText, BarChart3, ShieldCheck, UserCircle, Keyboard,
+  Mail, Settings, ScrollText, BarChart3, ShieldCheck, UserCircle, Keyboard, HardDriveDownload,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -30,6 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/settings/email/workflows', icon: Mail, labelKey: 'nav.email', requiredRole: ['superadmin'] },
   { to: '/settings', icon: Settings, labelKey: 'nav.settings', requiredRole: ['superadmin'] },
   { to: '/admin/audit-logs', icon: ScrollText, labelKey: 'nav.auditLogs', requiredRole: ['superadmin'] },
+  { to: '/admin/backup', icon: HardDriveDownload, labelKey: 'nav.backup', requiredRole: ['superadmin'] },
 ]
 
 export default function Sidebar({ open }: SidebarProps) {

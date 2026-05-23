@@ -39,7 +39,8 @@
     "settings": "Settings",
     "email": "Email",
     "reports": "Reports",
-    "auditLogs": "Audit Log"
+    "auditLogs": "Audit Log",
+    "backup": "Backup"
   },
   "dashboard": {
     "total_tasks": "Total Tasks",
@@ -66,6 +67,8 @@
   "worklog": {
     "title": "Work Log",
     "add": "Add Entry",
+    "view_list": "List View",
+    "view_calendar": "Calendar View",
     "edit": "Edit",
     "delete": "Delete",
     "date": "Date",
@@ -338,7 +341,8 @@
     "no_data": "No data for the selected period.",
     "user_col": "User",
     "total_col": "Total",
-    "grand_total": "Grand Total"
+    "grand_total": "Grand Total",
+    "export_csv": "Export CSV"
   },
   "history": {
     "title": "History",
@@ -378,5 +382,17 @@
   "language": {
     "tr": "Turkish",
     "en": "English"
+  },
+  "backup": {
+    "title": "Database Backup",
+    "section_title": "Download Database Backup",
+    "description": "Create and download a full PostgreSQL dump of the application database.",
+    "note_format": "Exported as a .sql file (PostgreSQL dump format)",
+    "note_includes": "Includes all tables: users, tasks, work logs, settings and more",
+    "note_restore": "Restore with: psql -U <user> -d <dbname> < backup.sql",
+    "download": "Download Backup",
+    "downloading": "Preparing...",
+    "error_no_pgdump": "pg_dump is not available on this server.",
+    "error_failed": "Backup failed. Please try again."
   }
 }

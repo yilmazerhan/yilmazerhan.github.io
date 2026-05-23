@@ -212,3 +212,57 @@ async def dashboard_stats(
         emails_sent_today=emails_sent_today,
         emails_failed_today=emails_failed_today,
     )
+
+
+# ─── Backup ───────────────────────────────────────────────────────────────────
+
+@router.get("/backup/download")
+async def download_backup(
+    _: Annotated[User, Depends(require_superadmin)],
+):
+    """Stream a pg_dump SQL backup. Requires pg_dump binary in the container."""
+    import os
+    import asyncio
+    from datetime import datetime
+    from urllib.parse import urlparse
+    from fastapi import HTTPException
+    from fastapi.responses import Response as FastAPIResponse
+    from app.config import settings
+
+    # Parse DATABASE_URL (strip async driver prefix)
+    raw_url = settings.DATABASE_URL.replace("+asyncpg", "")
+    parsed = urlparse(raw_url)
+
+    env = {**os.environ, "PGPASSWORD": parsed.password or ""}
+    host = parsed.hostname or "localhost"
+    port = str(parsed.port or 5432)
+    user = parsed.username or "postgres"
+    dbname = (parsed.path or "").lstrip("/")
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "pg_dump",
+            "-h", host,
+            "-p", port,
+            "-U", user,
+            "-d", dbname,
+            "--no-password",
+            "--format=plain",
+            "--no-owner",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            env=env,
+        )
+        stdout, stderr = await proc.communicate()
+    except FileNotFoundError:
+        raise HTTPException(status_code=501, detail="pg_dump binary not available in this environment.")
+
+    if proc.returncode != 0:
+        raise HTTPException(status_code=500, detail=f"pg_dump failed: {stderr.decode()[:500]}")
+
+    filename = f"backup_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.sql"
+    return FastAPIResponse(
+        content=stdout,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
