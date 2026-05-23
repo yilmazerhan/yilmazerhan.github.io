@@ -20,6 +20,8 @@ import EmailWorkflowsPage from '@/pages/EmailWorkflowsPage'
 import EmailLogsPage from '@/pages/EmailLogsPage'
 import SettingsPage from '@/pages/SettingsPage'
 import AuditLogsPage from '@/pages/AuditLogsPage'
+import ReportsPage from '@/pages/ReportsPage'
+import PermissionsPage from '@/pages/PermissionsPage'
 
 function BrandingInit() {
   const { data: branding } = useQuery({
@@ -69,7 +71,8 @@ export default function App() {
             <Route path="/kanban" element={<KanbanPage />} />
             <Route path="/users" element={<UsersPage />} />
             <Route path="/teams" element={<TeamsPage />} />
-            <Route path="/permissions" element={<Navigate to="/users" replace />} />
+            <Route path="/permissions" element={<PermissionsPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
             <Route path="/settings/email/templates" element={<EmailTemplatesPage />} />
             <Route path="/settings/email/workflows" element={<EmailWorkflowsPage />} />
             <Route path="/settings/email/logs" element={<EmailLogsPage />} />

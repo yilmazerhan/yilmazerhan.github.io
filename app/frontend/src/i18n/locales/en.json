@@ -254,7 +254,26 @@
     "save_failed": "Save failed.",
     "logo_failed": "Failed to upload logo.",
     "cert_key_required": "Certificate and key files are required.",
-    "jks_required": "JKS file is required."
+    "jks_required": "JKS file is required.",
+    "work_types_title": "Work Types",
+    "work_types_description": "Configure work categories used in the work log.",
+    "add_work_type": "Add Work Type",
+    "work_type_name": "Name",
+    "work_type_color": "Color",
+    "work_type_sort": "Sort Order",
+    "work_type_active": "Active",
+    "edit_work_type": "Edit Work Type",
+    "columns_title": "Kanban Columns",
+    "columns_description": "Manage task board columns and their behavior.",
+    "add_column": "Add Column",
+    "column_name_label": "Column Name",
+    "column_color_label": "Color",
+    "column_terminal_label": "Terminal Column",
+    "column_terminal_hint": "Tasks moved here can trigger a work log prompt.",
+    "column_sort_label": "Sort Order",
+    "edit_column": "Edit Column",
+    "confirm_delete_column": "Are you sure you want to delete this column?",
+    "confirm_delete_work_type": "Are you sure you want to delete this work type?"
   },
   "common": {
     "save": "Save",
@@ -306,6 +325,20 @@
     "delete_failed": "Failed to delete.",
     "name_required": "Name is required.",
     "slug_required": "Slug is required."
+  },
+  "reports": {
+    "title": "Reports",
+    "date_from": "From",
+    "date_to": "To",
+    "filter_all_users": "All Users",
+    "total_hours": "Total Hours",
+    "entries": "Entries",
+    "unique_users": "Users",
+    "pivot_title": "Hours by User & Work Type",
+    "no_data": "No data for the selected period.",
+    "user_col": "User",
+    "total_col": "Total",
+    "grand_total": "Grand Total"
   },
   "theme": {
     "light": "Light Mode",

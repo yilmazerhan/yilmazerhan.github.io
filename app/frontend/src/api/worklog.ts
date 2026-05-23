@@ -36,6 +36,32 @@ export const worklogKeys = {
   workTypes: ['workTypes'] as const,
 }
 
+export function useCreateWorkType() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { name: string; color: string; sort_order?: number }) =>
+      apiClient.post<WorkType>('/worklogs/work-types', data).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: worklogKeys.workTypes }),
+  })
+}
+
+export function useUpdateWorkType() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: string; name?: string; color?: string; sort_order?: number; is_active?: boolean }) =>
+      apiClient.patch<WorkType>(`/worklogs/work-types/${id}`, data).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: worklogKeys.workTypes }),
+  })
+}
+
+export function useDeleteWorkType() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => apiClient.delete(`/worklogs/work-types/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: worklogKeys.workTypes }),
+  })
+}
+
 export function useWorkTypes(activeOnly = true) {
   return useQuery({
     queryKey: worklogKeys.workTypes,

@@ -2,7 +2,21 @@ import { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format } from 'date-fns'
 import { tr, enUS } from 'date-fns/locale'
-import { Plus, Pencil, Trash2, CheckCircle, XCircle, Loader2, ShieldCheck, Upload, Building2, MessageSquare, Mail } from 'lucide-react'
+import { Plus, Pencil, Trash2, CheckCircle, XCircle, Loader2, ShieldCheck, Upload, Building2, MessageSquare, Mail, Layers, Tag } from 'lucide-react'
+import {
+  useWorkTypes,
+  useCreateWorkType,
+  useUpdateWorkType,
+  useDeleteWorkType,
+  type WorkType,
+} from '@/api/worklog'
+import {
+  useColumns,
+  useCreateColumn,
+  useUpdateColumn,
+  useDeleteColumn,
+  type KanbanColumn,
+} from '@/api/kanban'
 import {
   useJiraConfigs,
   useCreateJiraConfig,
@@ -155,6 +169,67 @@ export default function SettingsPage() {
   const [showForm, setShowForm] = useState(false)
   const [editingConfig, setEditingConfig] = useState<JiraConfig | null>(null)
   const [testResult, setTestResult] = useState<Record<string, { success: boolean; msg: string }>>({})
+
+  // Work Types state
+  const { data: workTypes = [] } = useWorkTypes(false)
+  const createWt = useCreateWorkType()
+  const updateWt = useUpdateWorkType()
+  const deleteWt = useDeleteWorkType()
+  const [wtShowForm, setWtShowForm] = useState(false)
+  const [wtEditing, setWtEditing] = useState<WorkType | null>(null)
+  const [wtName, setWtName] = useState('')
+  const [wtColor, setWtColor] = useState('#6366f1')
+  const [wtSortOrder, setWtSortOrder] = useState(0)
+  const [wtError, setWtError] = useState('')
+
+  function wtOpenCreate() { setWtEditing(null); setWtName(''); setWtColor('#6366f1'); setWtSortOrder(workTypes.length); setWtError(''); setWtShowForm(true) }
+  function wtOpenEdit(wt: WorkType) { setWtEditing(wt); setWtName(wt.name); setWtColor(wt.color); setWtSortOrder(wt.sort_order); setWtError(''); setWtShowForm(true) }
+
+  async function wtHandleSubmit(e: React.FormEvent) {
+    e.preventDefault(); setWtError('')
+    try {
+      if (wtEditing) await updateWt.mutateAsync({ id: wtEditing.id, name: wtName, color: wtColor, sort_order: wtSortOrder })
+      else await createWt.mutateAsync({ name: wtName, color: wtColor, sort_order: wtSortOrder })
+      setWtShowForm(false)
+    } catch (err: any) { setWtError(err.response?.data?.detail || t('common.error')) }
+  }
+
+  async function wtHandleDelete(id: string) {
+    if (!confirm(t('settings.confirm_delete_work_type'))) return
+    try { await deleteWt.mutateAsync(id) }
+    catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
+  }
+
+  // Kanban Columns state
+  const { data: columnsData = [] } = useColumns()
+  const createCol = useCreateColumn()
+  const updateCol = useUpdateColumn()
+  const deleteCol = useDeleteColumn()
+  const [colShowForm, setColShowForm] = useState(false)
+  const [colEditing, setColEditing] = useState<KanbanColumn | null>(null)
+  const [colName, setColName] = useState('')
+  const [colColor, setColColor] = useState('#e2e8f0')
+  const [colIsTerminal, setColIsTerminal] = useState(false)
+  const [colSortOrder, setColSortOrder] = useState(0)
+  const [colError, setColError] = useState('')
+
+  function colOpenCreate() { setColEditing(null); setColName(''); setColColor('#e2e8f0'); setColIsTerminal(false); setColSortOrder(columnsData.length); setColError(''); setColShowForm(true) }
+  function colOpenEdit(col: KanbanColumn) { setColEditing(col); setColName(col.name); setColColor(col.color); setColIsTerminal(col.is_terminal); setColSortOrder(col.sort_order); setColError(''); setColShowForm(true) }
+
+  async function colHandleSubmit(e: React.FormEvent) {
+    e.preventDefault(); setColError('')
+    try {
+      if (colEditing) await updateCol.mutateAsync({ id: colEditing.id, name: colName, color: colColor, is_terminal: colIsTerminal, sort_order: colSortOrder })
+      else await createCol.mutateAsync({ name: colName, color: colColor, is_terminal: colIsTerminal, sort_order: colSortOrder })
+      setColShowForm(false)
+    } catch (err: any) { setColError(err.response?.data?.detail || t('common.error')) }
+  }
+
+  async function colHandleDelete(id: string) {
+    if (!confirm(t('settings.confirm_delete_column'))) return
+    try { await deleteCol.mutateAsync(id) }
+    catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
+  }
 
   const [name, setName] = useState('')
   const [baseUrl, setBaseUrl] = useState('')
@@ -667,6 +742,208 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+
+      {/* Work Types Section */}
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Tag className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('settings.work_types_title')}</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{t('settings.work_types_description')}</p>
+            </div>
+          </div>
+          <button
+            onClick={wtOpenCreate}
+            className="flex items-center gap-2 px-3 py-1.5 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm font-medium"
+          >
+            <Plus className="h-4 w-4" />
+            {t('settings.add_work_type')}
+          </button>
+        </div>
+
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('settings.work_type_name')}</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('settings.work_type_sort')}</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('common.status')}</th>
+                <th className="text-right px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('common.actions')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {workTypes.length === 0 ? (
+                <tr><td colSpan={4} className="text-center py-6 text-gray-400">{t('common.loading')}</td></tr>
+              ) : workTypes.map((wt) => (
+                <tr key={wt.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                  <td className="px-4 py-3">
+                    <span className="inline-flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: wt.color }} />
+                      <span className="font-medium text-gray-800 dark:text-gray-200">{wt.name}</span>
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{wt.sort_order}</td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${wt.is_active ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500'}`}>
+                      {wt.is_active ? t('common.active') : t('common.inactive')}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-1">
+                      <button onClick={() => wtOpenEdit(wt)} className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20" title={t('common.edit')}>
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button onClick={() => updateWt.mutateAsync({ id: wt.id, is_active: !wt.is_active })} className="p-1.5 rounded text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20" title={wt.is_active ? t('common.inactive') : t('common.active')}>
+                        {wt.is_active ? <XCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                      </button>
+                      <button onClick={() => wtHandleDelete(wt.id)} className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" title={t('common.delete')}>
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {wtShowForm && (
+          <div className="mt-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+              {wtEditing ? t('settings.edit_work_type') : t('settings.add_work_type')}
+            </h3>
+            {wtError && <p className="text-sm text-red-600 mb-3">{wtError}</p>}
+            <form onSubmit={wtHandleSubmit} className="grid grid-cols-3 gap-3 items-end">
+              <div>
+                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t('settings.work_type_name')} *</label>
+                <input type="text" value={wtName} onChange={(e) => setWtName(e.target.value)} required className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t('settings.work_type_color')}</label>
+                <div className="flex items-center gap-2">
+                  <input type="color" value={wtColor} onChange={(e) => setWtColor(e.target.value)} className="w-10 h-9 rounded border border-gray-300 dark:border-gray-700 cursor-pointer" />
+                  <input type="text" value={wtColor} onChange={(e) => setWtColor(e.target.value)} className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t('settings.work_type_sort')}</label>
+                <input type="number" value={wtSortOrder} onChange={(e) => setWtSortOrder(parseInt(e.target.value) || 0)} min={0} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              </div>
+              <div className="col-span-3 flex justify-end gap-2">
+                <button type="button" onClick={() => setWtShowForm(false)} className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium">{t('common.cancel')}</button>
+                <button type="submit" disabled={createWt.isPending || updateWt.isPending} className="px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium disabled:opacity-50">
+                  {createWt.isPending || updateWt.isPending ? t('common.saving') : t('common.save')}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+      </section>
+
+      {/* Kanban Columns Section */}
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Layers className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('settings.columns_title')}</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{t('settings.columns_description')}</p>
+            </div>
+          </div>
+          <button
+            onClick={colOpenCreate}
+            className="flex items-center gap-2 px-3 py-1.5 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm font-medium"
+          >
+            <Plus className="h-4 w-4" />
+            {t('settings.add_column')}
+          </button>
+        </div>
+
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('settings.column_name_label')}</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('settings.column_sort_label')}</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('settings.column_terminal_label')}</th>
+                <th className="text-right px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('common.actions')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...columnsData].sort((a, b) => a.sort_order - b.sort_order).map((col) => (
+                <tr key={col.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                  <td className="px-4 py-3">
+                    <span className="inline-flex items-center gap-2">
+                      <span className="w-3 h-3 rounded flex-shrink-0" style={{ backgroundColor: col.color }} />
+                      <span className="font-medium text-gray-800 dark:text-gray-200">{col.name}</span>
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{col.sort_order}</td>
+                  <td className="px-4 py-3">
+                    {col.is_terminal ? (
+                      <span className="inline-block px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                        {t('kanban.archived')}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-1">
+                      <button onClick={() => colOpenEdit(col)} className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20" title={t('common.edit')}>
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button onClick={() => colHandleDelete(col.id)} className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" title={t('common.delete')}>
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {colShowForm && (
+          <div className="mt-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+              {colEditing ? t('settings.edit_column') : t('settings.add_column')}
+            </h3>
+            {colError && <p className="text-sm text-red-600 mb-3">{colError}</p>}
+            <form onSubmit={colHandleSubmit} className="space-y-3">
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t('settings.column_name_label')} *</label>
+                  <input type="text" value={colName} onChange={(e) => setColName(e.target.value)} required className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t('settings.column_color_label')}</label>
+                  <div className="flex items-center gap-2">
+                    <input type="color" value={colColor} onChange={(e) => setColColor(e.target.value)} className="w-10 h-9 rounded border border-gray-300 dark:border-gray-700 cursor-pointer" />
+                    <input type="text" value={colColor} onChange={(e) => setColColor(e.target.value)} className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t('settings.column_sort_label')}</label>
+                  <input type="number" value={colSortOrder} onChange={(e) => setColSortOrder(parseInt(e.target.value) || 0)} min={0} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                </div>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={colIsTerminal} onChange={(e) => setColIsTerminal(e.target.checked)} className="w-4 h-4 rounded text-primary-500 border-gray-300" />
+                <span className="text-sm text-gray-700 dark:text-gray-300">{t('settings.column_terminal_label')}</span>
+                <span className="text-xs text-gray-400">({t('settings.column_terminal_hint')})</span>
+              </label>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setColShowForm(false)} className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium">{t('common.cancel')}</button>
+                <button type="submit" disabled={createCol.isPending || updateCol.isPending} className="px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium disabled:opacity-50">
+                  {createCol.isPending || updateCol.isPending ? t('common.saving') : t('common.save')}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+      </section>
     </div>
   )
 }

@@ -254,7 +254,26 @@
     "save_failed": "Kayıt başarısız.",
     "logo_failed": "Logo yüklenemedi.",
     "cert_key_required": "Sertifika ve anahtar dosyaları gereklidir.",
-    "jks_required": "JKS dosyası gereklidir."
+    "jks_required": "JKS dosyası gereklidir.",
+    "work_types_title": "İş Tipleri",
+    "work_types_description": "İş günlüğünde kullanılan iş kategorilerini yapılandırın.",
+    "add_work_type": "İş Tipi Ekle",
+    "work_type_name": "Ad",
+    "work_type_color": "Renk",
+    "work_type_sort": "Sıralama",
+    "work_type_active": "Aktif",
+    "edit_work_type": "İş Tipini Düzenle",
+    "columns_title": "Kanban Sütunları",
+    "columns_description": "Görev panosu sütunlarını ve davranışlarını yönetin.",
+    "add_column": "Sütun Ekle",
+    "column_name_label": "Sütun Adı",
+    "column_color_label": "Renk",
+    "column_terminal_label": "Terminal Sütun",
+    "column_terminal_hint": "Görevler buraya taşındığında iş günlüğü istemi açılabilir.",
+    "column_sort_label": "Sıralama",
+    "edit_column": "Sütunu Düzenle",
+    "confirm_delete_column": "Bu sütunu silmek istediğinizden emin misiniz?",
+    "confirm_delete_work_type": "Bu iş tipini silmek istediğinizden emin misiniz?"
   },
   "common": {
     "save": "Kaydet",
@@ -306,6 +325,20 @@
     "delete_failed": "Silinemedi.",
     "name_required": "Ad zorunludur.",
     "slug_required": "Slug zorunludur."
+  },
+  "reports": {
+    "title": "Raporlar",
+    "date_from": "Başlangıç",
+    "date_to": "Bitiş",
+    "filter_all_users": "Tüm Kullanıcılar",
+    "total_hours": "Toplam Saat",
+    "entries": "Kayıt",
+    "unique_users": "Kullanıcı",
+    "pivot_title": "Kullanıcı ve İş Tipine Göre Saat",
+    "no_data": "Seçilen dönem için veri yok.",
+    "user_col": "Kullanıcı",
+    "total_col": "Toplam",
+    "grand_total": "Genel Toplam"
   },
   "theme": {
     "light": "Aydınlık Mod",
