@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -10,7 +10,6 @@ import {
   type DragEndEvent,
   closestCorners,
 } from '@dnd-kit/core'
-import { arrayMove } from '@dnd-kit/sortable'
 import { useTranslation } from 'react-i18next'
 import { useColumns, useTasks, useMoveTask, type Task, type KanbanColumn } from '@/api/kanban'
 import KanbanColumnComp from './KanbanColumn'
@@ -30,14 +29,16 @@ export default function KanbanBoard({ taskParams }: Props) {
   const moveTask = useMoveTask()
 
   const [activeTask, setActiveTask] = useState<Task | null>(null)
-  const [dragSourceColumnId, setDragSourceColumnId] = useState<string | null>(null)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [addColumnId, setAddColumnId] = useState<string | null>(null)
   const [completedTask, setCompletedTask] = useState<Task | null>(null)
 
-  // Local optimistic task state for smooth DnD
-  const [localTasks, setLocalTasks] = useState<Task[] | null>(null)
-  const tasks = localTasks ?? tasksData?.items ?? []
+  // Refs for drag state — synchronous, no re-render delay
+  const localTasksRef = useRef<Task[] | null>(null)
+  const dragSourceColumnIdRef = useRef<string | null>(null)
+  const [localTasksSnapshot, setLocalTasksSnapshot] = useState<Task[] | null>(null)
+
+  const tasks = localTasksSnapshot ?? tasksData?.items ?? []
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
@@ -62,59 +63,65 @@ export default function KanbanBoard({ taskParams }: Props) {
     if (event.active.data.current?.type === 'Task') {
       const t = event.active.data.current.task as Task
       setActiveTask(t)
-      setDragSourceColumnId(t.column_id)
-      setLocalTasks(tasks.slice())
+      // Use refs for synchronous access — no React re-render delay
+      const snapshot = (tasksData?.items ?? []).slice()
+      localTasksRef.current = snapshot
+      dragSourceColumnIdRef.current = t.column_id
+      setLocalTasksSnapshot(snapshot)
     }
   }
 
   function onDragOver(event: DragOverEvent) {
     const { active, over } = event
-    if (!over || !localTasks) return
+    if (!over || !localTasksRef.current) return
 
     const activeId = active.id as string
     const overId = over.id as string
     if (activeId === overId) return
 
-    const activeTask = localTasks.find((t) => t.id === activeId)
-    if (!activeTask) return
+    const current = localTasksRef.current
+    const dragged = current.find((t) => t.id === activeId)
+    if (!dragged) return
 
-    const overTask = localTasks.find((t) => t.id === overId)
+    const overTask = current.find((t) => t.id === overId)
     const overCol = sortedColumns.find((c) => c.id === overId)
     const targetColumnId = overTask ? overTask.column_id : overCol?.id
 
-    if (!targetColumnId || activeTask.column_id === targetColumnId) return
+    if (!targetColumnId || dragged.column_id === targetColumnId) return
 
-    setLocalTasks((prev) =>
-      (prev ?? []).map((t) =>
-        t.id === activeId ? { ...t, column_id: targetColumnId } : t
-      )
+    const updated = current.map((t) =>
+      t.id === activeId ? { ...t, column_id: targetColumnId } : t
     )
+    localTasksRef.current = updated
+    setLocalTasksSnapshot(updated)
   }
 
   async function onDragEnd(event: DragEndEvent) {
     const { active, over } = event
     setActiveTask(null)
 
-    if (!over || !localTasks) {
-      setLocalTasks(null)
-      setDragSourceColumnId(null)
-      return
-    }
+    const localTasks = localTasksRef.current
+    const dragSourceColumnId = dragSourceColumnIdRef.current
+
+    // Reset refs and snapshot
+    localTasksRef.current = null
+    dragSourceColumnIdRef.current = null
+    setLocalTasksSnapshot(null)
+
+    if (!over || !localTasks) return
 
     const activeId = active.id as string
     const overId = over.id as string
     const draggedTask = localTasks.find((t) => t.id === activeId)
-    if (!draggedTask) { setLocalTasks(null); setDragSourceColumnId(null); return }
+    if (!draggedTask) return
 
     const overTask = localTasks.find((t) => t.id === overId)
     const overCol = sortedColumns.find((c) => c.id === overId)
     const targetColumnId = overTask ? overTask.column_id : overCol?.id ?? draggedTask.column_id
 
-    // Use captured source column (before optimistic update changed column_id)
     const sourceColumn = sortedColumns.find((c) => c.id === dragSourceColumnId)
     const targetColumn = sortedColumns.find((c) => c.id === targetColumnId)
 
-    // Determine new sort order
     const colTasks = localTasks
       .filter((t) => t.column_id === targetColumnId && !t.is_archived)
       .sort((a, b) => a.sort_order - b.sort_order)
@@ -126,9 +133,6 @@ export default function KanbanBoard({ taskParams }: Props) {
     } else {
       newSortOrder = colTasks.length + 1
     }
-
-    setLocalTasks(null)
-    setDragSourceColumnId(null)
 
     try {
       const movedTask = await moveTask.mutateAsync({ id: activeId, column_id: targetColumnId, sort_order: newSortOrder })

@@ -187,9 +187,9 @@ class KanbanService:
         requester: User,
         title: Optional[str] = None,
         description: Optional[str] = None,
-        assignee_id: Optional[uuid.UUID] = None,
+        assignee_id: object = ...,   # Ellipsis = not sent; None = clear
         priority: Optional[str] = None,
-        due_date: Optional[date] = None,
+        due_date: object = ...,      # Ellipsis = not sent; None = clear
         jira_ticket: Optional[str] = None,
         is_archived: Optional[bool] = None,
     ) -> Task:
@@ -197,19 +197,18 @@ class KanbanService:
         if not can_edit_task(requester, task):
             raise ForbiddenError("Bu görevi düzenleme yetkiniz yok.")
 
-        prev_assignee = task.assignee_id
         if title is not None:
             task.title = title
         if description is not None:
             task.description = description
-        if assignee_id is not None:
-            task.assignee_id = assignee_id
+        if assignee_id is not ...:
+            task.assignee_id = assignee_id  # type: ignore[assignment]
         if priority is not None:
             task.priority = priority
-        if due_date is not None:
-            task.due_date = due_date
+        if due_date is not ...:
+            task.due_date = due_date  # type: ignore[assignment]
         if jira_ticket is not None:
-            task.jira_ticket = jira_ticket if jira_ticket.strip() else None
+            task.jira_ticket = jira_ticket.strip() or None
         if is_archived is not None:
             task.is_archived = is_archived
 

@@ -138,14 +138,15 @@ async def update_task(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = KanbanService(db)
+    sent = body.model_fields_set
     return await svc.update_task(
         task_id=task_id,
         requester=current_user,
         title=body.title,
         description=body.description,
-        assignee_id=body.assignee_id,
+        assignee_id=body.assignee_id if "assignee_id" in sent else ...,
         priority=body.priority,
-        due_date=body.due_date,
+        due_date=body.due_date if "due_date" in sent else ...,
         jira_ticket=body.jira_ticket,
         is_archived=body.is_archived,
     )

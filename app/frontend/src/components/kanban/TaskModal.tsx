@@ -85,7 +85,8 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
       }
       onClose()
     } catch (err: any) {
-      setError(err.response?.data?.detail || t('common.error'))
+      const detail = err.response?.data?.detail
+      setError(Array.isArray(detail) ? detail.map((d: any) => d.msg).join(', ') : detail || t('common.error'))
     }
   }
 
@@ -96,7 +97,8 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
       await deleteTask.mutateAsync(task.id)
       onClose()
     } catch (err: any) {
-      setError(err.response?.data?.detail || t('common.error'))
+      const detail = err.response?.data?.detail
+      setError(Array.isArray(detail) ? detail.map((d: any) => d.msg).join(', ') : detail || t('common.error'))
     }
   }
 
