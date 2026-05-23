@@ -27,6 +27,7 @@ export interface Task {
   assignee: TaskUser | null
   priority: 'low' | 'medium' | 'high' | 'critical'
   due_date: string | null
+  start_date: string | null
   jira_ticket: string | null
   jira_status: string | null
   jira_status_updated_at: string | null
@@ -34,6 +35,33 @@ export interface Task {
   is_archived: boolean
   created_at: string
   updated_at: string
+}
+
+export interface Attachment {
+  id: string
+  task_id: string
+  original_filename: string
+  file_size: number
+  mime_type: string
+  uploaded_by: string | null
+  created_at: string
+}
+
+export interface ActivityEntry {
+  id: string
+  task_id: string
+  task_title: string
+  action: string
+  changes: { field: string; old: string | null; new: string | null }[] | null
+  actor: { id: string; full_name: string } | null
+  created_at: string
+}
+
+export interface ActivityFeedResponse {
+  items: ActivityEntry[]
+  total: number
+  skip: number
+  limit: number
 }
 
 export interface TaskListResponse {
@@ -118,6 +146,7 @@ export function useCreateTask() {
       assignee_id?: string
       priority?: string
       due_date?: string
+      start_date?: string
       jira_ticket?: string
     }) => apiClient.post<Task>('/kanban/tasks', data).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: kanbanKeys.all }),
@@ -134,6 +163,7 @@ export function useUpdateTask() {
       assignee_id?: string | null
       priority?: string
       due_date?: string | null
+      start_date?: string | null
       jira_ticket?: string | null
       is_archived?: boolean
     }) => apiClient.patch<Task>(`/kanban/tasks/${id}`, data).then((r) => r.data),
@@ -291,5 +321,61 @@ export function useBulkUpdateTasks() {
       is_archived?: boolean
     }) => apiClient.patch<{ updated: number }>('/kanban/tasks/bulk', data).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: kanbanKeys.all }),
+  })
+}
+
+// ─── Attachments ─────────────────────────────────────────────────────────────
+
+export const attachmentKeys = {
+  list: (taskId: string) => [...kanbanKeys.all, 'attachments', taskId] as const,
+}
+
+export function useTaskAttachments(taskId: string | null | undefined) {
+  return useQuery({
+    queryKey: attachmentKeys.list(taskId ?? ''),
+    queryFn: () =>
+      apiClient.get<Attachment[]>(`/kanban/tasks/${taskId}/attachments`).then((r) => r.data),
+    enabled: !!taskId,
+  })
+}
+
+export function useUploadAttachment(taskId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (file: File) => {
+      const fd = new FormData()
+      fd.append('file', file)
+      return apiClient.post<Attachment>(`/kanban/tasks/${taskId}/attachments`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }).then((r) => r.data)
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: attachmentKeys.list(taskId) }),
+  })
+}
+
+export function useDeleteAttachment(taskId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (attId: string) =>
+      apiClient.delete(`/kanban/tasks/${taskId}/attachments/${attId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: attachmentKeys.list(taskId) }),
+  })
+}
+
+export function getAttachmentDownloadUrl(taskId: string, attId: string) {
+  return `/api/v1/kanban/tasks/${taskId}/attachments/${attId}/download`
+}
+
+// ─── Activity Feed ────────────────────────────────────────────────────────────
+
+export const activityKeys = {
+  feed: (p: object) => [...kanbanKeys.all, 'activity', p] as const,
+}
+
+export function useActivityFeed(params: { skip?: number; limit?: number } = {}) {
+  return useQuery({
+    queryKey: activityKeys.feed(params),
+    queryFn: () =>
+      apiClient.get<ActivityFeedResponse>('/kanban/activity', { params }).then((r) => r.data),
   })
 }

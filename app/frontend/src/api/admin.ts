@@ -170,3 +170,88 @@ export function useDashboardStats(opts?: { enabled?: boolean }) {
     enabled: opts?.enabled ?? true,
   })
 }
+
+// ─── Report Schedules ─────────────────────────────────────────────────────────
+
+export interface ReportSchedule {
+  id: string
+  name: string
+  frequency: 'daily' | 'weekly' | 'monthly'
+  day_of_week: number | null
+  day_of_month: number | null
+  hour: number
+  recipient_emails: string[]
+  team_id: string | null
+  user_id: string | null
+  date_range_days: number
+  is_active: boolean
+  created_by: string | null
+  last_run_at: string | null
+  next_run_at: string | null
+  created_at: string
+}
+
+const reportScheduleKeys = {
+  all: ['admin', 'report-schedules'] as const,
+}
+
+export function useReportSchedules() {
+  return useQuery({
+    queryKey: reportScheduleKeys.all,
+    queryFn: () => apiClient.get<ReportSchedule[]>('/admin/reports/schedules').then((r) => r.data),
+  })
+}
+
+export function useCreateReportSchedule() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: {
+      name: string
+      frequency: string
+      day_of_week?: number | null
+      day_of_month?: number | null
+      hour?: number
+      recipient_emails: string[]
+      team_id?: string | null
+      user_id?: string | null
+      date_range_days?: number
+      is_active?: boolean
+    }) => apiClient.post<ReportSchedule>('/admin/reports/schedules', data).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: reportScheduleKeys.all }),
+  })
+}
+
+export function useUpdateReportSchedule() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: string } & Partial<{
+      name: string
+      frequency: string
+      day_of_week: number | null
+      day_of_month: number | null
+      hour: number
+      recipient_emails: string[]
+      team_id: string | null
+      user_id: string | null
+      date_range_days: number
+      is_active: boolean
+    }>) => apiClient.patch<ReportSchedule>(`/admin/reports/schedules/${id}`, data).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: reportScheduleKeys.all }),
+  })
+}
+
+export function useDeleteReportSchedule() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => apiClient.delete(`/admin/reports/schedules/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: reportScheduleKeys.all }),
+  })
+}
+
+export function useRunReportSchedule() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => apiClient.post(`/admin/reports/schedules/${id}/run`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: reportScheduleKeys.all }),
+  })
+}

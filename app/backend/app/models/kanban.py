@@ -45,6 +45,7 @@ class Task(Base):
         default="medium",
     )
     due_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True, index=True)
+    start_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     jira_ticket: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     jira_status: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     jira_status_updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -61,3 +62,4 @@ class Task(Base):
     comments: Mapped[list["TaskComment"]] = relationship("TaskComment", back_populates="task", cascade="all, delete-orphan", order_by="TaskComment.created_at")  # type: ignore[name-defined]
     subtasks: Mapped[list["TaskSubtask"]] = relationship("TaskSubtask", back_populates="task", cascade="all, delete-orphan", lazy="selectin", order_by="TaskSubtask.sort_order")  # type: ignore[name-defined]
     work_logs: Mapped[list["WorkLog"]] = relationship("WorkLog", back_populates="task", lazy="selectin")  # type: ignore[name-defined]
+    attachments: Mapped[list["TaskAttachment"]] = relationship("TaskAttachment", back_populates="task", cascade="all, delete-orphan", lazy="selectin", order_by="TaskAttachment.created_at")  # type: ignore[name-defined]

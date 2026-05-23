@@ -2,7 +2,8 @@ import uuid
 from datetime import date
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, UploadFile, File
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -12,6 +13,7 @@ from app.schemas.kanban import (
     TaskCreate, TaskUpdate, TaskMoveRequest, TaskResponse, TaskListResponse,
     TaskCommentCreate, TaskCommentResponse, TaskHistoryEntry,
     SubtaskCreate, SubtaskUpdate, SubtaskResponse,
+    AttachmentResponse,
 )
 from pydantic import BaseModel as _BaseModel
 from app.schemas.auth import MessageResponse
@@ -121,6 +123,7 @@ async def create_task(
         assignee_id=body.assignee_id,
         priority=body.priority,
         due_date=body.due_date,
+        start_date=body.start_date,
         jira_ticket=body.jira_ticket,
     )
 
@@ -177,6 +180,7 @@ async def update_task(
         assignee_id=body.assignee_id if "assignee_id" in sent else ...,
         priority=body.priority,
         due_date=body.due_date if "due_date" in sent else ...,
+        start_date=body.start_date if "start_date" in sent else ...,
         jira_ticket=body.jira_ticket,
         is_archived=body.is_archived,
     )
@@ -295,3 +299,130 @@ async def delete_subtask(
 ):
     svc = KanbanService(db)
     await svc.delete_subtask(task_id, subtask_id)
+
+
+# ─── Activity Timeline ────────────────────────────────────────────────────────
+
+@router.get("/activity", response_model=dict)
+async def list_activity(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+):
+    svc = KanbanService(db)
+    items, total = await svc.list_all_history(limit=limit, skip=skip)
+    from app.models.kanban import Task as TaskModel
+
+    result_items = []
+    for h in items:
+        task_result = await db.execute(
+            select(TaskModel).where(TaskModel.id == h.task_id)
+        )
+        task = task_result.scalar_one_or_none()
+        result_items.append({
+            "id": str(h.id),
+            "task_id": str(h.task_id),
+            "task_title": task.title if task else "Deleted Task",
+            "action": h.action,
+            "changes": h.changes,
+            "actor": {"id": str(h.actor.id), "full_name": h.actor.full_name} if h.actor else None,
+            "created_at": h.created_at.isoformat(),
+        })
+    return {"items": result_items, "total": total, "skip": skip, "limit": limit}
+
+
+# ─── Attachments ──────────────────────────────────────────────────────────────
+
+@router.get("/tasks/{task_id}/attachments", response_model=list[AttachmentResponse])
+async def list_attachments(
+    task_id: uuid.UUID,
+    _: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = KanbanService(db)
+    return await svc.list_attachments(task_id)
+
+
+@router.post("/tasks/{task_id}/attachments", response_model=AttachmentResponse, status_code=201)
+async def upload_attachment(
+    task_id: uuid.UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    file: UploadFile = File(...),
+):
+    import os
+    import uuid as _uuid
+
+    # Max 10MB
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=413, detail="Dosya 10MB'dan büyük olamaz.")
+
+    # Ensure upload directory exists
+    upload_dir = "/app/uploads"
+    os.makedirs(upload_dir, exist_ok=True)
+
+    # Generate unique stored filename
+    ext = os.path.splitext(file.filename or "")[-1][:10]
+    stored_name = f"{_uuid.uuid4()}{ext}"
+    file_path = os.path.join(upload_dir, stored_name)
+
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+    svc = KanbanService(db)
+    return await svc.create_attachment(
+        task_id=task_id,
+        filename=stored_name,
+        original_filename=file.filename or stored_name,
+        file_size=len(content),
+        mime_type=file.content_type or "application/octet-stream",
+        uploaded_by=current_user.id,
+    )
+
+
+@router.get("/tasks/{task_id}/attachments/{att_id}/download")
+async def download_attachment(
+    task_id: uuid.UUID,
+    att_id: uuid.UUID,
+    _: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    import os
+    from fastapi import HTTPException
+    from fastapi.responses import FileResponse
+    from app.models.task_attachment import TaskAttachment
+
+    result = await db.execute(
+        select(TaskAttachment).where(
+            TaskAttachment.id == att_id,
+            TaskAttachment.task_id == task_id,
+        )
+    )
+    att = result.scalar_one_or_none()
+    if not att:
+        raise HTTPException(status_code=404, detail="Dosya eki bulunamadı.")
+
+    file_path = os.path.join("/app/uploads", att.filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Dosya bulunamadı.")
+
+    return FileResponse(
+        file_path,
+        media_type=att.mime_type,
+        filename=att.original_filename,
+        headers={"Content-Disposition": f'attachment; filename="{att.original_filename}"'},
+    )
+
+
+@router.delete("/tasks/{task_id}/attachments/{att_id}", status_code=204)
+async def delete_attachment(
+    task_id: uuid.UUID,
+    att_id: uuid.UUID,
+    _: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = KanbanService(db)
+    await svc.delete_attachment(task_id, att_id)

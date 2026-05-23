@@ -17,6 +17,7 @@ from app.models.email_log import EmailLog
 from app.schemas.admin import (
     SslCertificateResponse, BrandingResponse, BrandingUpdate,
     AuditLogResponse, AuditLogListResponse, DashboardStats,
+    ReportScheduleCreate, ReportScheduleUpdate, ReportScheduleResponse,
 )
 from app.schemas.auth import MessageResponse
 from app.services.ssl_service import SslService
@@ -370,3 +371,104 @@ async def user_activity_report(
             for l in logs[:20]
         ],
     }
+
+
+# ─── Report Schedules ────────────────────────────────────────────────────────
+
+@router.get("/reports/schedules", response_model=list[ReportScheduleResponse])
+async def list_report_schedules(
+    _: Annotated[User, Depends(require_superadmin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    from app.models.report_schedule import ReportSchedule
+    result = await db.execute(select(ReportSchedule).order_by(ReportSchedule.created_at.desc()))
+    return result.scalars().all()
+
+
+@router.post("/reports/schedules", response_model=ReportScheduleResponse, status_code=201)
+async def create_report_schedule(
+    body: ReportScheduleCreate,
+    current_user: Annotated[User, Depends(require_superadmin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    from app.models.report_schedule import ReportSchedule
+    from app.services.report_schedule_service import compute_next_run
+
+    schedule = ReportSchedule(
+        name=body.name,
+        frequency=body.frequency,
+        day_of_week=body.day_of_week,
+        day_of_month=body.day_of_month,
+        hour=body.hour,
+        recipient_emails=body.recipient_emails,
+        team_id=body.team_id,
+        user_id=body.user_id,
+        date_range_days=body.date_range_days,
+        is_active=body.is_active,
+        created_by=current_user.id,
+        next_run_at=compute_next_run(body.frequency, body.day_of_week, body.day_of_month, body.hour),
+    )
+    db.add(schedule)
+    await db.commit()
+    await db.refresh(schedule)
+    return schedule
+
+
+@router.patch("/reports/schedules/{schedule_id}", response_model=ReportScheduleResponse)
+async def update_report_schedule(
+    schedule_id: uuid.UUID,
+    body: ReportScheduleUpdate,
+    _: Annotated[User, Depends(require_superadmin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    from app.models.report_schedule import ReportSchedule
+    from fastapi import HTTPException
+    result = await db.execute(select(ReportSchedule).where(ReportSchedule.id == schedule_id))
+    schedule = result.scalar_one_or_none()
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Zamanlama bulunamadı.")
+
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(schedule, field, value)
+    await db.commit()
+    await db.refresh(schedule)
+    return schedule
+
+
+@router.delete("/reports/schedules/{schedule_id}", status_code=204)
+async def delete_report_schedule(
+    schedule_id: uuid.UUID,
+    _: Annotated[User, Depends(require_superadmin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    from app.models.report_schedule import ReportSchedule
+    from fastapi import HTTPException
+    result = await db.execute(select(ReportSchedule).where(ReportSchedule.id == schedule_id))
+    schedule = result.scalar_one_or_none()
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Zamanlama bulunamadı.")
+    await db.delete(schedule)
+    await db.commit()
+
+
+@router.post("/reports/schedules/{schedule_id}/run", response_model=dict)
+async def run_report_schedule(
+    schedule_id: uuid.UUID,
+    current_user: Annotated[User, Depends(require_superadmin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    from app.models.report_schedule import ReportSchedule
+    from app.services.report_schedule_service import generate_and_send_report, compute_next_run
+    from fastapi import HTTPException
+    from datetime import datetime
+
+    result = await db.execute(select(ReportSchedule).where(ReportSchedule.id == schedule_id))
+    schedule = result.scalar_one_or_none()
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Zamanlama bulunamadı.")
+
+    count = await generate_and_send_report(db, schedule)
+    schedule.last_run_at = datetime.utcnow()
+    schedule.next_run_at = compute_next_run(schedule.frequency, schedule.day_of_week, schedule.day_of_month, schedule.hour)
+    await db.commit()
+    return {"sent": count, "message": f"{count} alıcıya rapor gönderildi."}

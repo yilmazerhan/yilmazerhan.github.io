@@ -1,11 +1,12 @@
 import { useState, useRef } from 'react'
-import { X, Trash2, Send, History, MessageSquare, ClipboardList, CheckSquare, Square, ListChecks, Plus } from 'lucide-react'
+import { X, Trash2, Send, History, MessageSquare, ClipboardList, CheckSquare, Square, ListChecks, Plus, Paperclip, Download } from 'lucide-react'
 import { format } from 'date-fns'
 import { useTranslation } from 'react-i18next'
 import {
   useCreateTask, useUpdateTask, useDeleteTask, useMoveTask,
   useTaskComments, useCreateComment, useDeleteComment,
   useTaskHistory, useTaskSubtasks, useCreateSubtask, useUpdateSubtask, useDeleteSubtask,
+  useTaskAttachments, useUploadAttachment, useDeleteAttachment, getAttachmentDownloadUrl,
   type Task, type TaskHistoryEntry,
 } from '@/api/kanban'
 import type { KanbanColumn } from '@/api/kanban'
@@ -22,7 +23,7 @@ interface Props {
 
 const PRIORITIES = ['low', 'medium', 'high', 'critical'] as const
 
-type Tab = 'details' | 'subtasks' | 'comments' | 'history'
+type Tab = 'details' | 'subtasks' | 'comments' | 'history' | 'attachments'
 
 // ─── History timeline ─────────────────────────────────────────────────────────
 
@@ -155,6 +156,7 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
   const [assigneeId, setAssigneeId] = useState(task?.assignee_id ?? '')
   const [priority, setPriority] = useState<typeof PRIORITIES[number]>(task?.priority ?? 'medium')
   const [dueDate, setDueDate] = useState(task?.due_date ?? '')
+  const [startDate, setStartDate] = useState(task?.start_date ?? '')
   const [jiraTicket, setJiraTicket] = useState(task?.jira_ticket ?? '')
   const [error, setError] = useState('')
 
@@ -189,6 +191,10 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
     : []
 
   const { data: historyEntries = [] } = useTaskHistory(isEdit ? task?.id : undefined)
+  const { data: attachments = [] } = useTaskAttachments(isEdit ? task?.id : null)
+  const uploadAttachment = useUploadAttachment(task?.id ?? '')
+  const deleteAttachment = useDeleteAttachment(task?.id ?? '')
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function handleAddComment(e: React.FormEvent) {
     e.preventDefault()
@@ -227,6 +233,7 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
           assignee_id: assigneeId || null,
           priority,
           due_date: dueDate || null,
+          start_date: startDate || null,
           jira_ticket: jiraTicket.trim() || null,
         })
 
@@ -249,6 +256,7 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
           assignee_id: assigneeId || undefined,
           priority,
           due_date: dueDate || undefined,
+          start_date: startDate || undefined,
           jira_ticket: jiraTicket.trim() || undefined,
         })
       }
@@ -278,6 +286,7 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
     { key: 'details', icon: ClipboardList, labelKey: 'kanban_tabs.details' },
     { key: 'subtasks', icon: ListChecks, labelKey: 'kanban.subtasks', count: subtasksTotal || undefined },
     { key: 'comments', icon: MessageSquare, labelKey: 'kanban.comments', count: comments.length || undefined },
+    { key: 'attachments', icon: Paperclip, labelKey: 'attachments.title', count: attachments.length || undefined },
     { key: 'history', icon: History, labelKey: 'history.title', count: historyEntries.length || undefined },
   ]
 
@@ -397,6 +406,19 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
                     className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-60"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {t('kanban.start_date')}
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  disabled={!canEdit}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-60"
+                />
               </div>
 
               <div>
@@ -658,6 +680,80 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
                   <Send className="h-4 w-4" />
                 </button>
               </form>
+            </div>
+          )}
+
+          {/* ── Attachments tab ── */}
+          {activeTab === 'attachments' && isEdit && task && (
+            <div className="p-4 space-y-3 overflow-y-auto flex-1">
+              {/* Upload area */}
+              <div
+                className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-4 text-center cursor-pointer hover:border-primary-400 transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Paperclip className="h-5 w-5 text-gray-400 mx-auto mb-1" />
+                <p className="text-sm text-gray-500 dark:text-gray-400">{t('attachments.drop_hint')}</p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    try {
+                      await uploadAttachment.mutateAsync(file)
+                    } catch (err: any) {
+                      const detail = err.response?.data?.detail
+                      alert(detail || t('common.error'))
+                    }
+                    e.target.value = ''
+                  }}
+                />
+              </div>
+
+              {/* Attachment list */}
+              {attachments.length === 0 ? (
+                <p className="text-center text-sm text-gray-400 py-4">{t('attachments.no_attachments')}</p>
+              ) : (
+                <div className="space-y-2">
+                  {attachments.map((att) => {
+                    const sizeKb = Math.round(att.file_size / 1024)
+                    const sizeLabel = att.file_size < 1024 * 1024
+                      ? `${sizeKb} ${t('attachments.size_kb')}`
+                      : `${(att.file_size / (1024 * 1024)).toFixed(1)} ${t('attachments.size_mb')}`
+                    return (
+                      <div
+                        key={att.id}
+                        className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 group"
+                      >
+                        <Paperclip className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{att.original_filename}</p>
+                          <p className="text-xs text-gray-400">{sizeLabel}</p>
+                        </div>
+                        <a
+                          href={getAttachmentDownloadUrl(task.id, att.id)}
+                          download={att.original_filename}
+                          className="p-1.5 rounded text-gray-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20"
+                          title={t('attachments.download')}
+                        >
+                          <Download className="h-4 w-4" />
+                        </a>
+                        <button
+                          onClick={async () => {
+                            if (!confirm(t('attachments.confirm_delete'))) return
+                            await deleteAttachment.mutateAsync(att.id)
+                          }}
+                          className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          title={t('attachments.delete')}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           )}
 

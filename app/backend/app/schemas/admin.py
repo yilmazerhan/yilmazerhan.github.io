@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SslCertificateResponse(BaseModel):
@@ -53,3 +53,46 @@ class DashboardStats(BaseModel):
     worklogs_this_week: int
     emails_sent_today: int
     emails_failed_today: int
+
+
+class ReportScheduleCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    frequency: str  # daily, weekly, monthly
+    day_of_week: Optional[int] = None
+    day_of_month: Optional[int] = None
+    hour: int = 8
+    recipient_emails: list[str] = []
+    team_id: Optional[uuid.UUID] = None
+    user_id: Optional[uuid.UUID] = None
+    date_range_days: int = 7
+    is_active: bool = True
+
+class ReportScheduleUpdate(BaseModel):
+    name: Optional[str] = None
+    frequency: Optional[str] = None
+    day_of_week: Optional[int] = None
+    day_of_month: Optional[int] = None
+    hour: Optional[int] = None
+    recipient_emails: Optional[list[str]] = None
+    team_id: Optional[uuid.UUID] = None
+    user_id: Optional[uuid.UUID] = None
+    date_range_days: Optional[int] = None
+    is_active: Optional[bool] = None
+
+class ReportScheduleResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    frequency: str
+    day_of_week: Optional[int]
+    day_of_month: Optional[int]
+    hour: int
+    recipient_emails: list[str]
+    team_id: Optional[uuid.UUID]
+    user_id: Optional[uuid.UUID]
+    date_range_days: int
+    is_active: bool
+    created_by: Optional[uuid.UUID]
+    last_run_at: Optional[datetime]
+    next_run_at: Optional[datetime]
+    created_at: datetime
+    model_config = {"from_attributes": True}

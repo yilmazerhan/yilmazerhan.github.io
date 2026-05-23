@@ -1,10 +1,14 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format, startOfMonth } from 'date-fns'
-import { Clock, Users, FileText, TrendingUp, Download } from 'lucide-react'
+import { Clock, Users, FileText, TrendingUp, Download, CalendarClock, Plus, Trash2, Play, Pencil } from 'lucide-react'
 import { useWorkLogs } from '@/api/worklog'
 import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
+import {
+  useReportSchedules, useCreateReportSchedule, useUpdateReportSchedule,
+  useDeleteReportSchedule, useRunReportSchedule, type ReportSchedule,
+} from '@/api/admin'
 
 function exportCSV(logs: any[], dateFrom: string, dateTo: string, t: (key: string) => string) {
   const header = [t('reports.csv_date'), t('reports.csv_user'), t('reports.csv_work_type'), t('reports.csv_duration'), t('reports.csv_description')]
@@ -23,6 +27,174 @@ function exportCSV(logs: any[], dateFrom: string, dateTo: string, t: (key: strin
   a.download = `worklog_${dateFrom}_${dateTo}.csv`
   a.click()
   URL.revokeObjectURL(url)
+}
+
+const FREQ_OPTIONS = ['daily', 'weekly', 'monthly'] as const
+const DOW_OPTIONS = [
+  { v: 0, k: 'report_schedule.mon' }, { v: 1, k: 'report_schedule.tue' },
+  { v: 2, k: 'report_schedule.wed' }, { v: 3, k: 'report_schedule.thu' },
+  { v: 4, k: 'report_schedule.fri' }, { v: 5, k: 'report_schedule.sat' },
+  { v: 6, k: 'report_schedule.sun' },
+]
+
+interface ScheduleForm {
+  id?: string
+  name: string
+  frequency: 'daily' | 'weekly' | 'monthly'
+  day_of_week: number | null
+  day_of_month: number | null
+  hour: number
+  recipient_emails: string
+  date_range_days: number
+  is_active: boolean
+}
+
+function emptyForm(): ScheduleForm {
+  return { name: '', frequency: 'weekly', day_of_week: 0, day_of_month: null, hour: 8, recipient_emails: '', date_range_days: 7, is_active: true }
+}
+
+function ReportScheduleSection({ t }: { t: (k: string) => string }) {
+  const { data: schedules = [] } = useReportSchedules()
+  const createSchedule = useCreateReportSchedule()
+  const updateSchedule = useUpdateReportSchedule()
+  const deleteSchedule = useDeleteReportSchedule()
+  const runSchedule = useRunReportSchedule()
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState<ScheduleForm>(emptyForm())
+
+  function openNew() { setForm(emptyForm()); setShowForm(true) }
+  function openEdit(s: ReportSchedule) {
+    setForm({
+      id: s.id, name: s.name, frequency: s.frequency, day_of_week: s.day_of_week,
+      day_of_month: s.day_of_month, hour: s.hour,
+      recipient_emails: s.recipient_emails.join('\n'),
+      date_range_days: s.date_range_days, is_active: s.is_active,
+    })
+    setShowForm(true)
+  }
+
+  async function handleSave() {
+    const payload = {
+      name: form.name,
+      frequency: form.frequency,
+      day_of_week: form.frequency === 'weekly' ? form.day_of_week : null,
+      day_of_month: form.frequency === 'monthly' ? form.day_of_month : null,
+      hour: form.hour,
+      recipient_emails: form.recipient_emails.split('\n').map(e => e.trim()).filter(Boolean),
+      date_range_days: form.date_range_days,
+      is_active: form.is_active,
+    }
+    try {
+      if (form.id) {
+        await updateSchedule.mutateAsync({ id: form.id, ...payload })
+      } else {
+        await createSchedule.mutateAsync(payload)
+      }
+      setShowForm(false)
+    } catch { /* ignore */ }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <CalendarClock className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+          <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">{t('report_schedule.title')}</h2>
+        </div>
+        <button
+          onClick={openNew}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-primary-500 hover:bg-primary-600 text-white rounded-lg"
+        >
+          <Plus className="h-4 w-4" />
+          {t('report_schedule.add')}
+        </button>
+      </div>
+
+      {schedules.length === 0 ? (
+        <p className="text-center py-6 text-gray-400 text-sm">{t('report_schedule.no_schedules')}</p>
+      ) : (
+        <div className="space-y-2">
+          {schedules.map((s) => (
+            <div key={s.id} className="flex items-center gap-3 p-3 rounded-lg border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm text-gray-800 dark:text-gray-200">{s.name}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {t(`report_schedule.frequency_${s.frequency}`)} · {s.recipient_emails.join(', ')} · {s.date_range_days}d
+                </p>
+                <p className="text-xs text-gray-400">
+                  {t('report_schedule.next_run')}: {s.next_run_at ? format(new Date(s.next_run_at), 'dd MMM HH:mm') : t('report_schedule.never')}
+                </p>
+              </div>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${s.is_active ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
+                {s.is_active ? 'Active' : 'Inactive'}
+              </span>
+              <button onClick={() => runSchedule.mutateAsync(s.id).then(() => alert(t('report_schedule.run_success')))} className="p-1.5 rounded text-gray-400 hover:text-green-500" title={t('report_schedule.run_now')}>
+                <Play className="h-4 w-4" />
+              </button>
+              <button onClick={() => openEdit(s)} className="p-1.5 rounded text-gray-400 hover:text-blue-500">
+                <Pencil className="h-4 w-4" />
+              </button>
+              <button onClick={async () => { if (confirm(t('report_schedule.delete_confirm'))) await deleteSchedule.mutateAsync(s.id) }} className="p-1.5 rounded text-gray-400 hover:text-red-500">
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showForm && (
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4 space-y-3">
+          <h3 className="font-semibold text-gray-800 dark:text-gray-200 text-sm">{form.id ? t('report_schedule.edit') : t('report_schedule.add')}</h3>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">{t('report_schedule.name')}</label>
+            <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">{t('report_schedule.frequency')}</label>
+              <select value={form.frequency} onChange={e => setForm(f => ({ ...f, frequency: e.target.value as typeof form.frequency }))} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white">
+                {FREQ_OPTIONS.map(fq => <option key={fq} value={fq}>{t(`report_schedule.frequency_${fq}`)}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">{t('report_schedule.hour')}</label>
+              <input type="number" min={0} max={23} value={form.hour} onChange={e => setForm(f => ({ ...f, hour: +e.target.value }))} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white" />
+            </div>
+          </div>
+          {form.frequency === 'weekly' && (
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">{t('report_schedule.day_of_week')}</label>
+              <select value={form.day_of_week ?? 0} onChange={e => setForm(f => ({ ...f, day_of_week: +e.target.value }))} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white">
+                {DOW_OPTIONS.map(d => <option key={d.v} value={d.v}>{t(d.k)}</option>)}
+              </select>
+            </div>
+          )}
+          {form.frequency === 'monthly' && (
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">{t('report_schedule.day_of_month')}</label>
+              <input type="number" min={1} max={28} value={form.day_of_month ?? 1} onChange={e => setForm(f => ({ ...f, day_of_month: +e.target.value }))} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white" />
+            </div>
+          )}
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">{t('report_schedule.recipient_emails')} <span className="text-gray-400">({t('report_schedule.recipient_emails_hint')})</span></label>
+            <textarea value={form.recipient_emails} onChange={e => setForm(f => ({ ...f, recipient_emails: e.target.value }))} rows={3} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white resize-none" />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">{t('report_schedule.date_range_days')}</label>
+            <input type="number" min={1} max={365} value={form.date_range_days} onChange={e => setForm(f => ({ ...f, date_range_days: +e.target.value }))} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white" />
+          </div>
+          <div className="flex items-center gap-2">
+            <input type="checkbox" id="is_active" checked={form.is_active} onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))} />
+            <label htmlFor="is_active" className="text-sm text-gray-700 dark:text-gray-300">{t('report_schedule.is_active')}</label>
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button onClick={() => setShowForm(false)} className="flex-1 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400">{t('report_schedule.cancel')}</button>
+            <button onClick={handleSave} disabled={createSchedule.isPending || updateSchedule.isPending} className="flex-1 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium disabled:opacity-50">{t('report_schedule.save')}</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function ReportsPage() {
@@ -269,6 +441,13 @@ export default function ReportsPage() {
             </div>
           </div>
         </>
+      )}
+
+      {/* Scheduled Reports — only for superadmin */}
+      {user?.role === 'superadmin' && (
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+          <ReportScheduleSection t={t} />
+        </div>
       )}
     </div>
   )

@@ -177,6 +177,7 @@ class KanbanService:
         priority: str = "medium",
         due_date: Optional[date] = None,
         jira_ticket: Optional[str] = None,
+        start_date: Optional[date] = None,
     ) -> Task:
         col = await self.db.execute(select(KanbanColumn).where(KanbanColumn.id == column_id))
         if not col.scalar_one_or_none():
@@ -196,6 +197,7 @@ class KanbanService:
             assignee_id=assignee_id,
             priority=priority,
             due_date=due_date,
+            start_date=start_date,
             jira_ticket=jira_ticket,
             sort_order=sort_order,
         )
@@ -224,6 +226,7 @@ class KanbanService:
         assignee_id: object = ...,   # Ellipsis = not sent; None = clear
         priority: Optional[str] = None,
         due_date: object = ...,      # Ellipsis = not sent; None = clear
+        start_date: object = ...,    # Ellipsis = not sent; None = clear
         jira_ticket: Optional[str] = None,
         is_archived: Optional[bool] = None,
     ) -> Task:
@@ -257,6 +260,12 @@ class KanbanService:
             if old_due != new_due:
                 changes.append({"field": "due_date", "old": old_due, "new": new_due})
             task.due_date = due_date  # type: ignore[assignment]
+        if start_date is not ...:
+            old_start = task.start_date.isoformat() if task.start_date else None
+            new_start = start_date.isoformat() if start_date else None  # type: ignore[union-attr]
+            if old_start != new_start:
+                changes.append({"field": "start_date", "old": old_start, "new": new_start})
+            task.start_date = start_date  # type: ignore[assignment]
         if jira_ticket is not None:
             new_jira = jira_ticket.strip() or None
             if new_jira != task.jira_ticket:
@@ -429,6 +438,81 @@ class KanbanService:
         if not subtask:
             raise HTTPException(status_code=404, detail="Alt görev bulunamadı.")
         await self.db.delete(subtask)
+        await self.db.commit()
+
+    async def list_all_history(
+        self,
+        limit: int = 100,
+        skip: int = 0,
+        task_id: Optional[uuid.UUID] = None,
+    ) -> tuple[list, int]:
+        from app.models.task_history import TaskHistory
+
+        q = select(TaskHistory).options(
+            selectinload(TaskHistory.actor)
+        )
+        if task_id:
+            q = q.where(TaskHistory.task_id == task_id)
+
+        total_result = await self.db.execute(select(func.count()).select_from(q.subquery()))
+        total = total_result.scalar_one()
+
+        items_result = await self.db.execute(
+            q.order_by(TaskHistory.created_at.desc()).offset(skip).limit(limit)
+        )
+        return list(items_result.scalars().all()), total
+
+    # ─── Attachments ──────────────────────────────────────────────────────────
+
+    async def list_attachments(self, task_id: uuid.UUID) -> list:
+        from app.models.task_attachment import TaskAttachment
+        result = await self.db.execute(
+            select(TaskAttachment)
+            .where(TaskAttachment.task_id == task_id)
+            .order_by(TaskAttachment.created_at.desc())
+        )
+        return list(result.scalars().all())
+
+    async def create_attachment(
+        self,
+        task_id: uuid.UUID,
+        filename: str,
+        original_filename: str,
+        file_size: int,
+        mime_type: str,
+        uploaded_by: uuid.UUID,
+    ) -> object:
+        from app.models.task_attachment import TaskAttachment
+        att = TaskAttachment(
+            task_id=task_id,
+            filename=filename,
+            original_filename=original_filename,
+            file_size=file_size,
+            mime_type=mime_type,
+            uploaded_by=uploaded_by,
+        )
+        self.db.add(att)
+        await self.db.commit()
+        await self.db.refresh(att)
+        return att
+
+    async def delete_attachment(self, task_id: uuid.UUID, attachment_id: uuid.UUID) -> None:
+        from app.models.task_attachment import TaskAttachment
+        import os
+        result = await self.db.execute(
+            select(TaskAttachment).where(
+                TaskAttachment.id == attachment_id,
+                TaskAttachment.task_id == task_id,
+            )
+        )
+        att = result.scalar_one_or_none()
+        if not att:
+            raise NotFoundError("Dosya eki")
+        # Delete file from disk
+        file_path = os.path.join("/app/uploads", att.filename)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        await self.db.delete(att)
         await self.db.commit()
 
     # ─── Bulk Operations ──────────────────────────────────────────────────────

@@ -4,6 +4,7 @@ from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
+
 class ColumnCreate(BaseModel):
     name: str
     color: str = "#e2e8f0"
@@ -53,6 +54,7 @@ class TaskCreate(BaseModel):
     assignee_id: Optional[uuid.UUID] = None
     priority: str = "medium"
     due_date: Optional[date] = None
+    start_date: Optional[date] = None
     jira_ticket: Optional[str] = None
 
     @field_validator("priority")
@@ -77,6 +79,7 @@ class TaskUpdate(BaseModel):
     assignee_id: Optional[uuid.UUID] = None
     priority: Optional[str] = None
     due_date: Optional[date] = None
+    start_date: Optional[date] = None
     jira_ticket: Optional[str] = None
     is_archived: Optional[bool] = None
 
@@ -98,6 +101,7 @@ class TaskResponse(BaseModel):
     assignee: Optional[UserBasic]
     priority: str
     due_date: Optional[date]
+    start_date: Optional[date] = None
     jira_ticket: Optional[str]
     jira_status: Optional[str]
     jira_status_updated_at: Optional[datetime]
@@ -174,5 +178,16 @@ class SubtaskResponse(BaseModel):
     title: str
     is_completed: bool
     sort_order: int
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AttachmentResponse(BaseModel):
+    id: uuid.UUID
+    task_id: uuid.UUID
+    original_filename: str
+    file_size: int
+    mime_type: str
+    uploaded_by: Optional[uuid.UUID]
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
