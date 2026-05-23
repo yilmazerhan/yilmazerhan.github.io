@@ -141,7 +141,7 @@ class WorkLogService:
         )
         self.db.add(log)
         await self.db.flush()
-        await self.db.refresh(log, ["user", "work_type"])
+        await self.db.refresh(log, ["created_at", "updated_at", "user", "work_type"])
         return log
 
     async def _get_log_with_user(self, log_id: uuid.UUID) -> WorkLog:
@@ -197,6 +197,7 @@ class WorkLogService:
             log.description = description
 
         await self.db.flush()
+        await self.db.refresh(log, ["updated_at", "user", "work_type"])
         return log
 
     async def delete_log(self, log_id: uuid.UUID, requester: User) -> None:
