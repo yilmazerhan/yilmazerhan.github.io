@@ -15,7 +15,6 @@ import WorkLogPage from '@/pages/WorkLogPage'
 import KanbanPage from '@/pages/KanbanPage'
 import UsersPage from '@/pages/UsersPage'
 import TeamsPage from '@/pages/TeamsPage'
-import PermissionsPage from '@/pages/PermissionsPage'
 import EmailTemplatesPage from '@/pages/EmailTemplatesPage'
 import EmailWorkflowsPage from '@/pages/EmailWorkflowsPage'
 import EmailLogsPage from '@/pages/EmailLogsPage'
@@ -70,7 +69,7 @@ export default function App() {
             <Route path="/kanban" element={<KanbanPage />} />
             <Route path="/users" element={<UsersPage />} />
             <Route path="/teams" element={<TeamsPage />} />
-            <Route path="/permissions" element={<PermissionsPage />} />
+            <Route path="/permissions" element={<Navigate to="/users" replace />} />
             <Route path="/settings/email/templates" element={<EmailTemplatesPage />} />
             <Route path="/settings/email/workflows" element={<EmailWorkflowsPage />} />
             <Route path="/settings/email/logs" element={<EmailLogsPage />} />
