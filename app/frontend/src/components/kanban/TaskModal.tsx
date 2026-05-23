@@ -170,6 +170,17 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
   const deleteComment = useDeleteComment(task?.id ?? '')
   const [commentText, setCommentText] = useState('')
   const commentInputRef = useRef<HTMLTextAreaElement>(null)
+  const [mentionQuery, setMentionQuery] = useState('')
+  const [mentionOpen, setMentionOpen] = useState(false)
+  const [mentionPos, setMentionPos] = useState(0)
+  const { data: allUsersData } = useUsers({ limit: 200 })
+  const allUsers = allUsersData?.items ?? []
+  const mentionResults = mentionQuery
+    ? allUsers.filter(u =>
+        u.username.toLowerCase().includes(mentionQuery.toLowerCase()) ||
+        u.full_name.toLowerCase().includes(mentionQuery.toLowerCase())
+      ).slice(0, 6)
+    : []
 
   const { data: historyEntries = [] } = useTaskHistory(isEdit ? task?.id : undefined)
 
@@ -467,7 +478,13 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
                           {format(new Date(c.created_at), 'dd MMM HH:mm')}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{c.content}</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
+                        {c.content.split(/(@[A-Za-z0-9_.]+)/g).map((part, i) =>
+                          part.startsWith('@') ? (
+                            <span key={i} className="text-primary-600 dark:text-primary-400 font-medium">{part}</span>
+                          ) : part
+                        )}
+                      </p>
                     </div>
                     {(user?.role === 'superadmin' || c.user_id === user?.id) && (
                       <button
@@ -483,20 +500,73 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
               </div>
 
               <form onSubmit={handleAddComment} className="flex gap-2">
-                <textarea
-                  ref={commentInputRef}
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      handleAddComment(e as any)
-                    }
-                  }}
-                  rows={2}
-                  placeholder={t('kanban.add_comment')}
-                  className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
-                />
+                <div className="flex-1 relative">
+                  <textarea
+                    ref={commentInputRef}
+                    value={commentText}
+                    onChange={(e) => {
+                      const val = e.target.value
+                      setCommentText(val)
+                      const cursor = e.target.selectionStart ?? val.length
+                      const before = val.slice(0, cursor)
+                      const match = before.match(/@([A-Za-z0-9_.]*)$/)
+                      if (match) {
+                        setMentionQuery(match[1])
+                        setMentionPos(cursor - match[0].length)
+                        setMentionOpen(true)
+                      } else {
+                        setMentionOpen(false)
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (mentionOpen) {
+                        if (e.key === 'Escape') { setMentionOpen(false); return }
+                        if (e.key === 'Enter' && mentionResults.length > 0) {
+                          e.preventDefault()
+                          const u = mentionResults[0]
+                          const before = commentText.slice(0, mentionPos)
+                          const after = commentText.slice(commentText.indexOf(' ', mentionPos) === -1 ? commentText.length : commentText.indexOf(' ', mentionPos))
+                          setCommentText(before + `@${u.username} ` + after)
+                          setMentionOpen(false)
+                          return
+                        }
+                      }
+                      if (e.key === 'Enter' && !e.shiftKey && !mentionOpen) {
+                        e.preventDefault()
+                        handleAddComment(e as any)
+                      }
+                    }}
+                    rows={2}
+                    placeholder={t('kanban.add_comment')}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+                  />
+                  {mentionOpen && mentionResults.length > 0 && (
+                    <div className="absolute bottom-full mb-1 left-0 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 overflow-hidden">
+                      {mentionResults.map((u) => (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            const before = commentText.slice(0, mentionPos)
+                            const after = commentText.slice(mentionPos + mentionQuery.length + 1)
+                            setCommentText(before + `@${u.username} ` + after)
+                            setMentionOpen(false)
+                          }}
+                          className="w-full text-left px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2"
+                        >
+                          <span className="w-6 h-6 rounded-full bg-primary-500 text-white text-xs flex items-center justify-center font-bold flex-shrink-0">
+                            {u.full_name[0].toUpperCase()}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">{u.full_name}</p>
+                            <p className="text-xs text-gray-400 truncate">@{u.username}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button
                   type="submit"
                   disabled={!commentText.trim() || createComment.isPending}

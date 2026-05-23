@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Plus, Search, Pencil, Trash2, ShieldCheck, KeyRound } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, ShieldCheck, KeyRound, BarChart3 } from 'lucide-react'
 import { useUsers, useDeleteUser, type User } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
 import UserFormModal from '@/components/users/UserFormModal'
@@ -130,6 +131,15 @@ export default function UsersPage() {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-1">
+                    {(currentUser?.role === 'superadmin' || currentUser?.role === 'team_manager') && (
+                      <Link
+                        to={`/reports/user/${user.id}`}
+                        className="p-1.5 rounded text-gray-400 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/20"
+                        title={t('activity.title')}
+                      >
+                        <BarChart3 className="h-4 w-4" />
+                      </Link>
+                    )}
                     <button
                       onClick={() => setPermUser(user)}
                       className="p-1.5 rounded text-gray-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20"

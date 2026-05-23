@@ -394,5 +394,23 @@
     "downloading": "Hazırlanıyor...",
     "error_no_pgdump": "Bu sunucuda pg_dump mevcut değil.",
     "error_failed": "Yedek alınamadı. Lütfen tekrar deneyin."
+  },
+  "notifications": {
+    "title": "Bildirimler",
+    "empty": "Bildirim yok",
+    "mark_all_read": "Tümünü okundu say",
+    "type_task_assigned": "Görev atandı",
+    "type_comment_added": "Yeni yorum",
+    "type_mention": "Bahsedildi"
+  },
+  "activity": {
+    "title": "Kullanıcı Aktivitesi",
+    "active_tasks": "Aktif Görevler",
+    "overdue_tasks": "Gecikmiş",
+    "archived_tasks": "Arşivlenmiş Görevler",
+    "hours_by_type": "İş Tipine Göre Saat",
+    "tasks_by_column": "Sütuna Göre Görevler",
+    "no_tasks": "Aktif görev yok",
+    "recent_logs": "Son İş Günlükleri"
   }
 }

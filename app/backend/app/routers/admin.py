@@ -6,6 +6,7 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models.user import User
@@ -20,7 +21,7 @@ from app.schemas.admin import (
 from app.schemas.auth import MessageResponse
 from app.services.ssl_service import SslService
 from app.services.branding_service import get_branding, update_branding, update_logo
-from app.core.dependencies import get_current_user, require_superadmin
+from app.core.dependencies import get_current_user, require_superadmin, require_manager_or_above
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -266,3 +267,106 @@ async def download_backup(
         media_type="application/octet-stream",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+# ─── User Activity Report ──────────────────────────────────────────────────────
+
+@router.get("/reports/user/{user_id}")
+async def user_activity_report(
+    user_id: uuid.UUID,
+    current_user: Annotated[User, Depends(require_manager_or_above)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+):
+    from app.models.worklog import WorkLog, WorkType
+    from app.models.kanban import Task, KanbanColumn
+
+    # Fetch subject user
+    u_result = await db.execute(select(User).where(User.id == user_id))
+    subject = u_result.scalar_one_or_none()
+    if not subject:
+        from app.core.exceptions import NotFoundError
+        raise NotFoundError("Kullanıcı")
+
+    # Default: last 30 days
+    end = date_to or date.today()
+    start = date_from or (end - timedelta(days=30))
+
+    # Work logs in range
+    wl_q = (
+        select(WorkLog)
+        .options(selectinload(WorkLog.work_type))
+        .where(
+            WorkLog.user_id == user_id,
+            WorkLog.log_date >= start,
+            WorkLog.log_date <= end,
+        )
+        .order_by(WorkLog.log_date.desc())
+    )
+    wl_result = await db.execute(wl_q)
+    logs = wl_result.scalars().all()
+
+    total_hours = sum(l.duration_hours for l in logs)
+    hours_by_type: dict[str, dict] = {}
+    for l in logs:
+        k = str(l.work_type_id)
+        if k not in hours_by_type:
+            hours_by_type[k] = {"name": l.work_type.name, "color": l.work_type.color, "hours": 0, "count": 0}
+        hours_by_type[k]["hours"] += l.duration_hours
+        hours_by_type[k]["count"] += 1
+
+    # Tasks assigned to this user
+    from sqlalchemy.orm import selectinload as sil
+    tasks_result = await db.execute(
+        select(Task)
+        .options(sil(Task.column))
+        .where(Task.assignee_id == user_id)
+    )
+    all_tasks = tasks_result.scalars().all()
+    active_tasks = [t for t in all_tasks if not t.is_archived]
+    archived_tasks = [t for t in all_tasks if t.is_archived]
+    today = date.today()
+    overdue = [t for t in active_tasks if t.due_date and t.due_date < today]
+
+    tasks_by_column: dict[str, dict] = {}
+    for t in active_tasks:
+        col_name = t.column.name if t.column else "Bilinmeyen"
+        col_color = t.column.color if t.column else "#888"
+        k = str(t.column_id)
+        if k not in tasks_by_column:
+            tasks_by_column[k] = {"name": col_name, "color": col_color, "count": 0}
+        tasks_by_column[k]["count"] += 1
+
+    return {
+        "user": {
+            "id": str(subject.id),
+            "full_name": subject.full_name,
+            "email": subject.email,
+            "username": subject.username,
+            "role": subject.role,
+            "team_id": str(subject.team_id) if subject.team_id else None,
+        },
+        "period": {"date_from": start.isoformat(), "date_to": end.isoformat()},
+        "work_log_summary": {
+            "total_hours": float(total_hours),
+            "entry_count": len(logs),
+            "hours_by_type": list(hours_by_type.values()),
+        },
+        "task_summary": {
+            "active": len(active_tasks),
+            "archived": len(archived_tasks),
+            "overdue": len(overdue),
+            "by_column": list(tasks_by_column.values()),
+        },
+        "recent_logs": [
+            {
+                "log_date": l.log_date.isoformat(),
+                "work_type": l.work_type.name,
+                "work_type_color": l.work_type.color,
+                "duration_hours": float(l.duration_hours),
+                "description": l.description,
+            }
+            for l in logs[:20]
+        ],
+    }

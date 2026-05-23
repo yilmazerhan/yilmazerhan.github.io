@@ -11,6 +11,7 @@ from app.models.task_history import TaskHistory
 from app.models.user import User
 from app.core.permissions import can_edit_task, can_delete_task
 from app.core.exceptions import NotFoundError, ForbiddenError, ValidationError
+from app.services.notification_service import NotificationService
 
 
 class KanbanService:
@@ -197,6 +198,16 @@ class KanbanService:
         await self.db.flush()
         await self.db.refresh(task, ["created_at", "updated_at", "assignee", "creator", "column"])
         await self._write_history(task.id, created_by, "created")
+        # Notify assigned user
+        if assignee_id and assignee_id != created_by:
+            nsvc = NotificationService(self.db)
+            await nsvc.create(
+                user_id=assignee_id,
+                type='task_assigned',
+                title='Size bir görev atandı',
+                body=f'"{title}"',
+                link='/kanban',
+            )
         return task
 
     async def update_task(
@@ -260,6 +271,20 @@ class KanbanService:
                     ch["new"] = task.assignee.full_name if task.assignee else ch["new"]
             await self._write_history(task.id, requester.id, "updated", changes)
 
+        # Notify new assignee if changed
+        if assignee_id is not ... and assignee_id is not None and assignee_id != requester.id:
+            for ch in changes:
+                if ch["field"] == "assignee":
+                    nsvc = NotificationService(self.db)
+                    await nsvc.create(
+                        user_id=assignee_id,
+                        type='task_assigned',
+                        title='Size bir görev atandı',
+                        body=f'"{task.title}"',
+                        link='/kanban',
+                    )
+                    break
+
         return task
 
     async def move_task(
@@ -320,6 +345,22 @@ class KanbanService:
             task_id, user_id, "comment_added",
             [{"field": "comment", "old": None, "new": content[:120]}],
         )
+        # Notify task assignee and creator about new comment (not self)
+        task_full = await self._get_task(task_id)
+        nsvc = NotificationService(self.db)
+        notified: set[uuid.UUID] = {user_id}
+        for notify_uid in [task_full.assignee_id, task_full.created_by]:
+            if notify_uid and notify_uid not in notified:
+                notified.add(notify_uid)
+                await nsvc.create(
+                    user_id=notify_uid,
+                    type='comment_added',
+                    title='Görevinize yorum eklendi',
+                    body=f'"{task_full.title}": {content[:80]}',
+                    link='/kanban',
+                )
+        # Notify @mentions
+        await nsvc.notify_mentions(content, task_full.title, user_id)
         return comment
 
     async def delete_comment(self, comment_id: uuid.UUID, requester: User) -> None:

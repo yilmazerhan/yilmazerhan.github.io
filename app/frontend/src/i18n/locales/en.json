@@ -394,5 +394,23 @@
     "downloading": "Preparing...",
     "error_no_pgdump": "pg_dump is not available on this server.",
     "error_failed": "Backup failed. Please try again."
+  },
+  "notifications": {
+    "title": "Notifications",
+    "empty": "No notifications",
+    "mark_all_read": "Mark all read",
+    "type_task_assigned": "Task assigned",
+    "type_comment_added": "New comment",
+    "type_mention": "Mentioned"
+  },
+  "activity": {
+    "title": "User Activity",
+    "active_tasks": "Active Tasks",
+    "overdue_tasks": "Overdue",
+    "archived_tasks": "Archived Tasks",
+    "hours_by_type": "Hours by Work Type",
+    "tasks_by_column": "Tasks by Column",
+    "no_tasks": "No active tasks",
+    "recent_logs": "Recent Work Logs"
   }
 }

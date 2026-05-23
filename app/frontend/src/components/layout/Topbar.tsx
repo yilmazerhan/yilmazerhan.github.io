@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Menu, Moon, Sun, Globe, LogOut, KeyRound, Search } from 'lucide-react'
+import { Menu, Moon, Sun, Globe, LogOut, KeyRound, Search, Bell } from 'lucide-react'
 import { useThemeStore } from '@/store/themeStore'
 import { useAuthStore } from '@/store/authStore'
 import apiClient from '@/api/client'
 import i18n from '@/i18n'
 import ChangePasswordModal from '@/components/users/ChangePasswordModal'
+import { useNotifications, useMarkAllRead, useMarkRead } from '@/api/notifications'
+import { formatDistanceToNow } from 'date-fns'
 
 interface TopbarProps {
   onMenuToggle: () => void
@@ -28,6 +30,11 @@ export default function Topbar({ onMenuToggle, onSearchOpen }: TopbarProps) {
   const { theme, toggleTheme } = useThemeStore()
   const { user, logout } = useAuthStore()
   const [changePwOpen, setChangePwOpen] = useState(false)
+  const [notifOpen, setNotifOpen] = useState(false)
+  const { data: notifData } = useNotifications()
+  const markRead = useMarkRead()
+  const markAllRead = useMarkAllRead()
+  const unreadCount = notifData?.unread_count ?? 0
 
   async function handleLogout() {
     await apiClient.post('/auth/logout').catch(() => {})
@@ -86,6 +93,60 @@ export default function Topbar({ onMenuToggle, onSearchOpen }: TopbarProps) {
           >
             {theme === 'light' ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
           </button>
+
+          {/* Notifications */}
+          <div className="relative">
+            <button
+              onClick={() => setNotifOpen((v) => !v)}
+              className="relative p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+              title={t('notifications.title')}
+            >
+              <Bell className="h-5 w-5" />
+              {unreadCount > 0 && (
+                <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+            {notifOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
+                <div className="absolute right-0 top-10 z-50 w-80 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 shadow-xl overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                    <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{t('notifications.title')}</span>
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={() => markAllRead.mutate()}
+                        className="text-xs text-primary-600 dark:text-primary-400 hover:underline"
+                      >
+                        {t('notifications.mark_all_read')}
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-96 overflow-y-auto">
+                    {!notifData?.items.length ? (
+                      <p className="text-center text-sm text-gray-400 py-8">{t('notifications.empty')}</p>
+                    ) : notifData.items.map((n) => (
+                      <button
+                        key={n.id}
+                        onClick={() => { markRead.mutate(n.id); setNotifOpen(false) }}
+                        className={`w-full text-left px-4 py-3 border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 flex gap-3 ${!n.is_read ? 'bg-blue-50 dark:bg-blue-900/10' : ''}`}
+                      >
+                        <span className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${n.type === 'task_assigned' ? 'bg-green-500' : n.type === 'mention' ? 'bg-purple-500' : 'bg-yellow-500'}`} />
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{n.title}</p>
+                          {n.body && <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{n.body}</p>}
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
 
           {/* User section */}
           <div className="flex items-center gap-1 pl-2 border-l border-gray-200 dark:border-gray-700">

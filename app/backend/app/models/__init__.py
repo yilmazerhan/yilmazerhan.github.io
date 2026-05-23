@@ -15,3 +15,4 @@ from app.models.app_setting import AppSetting  # noqa: F401
 from app.models.audit_log import AuditLog  # noqa: F401
 from app.models.teams_webhook import TeamsWebhookConfig  # noqa: F401
 from app.models.task_history import TaskHistory  # noqa: F401
+from app.models.notification import Notification  # noqa: F401
