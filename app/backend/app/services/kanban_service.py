@@ -6,6 +6,7 @@ from sqlalchemy import select, func, update as sa_update, or_
 from sqlalchemy.orm import selectinload
 
 from app.models.kanban import KanbanColumn, Task
+from app.models.task_comment import TaskComment
 from app.models.user import User
 from app.core.permissions import can_edit_task, can_delete_task
 from app.core.exceptions import NotFoundError, ForbiddenError, ValidationError
@@ -242,4 +243,36 @@ class KanbanService:
         if not can_delete_task(requester, task):
             raise ForbiddenError("Bu görevi silme yetkiniz yok.")
         task.is_archived = True
+        await self.db.flush()
+
+    # ─── Comments ─────────────────────────────────────────────────────────────
+    async def list_comments(self, task_id: uuid.UUID) -> list[TaskComment]:
+        result = await self.db.execute(
+            select(TaskComment)
+            .options(selectinload(TaskComment.author))
+            .where(TaskComment.task_id == task_id)
+            .order_by(TaskComment.created_at)
+        )
+        return list(result.scalars().all())
+
+    async def create_comment(self, task_id: uuid.UUID, user_id: uuid.UUID, content: str) -> TaskComment:
+        task_exists = await self.db.execute(select(Task.id).where(Task.id == task_id))
+        if not task_exists.scalar_one_or_none():
+            raise NotFoundError("Görev")
+        comment = TaskComment(task_id=task_id, user_id=user_id, content=content)
+        self.db.add(comment)
+        await self.db.flush()
+        await self.db.refresh(comment, ["created_at", "updated_at", "author"])
+        return comment
+
+    async def delete_comment(self, comment_id: uuid.UUID, requester: User) -> None:
+        result = await self.db.execute(
+            select(TaskComment).where(TaskComment.id == comment_id)
+        )
+        comment = result.scalar_one_or_none()
+        if not comment:
+            raise NotFoundError("Yorum")
+        if requester.role != "superadmin" and comment.user_id != requester.id:
+            raise ForbiddenError("Bu yorumu silme yetkiniz yok.")
+        await self.db.delete(comment)
         await self.db.flush()

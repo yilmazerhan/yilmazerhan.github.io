@@ -113,3 +113,27 @@ class TaskListResponse(BaseModel):
     total: int
     skip: int
     limit: int
+
+
+class TaskCommentCreate(BaseModel):
+    content: str
+
+    @field_validator("content")
+    @classmethod
+    def validate_content(cls, v: str) -> str:
+        v = v.strip()
+        if len(v) < 1:
+            raise ValueError("Yorum boş olamaz.")
+        if len(v) > 2000:
+            raise ValueError("Yorum en fazla 2000 karakter olabilir.")
+        return v
+
+
+class TaskCommentResponse(BaseModel):
+    id: uuid.UUID
+    task_id: uuid.UUID
+    user_id: Optional[uuid.UUID]
+    author: Optional[UserBasic]
+    content: str
+    created_at: datetime
+    model_config = {"from_attributes": True}

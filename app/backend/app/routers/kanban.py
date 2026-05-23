@@ -10,6 +10,7 @@ from app.models.user import User
 from app.schemas.kanban import (
     ColumnCreate, ColumnUpdate, ColumnReorderItem, ColumnResponse,
     TaskCreate, TaskUpdate, TaskMoveRequest, TaskResponse, TaskListResponse,
+    TaskCommentCreate, TaskCommentResponse,
 )
 from app.schemas.auth import MessageResponse
 from app.services.kanban_service import KanbanService
@@ -172,3 +173,38 @@ async def delete_task(
     svc = KanbanService(db)
     await svc.delete_task(task_id, current_user)
     return {"message": "Görev arşivlendi."}
+
+
+# ─── Comments ────────────────────────────────────────────────────────────────
+
+@router.get("/tasks/{task_id}/comments", response_model=list[TaskCommentResponse])
+async def list_comments(
+    task_id: uuid.UUID,
+    _: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = KanbanService(db)
+    return await svc.list_comments(task_id)
+
+
+@router.post("/tasks/{task_id}/comments", response_model=TaskCommentResponse, status_code=201)
+async def create_comment(
+    task_id: uuid.UUID,
+    body: TaskCommentCreate,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = KanbanService(db)
+    return await svc.create_comment(task_id, current_user.id, body.content)
+
+
+@router.delete("/tasks/{task_id}/comments/{comment_id}", response_model=MessageResponse)
+async def delete_comment(
+    task_id: uuid.UUID,
+    comment_id: uuid.UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = KanbanService(db)
+    await svc.delete_comment(comment_id, current_user)
+    return {"message": "Yorum silindi."}

@@ -93,9 +93,22 @@ async def create_log(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
+    from app.core.exceptions import ForbiddenError
+    from sqlalchemy import select as sa_select
+    target_id = current_user.id
+    if body.target_user_id and body.target_user_id != current_user.id:
+        if current_user.role not in ("superadmin", "team_manager"):
+            raise ForbiddenError("Başkası adına kayıt oluşturma yetkiniz yok.")
+        if current_user.role == "team_manager":
+            from app.models.user import User as UserModel
+            result = await db.execute(sa_select(UserModel).where(UserModel.id == body.target_user_id, UserModel.is_deleted == False))
+            target_user = result.scalar_one_or_none()
+            if not target_user or target_user.team_id != current_user.team_id:
+                raise ForbiddenError("Bu kullanıcı sizin takımınızda değil.")
+        target_id = body.target_user_id
     svc = WorkLogService(db)
     return await svc.create_log(
-        user_id=current_user.id,
+        user_id=target_id,
         work_type_id=body.work_type_id,
         log_date=body.log_date,
         duration_hours=body.duration_hours,

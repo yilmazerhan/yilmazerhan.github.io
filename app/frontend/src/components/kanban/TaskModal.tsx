@@ -1,8 +1,12 @@
-import { useState, useEffect } from 'react'
-import { X, Trash2 } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { X, Trash2, Send } from 'lucide-react'
 import { format } from 'date-fns'
 import { useTranslation } from 'react-i18next'
-import { useCreateTask, useUpdateTask, useDeleteTask, useMoveTask, type Task } from '@/api/kanban'
+import {
+  useCreateTask, useUpdateTask, useDeleteTask, useMoveTask,
+  useTaskComments, useCreateComment, useDeleteComment,
+  type Task,
+} from '@/api/kanban'
 import type { KanbanColumn } from '@/api/kanban'
 import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
@@ -37,6 +41,30 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
   const deleteTask = useDeleteTask()
   const moveTask = useMoveTask()
   const loading = createTask.isPending || updateTask.isPending || moveTask.isPending
+
+  // Comments (only when editing an existing task)
+  const { data: comments = [] } = useTaskComments(isEdit ? task?.id : undefined)
+  const createComment = useCreateComment(task?.id ?? '')
+  const deleteComment = useDeleteComment(task?.id ?? '')
+  const [commentText, setCommentText] = useState('')
+  const commentInputRef = useRef<HTMLTextAreaElement>(null)
+
+  async function handleAddComment(e: React.FormEvent) {
+    e.preventDefault()
+    const text = commentText.trim()
+    if (!text) return
+    try {
+      await createComment.mutateAsync(text)
+      setCommentText('')
+    } catch {
+      // ignore
+    }
+  }
+
+  async function handleDeleteComment(commentId: string) {
+    if (!confirm(t('kanban.delete_comment'))) return
+    await deleteComment.mutateAsync(commentId)
+  }
 
   const canEdit = !isEdit ||
     user?.role === 'superadmin' ||
@@ -266,6 +294,73 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
             )}
           </div>
         </form>
+
+        {/* Comments section — only for existing tasks */}
+        {isEdit && task && (
+          <div className="px-6 pb-6 border-t border-gray-200 dark:border-gray-800 pt-4">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+              {t('kanban.comments')}
+              {comments.length > 0 && (
+                <span className="text-xs font-normal text-gray-400">
+                  {t('kanban.comment_count', { count: comments.length })}
+                </span>
+              )}
+            </h3>
+
+            <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
+              {comments.length === 0 ? (
+                <p className="text-sm text-gray-400 dark:text-gray-500">{t('kanban.no_comments')}</p>
+              ) : comments.map((c) => (
+                <div key={c.id} className="flex gap-2 group">
+                  <div className="flex-1 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                        {c.author?.full_name ?? '—'}
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        {format(new Date(c.created_at), 'dd MMM HH:mm')}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{c.content}</p>
+                  </div>
+                  {(user?.role === 'superadmin' || c.user_id === user?.id) && (
+                    <button
+                      onClick={() => handleDeleteComment(c.id)}
+                      className="opacity-0 group-hover:opacity-100 p-1 text-gray-300 hover:text-red-500 transition-opacity self-start mt-1"
+                      title={t('kanban.delete_comment')}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <form onSubmit={handleAddComment} className="flex gap-2">
+              <textarea
+                ref={commentInputRef}
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleAddComment(e as any)
+                  }
+                }}
+                rows={2}
+                placeholder={t('kanban.add_comment')}
+                className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+              />
+              <button
+                type="submit"
+                disabled={!commentText.trim() || createComment.isPending}
+                className="px-3 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg disabled:opacity-40 self-end"
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            </form>
+          </div>
+        )}
       </div>
     </div>
   )

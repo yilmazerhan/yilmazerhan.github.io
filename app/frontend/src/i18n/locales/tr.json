@@ -58,7 +58,10 @@
     "db_tasks": "Görevler (aktif / toplam)",
     "db_worklogs": "İş Günlüğü (7 gün)",
     "db_emails": "E-posta Gönderildi (bugün)",
-    "db_email_failed": "başarısız"
+    "db_email_failed": "başarısız",
+    "hours_by_type": "Bu Hafta İş Tipi Dağılımı",
+    "hours_by_person": "Bu Hafta Kişi Başı Saat",
+    "no_hours": "Bu hafta kayıt yok"
   },
   "worklog": {
     "title": "İş Günlüğü",
@@ -82,7 +85,9 @@
     "hours_abbr": "s",
     "work_type_required": "İş tipi seçiniz.",
     "description_min_length": "Açıklama en az 5 karakter olmalıdır.",
-    "filter_all_users": "Tüm Kullanıcılar"
+    "filter_all_users": "Tüm Kullanıcılar",
+    "for_user": "Kişi Adına",
+    "myself": "Kendin"
   },
   "kanban": {
     "title": "Görev Panosu",
@@ -116,7 +121,14 @@
     "optional_description": "İsteğe bağlı açıklama...",
     "log_work_title": "İş Günlüğüne Ekle",
     "log_work_subtitle": "\"{{title}}\" görevi tamamlandı. Çalışma kaydı eklemek ister misiniz?",
-    "log_work_skip": "Geç"
+    "log_work_skip": "Geç",
+    "filter_all_priorities": "Tüm Öncelikler",
+    "priority_filter": "Öncelik",
+    "comments": "Yorumlar",
+    "add_comment": "Yorum ekle...",
+    "no_comments": "Henüz yorum yok",
+    "delete_comment": "Yorumu Sil",
+    "comment_count": "{{count}} yorum"
   },
   "teams": {
     "title": "Takımlar",

@@ -38,6 +38,7 @@ class WorkLogCreate(BaseModel):
     log_date: date
     duration_hours: float
     description: str
+    target_user_id: Optional[uuid.UUID] = None  # Manager/superadmin only
 
     @field_validator("duration_hours")
     @classmethod

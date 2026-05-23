@@ -156,3 +156,44 @@ export function useDeleteTask() {
     onSuccess: () => qc.invalidateQueries({ queryKey: kanbanKeys.all }),
   })
 }
+
+export interface TaskComment {
+  id: string
+  task_id: string
+  user_id: string | null
+  author: TaskUser | null
+  content: string
+  created_at: string
+  updated_at: string
+}
+
+export const commentKeys = {
+  list: (taskId: string) => [...kanbanKeys.all, 'comments', taskId] as const,
+}
+
+export function useTaskComments(taskId: string | undefined) {
+  return useQuery({
+    queryKey: commentKeys.list(taskId ?? ''),
+    queryFn: () =>
+      apiClient.get<TaskComment[]>(`/kanban/tasks/${taskId}/comments`).then((r) => r.data),
+    enabled: !!taskId,
+  })
+}
+
+export function useCreateComment(taskId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (content: string) =>
+      apiClient.post<TaskComment>(`/kanban/tasks/${taskId}/comments`, { content }).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: commentKeys.list(taskId) }),
+  })
+}
+
+export function useDeleteComment(taskId: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (commentId: string) =>
+      apiClient.delete(`/kanban/tasks/${taskId}/comments/${commentId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: commentKeys.list(taskId) }),
+  })
+}

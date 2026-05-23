@@ -58,3 +58,4 @@ class Task(Base):
     assignee: Mapped[Optional["User"]] = relationship("User", back_populates="assigned_tasks", foreign_keys=[assignee_id])
     creator: Mapped["User"] = relationship("User", foreign_keys=[created_by])
     column: Mapped["KanbanColumn"] = relationship("KanbanColumn", back_populates="tasks")
+    comments: Mapped[list["TaskComment"]] = relationship("TaskComment", back_populates="task", cascade="all, delete-orphan", order_by="TaskComment.created_at")  # type: ignore[name-defined]

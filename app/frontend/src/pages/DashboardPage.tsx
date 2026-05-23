@@ -15,6 +15,7 @@ export default function DashboardPage() {
   const today = format(new Date(), 'yyyy-MM-dd')
   const weekAgo = format(subDays(new Date(), 7), 'yyyy-MM-dd')
   const isSuperAdmin = user?.role === 'superadmin'
+  const canSeeTeamData = user?.role === 'superadmin' || user?.role === 'team_manager'
 
   const { data: tasksData } = useTasks({ limit: 500 })
   const { data: logsData } = useWorkLogs({ date_from: weekAgo, date_to: today })
@@ -38,6 +39,30 @@ export default function DashboardPage() {
 
     return { total: active.length, overdue: overdue.length, dueThisWeek: dueThisWeek.length, myTasks: myTasks.length, totalHours, todayHours }
   }, [tasksData, logsData, user, today])
+
+  const workTypeBreakdown = useMemo(() => {
+    const logs = logsData?.items ?? []
+    const map: Record<string, { name: string; color: string; hours: number }> = {}
+    for (const log of logs) {
+      const key = log.work_type_id
+      if (!map[key]) map[key] = { name: log.work_type.name, color: log.work_type.color, hours: 0 }
+      map[key].hours += log.duration_hours
+    }
+    return Object.values(map).sort((a, b) => b.hours - a.hours)
+  }, [logsData])
+
+  const hoursByPerson = useMemo(() => {
+    const logs = logsData?.items ?? []
+    const map: Record<string, { name: string; hours: number }> = {}
+    for (const log of logs) {
+      if (!map[log.user_id]) map[log.user_id] = { name: log.user.full_name, hours: 0 }
+      map[log.user_id].hours += log.duration_hours
+    }
+    return Object.values(map).sort((a, b) => b.hours - a.hours)
+  }, [logsData])
+
+  const maxPersonHours = hoursByPerson[0]?.hours ?? 1
+  const maxTypeHours = workTypeBreakdown[0]?.hours ?? 1
 
   const recentLogs = logsData?.items.slice(0, 5) ?? []
   const urgentTasks = (tasksData?.items ?? [])
@@ -127,6 +152,104 @@ export default function DashboardPage() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Work type breakdown + hours per person */}
+      {workTypeBreakdown.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Work type bar chart */}
+          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+            <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-indigo-500" />
+              {t('dashboard.hours_by_type')}
+            </h2>
+            <div className="space-y-3">
+              {workTypeBreakdown.map((wt) => (
+                <div key={wt.name}>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: wt.color }} />
+                      <span className="text-sm text-gray-700 dark:text-gray-300 truncate max-w-[160px]">{wt.name}</span>
+                    </div>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white ml-2 flex-shrink-0">
+                      {wt.hours.toFixed(1)}{hourAbbr}
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${(wt.hours / maxTypeHours) * 100}%`, backgroundColor: wt.color }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Hours per person (manager/superadmin) or same-user single row */}
+          {canSeeTeamData && hoursByPerson.length > 0 ? (
+            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+              <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
+                <Users className="h-4 w-4 text-blue-500" />
+                {t('dashboard.hours_by_person')}
+              </h2>
+              <div className="space-y-3">
+                {hoursByPerson.map((p) => (
+                  <div key={p.name}>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center flex-shrink-0">
+                          <span className="text-xs font-semibold text-primary-700 dark:text-primary-300">
+                            {p.name.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <span className="text-sm text-gray-700 dark:text-gray-300 truncate max-w-[150px]">{p.name}</span>
+                      </div>
+                      <span className="text-sm font-medium text-gray-900 dark:text-white ml-2 flex-shrink-0">
+                        {p.hours.toFixed(1)}{hourAbbr}
+                      </span>
+                    </div>
+                    <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-primary-400 dark:bg-primary-500 transition-all duration-500"
+                        style={{ width: `${(p.hours / maxPersonHours) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5">
+              <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
+                <Clock className="h-4 w-4 text-blue-500" /> {t('dashboard.recent_logs')}
+              </h2>
+              {recentLogs.length === 0 ? (
+                <p className="text-sm text-gray-400 py-4 text-center">{t('dashboard.no_logs')}</p>
+              ) : (
+                <div className="space-y-2">
+                  {recentLogs.map((log) => (
+                    <div key={log.id} className="flex items-center justify-between gap-3 py-2 border-b border-gray-100 dark:border-gray-800 last:border-0">
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: log.work_type.color }} />
+                        <div className="min-w-0">
+                          <p className="text-sm text-gray-700 dark:text-gray-300 truncate">{log.description}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{log.user.full_name} · {log.work_type.name}</p>
+                        </div>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white">{log.duration_hours}{hourAbbr}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          {format(parseISO(log.log_date + 'T12:00:00'), 'd MMM', { locale })}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

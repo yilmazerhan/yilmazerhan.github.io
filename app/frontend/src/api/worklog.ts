@@ -74,6 +74,7 @@ export function useCreateWorkLog() {
       log_date: string
       duration_hours: number
       description: string
+      target_user_id?: string
     }) => apiClient.post<WorkLog>('/worklogs', data).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: worklogKeys.all })

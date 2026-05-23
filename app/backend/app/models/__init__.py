@@ -4,6 +4,7 @@ from app.models.team import Team  # noqa: F401
 from app.models.permission import PermissionOverride  # noqa: F401
 from app.models.worklog import WorkType, WorkLog  # noqa: F401
 from app.models.kanban import KanbanColumn, Task  # noqa: F401
+from app.models.task_comment import TaskComment  # noqa: F401
 from app.models.jira_config import JiraConfig  # noqa: F401
 from app.models.email_config import SmtpConfig  # noqa: F401
 from app.models.email_template import EmailTemplate  # noqa: F401

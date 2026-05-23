@@ -31,14 +31,19 @@ export default function KanbanPage() {
   )
   const teamUsers = usersData?.items ?? []
 
+  const [selectedPriority, setSelectedPriority] = useState<string>('')
+
   // Build task params based on role and filter state
-  const taskParams: { team_id?: string; assignee_id?: string } = {}
+  const taskParams: { team_id?: string; assignee_id?: string; priority?: string } = {}
   if (isSuperAdmin) {
     if (selectedUserId) taskParams.assignee_id = selectedUserId
     else if (selectedTeamId) taskParams.team_id = selectedTeamId
   } else if (isTeamMember && selectedUserId) {
     taskParams.assignee_id = selectedUserId
   }
+  if (selectedPriority) taskParams.priority = selectedPriority
+
+  const PRIORITIES = ['low', 'medium', 'high', 'critical'] as const
 
   function handleTeamChange(teamId: string) {
     setSelectedTeamId(teamId)
@@ -59,44 +64,53 @@ export default function KanbanPage() {
       </div>
 
       {/* Filter bar */}
-      {(isSuperAdmin || isTeamMember) && (
-        <div className="flex items-center gap-3 flex-wrap">
-          {isSuperAdmin && (
-            <select
-              value={selectedTeamId}
-              onChange={(e) => handleTeamChange(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200"
-            >
-              <option value="">{t('kanban.filter_all_teams', 'Tüm Takımlar')}</option>
-              {teams.map((team) => (
-                <option key={team.id} value={team.id}>{team.name}</option>
-              ))}
-            </select>
-          )}
+      <div className="flex items-center gap-3 flex-wrap">
+        {isSuperAdmin && (
+          <select
+            value={selectedTeamId}
+            onChange={(e) => handleTeamChange(e.target.value)}
+            className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200"
+          >
+            <option value="">{t('kanban.filter_all_teams')}</option>
+            {teams.map((team) => (
+              <option key={team.id} value={team.id}>{team.name}</option>
+            ))}
+          </select>
+        )}
 
-          {(teamUsers.length > 0) && (
-            <select
-              value={selectedUserId}
-              onChange={(e) => setSelectedUserId(e.target.value)}
-              className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200"
-            >
-              <option value="">{t('kanban.filter_all_users', 'Tüm Kullanıcılar')}</option>
-              {teamUsers.map((u) => (
-                <option key={u.id} value={u.id}>{u.full_name}</option>
-              ))}
-            </select>
-          )}
+        {(isSuperAdmin || isTeamMember) && teamUsers.length > 0 && (
+          <select
+            value={selectedUserId}
+            onChange={(e) => setSelectedUserId(e.target.value)}
+            className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200"
+          >
+            <option value="">{t('kanban.filter_all_users')}</option>
+            {teamUsers.map((u) => (
+              <option key={u.id} value={u.id}>{u.full_name}</option>
+            ))}
+          </select>
+        )}
 
-          {(selectedTeamId || selectedUserId) && (
-            <button
-              onClick={() => { setSelectedTeamId(''); setSelectedUserId('') }}
-              className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 underline"
-            >
-              {t('common.clear_filters', 'Filtreleri Temizle')}
-            </button>
-          )}
-        </div>
-      )}
+        <select
+          value={selectedPriority}
+          onChange={(e) => setSelectedPriority(e.target.value)}
+          className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200"
+        >
+          <option value="">{t('kanban.filter_all_priorities')}</option>
+          {PRIORITIES.map((p) => (
+            <option key={p} value={p}>{t(`kanban.priority_${p}`)}</option>
+          ))}
+        </select>
+
+        {(selectedTeamId || selectedUserId || selectedPriority) && (
+          <button
+            onClick={() => { setSelectedTeamId(''); setSelectedUserId(''); setSelectedPriority('') }}
+            className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 underline"
+          >
+            {t('common.clear_filters')}
+          </button>
+        )}
+      </div>
 
       <KanbanBoard taskParams={taskParams} />
 

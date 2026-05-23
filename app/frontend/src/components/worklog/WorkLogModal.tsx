@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { X } from 'lucide-react'
 import { format } from 'date-fns'
 import { useWorkTypes, useCreateWorkLog, useUpdateWorkLog, type WorkLog } from '@/api/worklog'
+import { useUsers } from '@/api/users'
+import { useAuthStore } from '@/store/authStore'
 import { useTranslation } from 'react-i18next'
 
 interface Props {
@@ -13,14 +15,22 @@ const DURATION_OPTIONS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 3.5, 4
 
 export default function WorkLogModal({ log, onClose }: Props) {
   const { t } = useTranslation()
+  const currentUser = useAuthStore((s) => s.user)
   const isEdit = !!log
   const { data: workTypes } = useWorkTypes()
+
+  const canSelectUser = !isEdit && (currentUser?.role === 'superadmin' || currentUser?.role === 'team_manager')
+  const usersParams = currentUser?.role === 'team_manager' && currentUser.team_id
+    ? { team_id: currentUser.team_id, is_active: true, limit: 200 }
+    : { is_active: true, limit: 200 }
+  const { data: usersData } = useUsers(canSelectUser ? usersParams : undefined)
 
   const today = format(new Date(), 'yyyy-MM-dd')
   const [workTypeId, setWorkTypeId] = useState(log?.work_type_id || '')
   const [logDate, setLogDate] = useState(log?.log_date || today)
   const [duration, setDuration] = useState(log?.duration_hours || 1)
   const [description, setDescription] = useState(log?.description || '')
+  const [targetUserId, setTargetUserId] = useState('')
   const [error, setError] = useState('')
 
   const createLog = useCreateWorkLog()
@@ -47,6 +57,7 @@ export default function WorkLogModal({ log, onClose }: Props) {
           log_date: logDate,
           duration_hours: duration,
           description: description.trim(),
+          target_user_id: targetUserId || undefined,
         })
       }
       onClose()
@@ -72,6 +83,24 @@ export default function WorkLogModal({ log, onClose }: Props) {
             <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">
               {error}
             </p>
+          )}
+
+          {canSelectUser && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {t('worklog.for_user')}
+              </label>
+              <select
+                value={targetUserId}
+                onChange={(e) => setTargetUserId(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="">{t('worklog.myself')}</option>
+                {usersData?.items.filter((u) => u.id !== currentUser?.id).map((u) => (
+                  <option key={u.id} value={u.id}>{u.full_name}</option>
+                ))}
+              </select>
+            </div>
           )}
 
           <div className="grid grid-cols-2 gap-3">

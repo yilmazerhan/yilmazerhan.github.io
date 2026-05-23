@@ -58,7 +58,10 @@
     "db_tasks": "Tasks (active / total)",
     "db_worklogs": "Work Logs (7 days)",
     "db_emails": "Emails Sent (today)",
-    "db_email_failed": "failed"
+    "db_email_failed": "failed",
+    "hours_by_type": "This Week by Work Type",
+    "hours_by_person": "Hours Per Person This Week",
+    "no_hours": "No records this week"
   },
   "worklog": {
     "title": "Work Log",
@@ -82,7 +85,9 @@
     "hours_abbr": "h",
     "work_type_required": "Please select a work type.",
     "description_min_length": "Description must be at least 5 characters.",
-    "filter_all_users": "All Users"
+    "filter_all_users": "All Users",
+    "for_user": "On Behalf Of",
+    "myself": "Myself"
   },
   "kanban": {
     "title": "Task Board",
@@ -116,7 +121,14 @@
     "optional_description": "Optional description...",
     "log_work_title": "Log Work",
     "log_work_subtitle": "Task \"{{title}}\" completed. Would you like to add a work log entry?",
-    "log_work_skip": "Skip"
+    "log_work_skip": "Skip",
+    "filter_all_priorities": "All Priorities",
+    "priority_filter": "Priority",
+    "comments": "Comments",
+    "add_comment": "Add a comment...",
+    "no_comments": "No comments yet",
+    "delete_comment": "Delete Comment",
+    "comment_count": "{{count}} comment(s)"
   },
   "teams": {
     "title": "Teams",

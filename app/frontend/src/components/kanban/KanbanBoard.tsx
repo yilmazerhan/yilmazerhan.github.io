@@ -19,7 +19,7 @@ import WorkLogFromTaskModal from './WorkLogFromTaskModal'
 
 interface Props {
   onAddTask?: (columnId: string) => void
-  taskParams?: { assignee_id?: string; team_id?: string }
+  taskParams?: { assignee_id?: string; team_id?: string; priority?: string }
 }
 
 export default function KanbanBoard({ taskParams }: Props) {
