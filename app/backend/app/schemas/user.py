@@ -7,6 +7,7 @@ import re
 
 class UserCreate(BaseModel):
     email: EmailStr
+    username: Optional[str] = None
     full_name: str
     role: str = "user"
     team_id: Optional[uuid.UUID] = None
@@ -94,6 +95,7 @@ class TeamBasic(BaseModel):
 class UserResponse(BaseModel):
     id: uuid.UUID
     email: str
+    username: str
     full_name: str
     role: str
     team_id: Optional[uuid.UUID]

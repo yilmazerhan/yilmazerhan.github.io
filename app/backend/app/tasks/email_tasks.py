@@ -116,6 +116,23 @@ def send_activation_email_task(self, to_email: str, full_name: str, activation_t
 
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=30)
+def send_new_account_email_task(self, to_email: str, full_name: str, username: str, temp_password: str):
+    try:
+        _run_async(_send_auth_email_async(
+            to_email=to_email,
+            template_slug="new_account",
+            variables={
+                "full_name": full_name,
+                "username": username,
+                "temp_password": temp_password,
+                "login_url": _build_url("/login"),
+            },
+        ))
+    except Exception as exc:
+        raise self.retry(exc=exc)
+
+
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=30)
 def send_password_reset_email_task(self, to_email: str, full_name: str, reset_token: str):
     try:
         _run_async(_send_auth_email_async(

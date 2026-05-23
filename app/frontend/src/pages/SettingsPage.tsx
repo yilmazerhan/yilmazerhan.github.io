@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format } from 'date-fns'
 import { tr, enUS } from 'date-fns/locale'
-import { Plus, Pencil, Trash2, CheckCircle, XCircle, Loader2, ShieldCheck, Upload, Building2, MessageSquare } from 'lucide-react'
+import { Plus, Pencil, Trash2, CheckCircle, XCircle, Loader2, ShieldCheck, Upload, Building2, MessageSquare, Mail } from 'lucide-react'
 import {
   useJiraConfigs,
   useCreateJiraConfig,
@@ -25,11 +25,61 @@ import {
   useTeamsWebhooks,
   useCreateTeamsWebhook,
   useDeleteTeamsWebhook,
+  useSmtpConfigs,
+  useCreateSmtpConfig,
+  useUpdateSmtpConfig,
+  type SmtpConfig,
 } from '@/api/email'
 
 export default function SettingsPage() {
   const { t, i18n } = useTranslation()
   const dateLocale = i18n.language === 'tr' ? tr : enUS
+
+  // SMTP
+  const { data: smtpConfigs = [] } = useSmtpConfigs()
+  const createSmtp = useCreateSmtpConfig()
+  const updateSmtp = useUpdateSmtpConfig()
+  const [smtpShowForm, setSmtpShowForm] = useState(false)
+  const [smtpEditing, setSmtpEditing] = useState<SmtpConfig | null>(null)
+  const [smtpHost, setSmtpHost] = useState('')
+  const [smtpPort, setSmtpPort] = useState(587)
+  const [smtpUsername, setSmtpUsername] = useState('')
+  const [smtpPassword, setSmtpPassword] = useState('')
+  const [smtpFromEmail, setSmtpFromEmail] = useState('')
+  const [smtpFromName, setSmtpFromName] = useState('')
+  const [smtpUseTls, setSmtpUseTls] = useState(true)
+  const [smtpError, setSmtpError] = useState('')
+
+  function smtpOpenCreate() {
+    setSmtpEditing(null)
+    setSmtpHost(''); setSmtpPort(587); setSmtpUsername(''); setSmtpPassword('')
+    setSmtpFromEmail(''); setSmtpFromName(''); setSmtpUseTls(true); setSmtpError('')
+    setSmtpShowForm(true)
+  }
+
+  function smtpOpenEdit(cfg: SmtpConfig) {
+    setSmtpEditing(cfg)
+    setSmtpHost(cfg.host); setSmtpPort(cfg.port); setSmtpUsername(cfg.username)
+    setSmtpPassword(''); setSmtpFromEmail(cfg.from_email); setSmtpFromName(cfg.from_name)
+    setSmtpUseTls(cfg.use_tls); setSmtpError('')
+    setSmtpShowForm(true)
+  }
+
+  async function smtpHandleSubmit(e: React.FormEvent) {
+    e.preventDefault(); setSmtpError('')
+    try {
+      if (smtpEditing) {
+        const data: any = { id: smtpEditing.id, host: smtpHost, port: smtpPort, username: smtpUsername, from_email: smtpFromEmail, from_name: smtpFromName, use_tls: smtpUseTls }
+        if (smtpPassword) data.password = smtpPassword
+        await updateSmtp.mutateAsync(data)
+      } else {
+        await createSmtp.mutateAsync({ host: smtpHost, port: smtpPort, username: smtpUsername, password: smtpPassword, from_email: smtpFromEmail, from_name: smtpFromName, use_tls: smtpUseTls })
+      }
+      setSmtpShowForm(false)
+    } catch (err: any) {
+      setSmtpError(err.response?.data?.detail || t('common.error'))
+    }
+  }
 
   const { data: configs = [], isLoading } = useJiraConfigs()
   const { data: sslCerts = [] } = useSslCertificates()
@@ -166,6 +216,57 @@ export default function SettingsPage() {
   return (
     <div className="space-y-8 max-w-3xl">
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('settings.title')}</h1>
+
+      {/* SMTP Section */}
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Mail className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('settings.smtp_title')}</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{t('settings.smtp_description')}</p>
+            </div>
+          </div>
+          <button
+            onClick={smtpOpenCreate}
+            className="flex items-center gap-2 px-3 py-1.5 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm font-medium"
+          >
+            <Plus className="h-4 w-4" />
+            {t('common.add')}
+          </button>
+        </div>
+
+        {smtpConfigs.length === 0 ? (
+          <div className="border border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-8 text-center">
+            <p className="text-gray-400 dark:text-gray-500 text-sm">{t('settings.smtp_none')}</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {smtpConfigs.map((cfg) => (
+              <div key={cfg.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-medium text-gray-900 dark:text-white">{cfg.host}:{cfg.port}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${cfg.is_active ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-500'}`}>
+                        {cfg.is_active ? t('common.active') : t('common.inactive')}
+                      </span>
+                      {cfg.use_tls && <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 font-medium">TLS</span>}
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-500 dark:text-gray-400">
+                      <span>{t('settings.smtp_from_label')}: {cfg.from_name} &lt;{cfg.from_email}&gt;</span>
+                      <span>{t('settings.smtp_username_label')}: {cfg.username}</span>
+                    </div>
+                  </div>
+                  <button onClick={() => smtpOpenEdit(cfg)} className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       {/* Jira Section */}
       <section>
@@ -460,6 +561,64 @@ export default function SettingsPage() {
           </form>
         </div>
       </section>
+
+      {/* SMTP Form Modal */}
+      {smtpShowForm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md shadow-xl">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {smtpEditing ? t('settings.smtp_edit') : t('settings.smtp_add')}
+              </h3>
+              <button onClick={() => setSmtpShowForm(false)} className="p-1 rounded text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <form onSubmit={smtpHandleSubmit} className="p-6 space-y-4">
+              {smtpError && <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">{smtpError}</p>}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings.smtp_host')} *</label>
+                  <input value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} required placeholder="smtp.gmail.com" className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings.smtp_port')} *</label>
+                  <input type="number" value={smtpPort} onChange={(e) => setSmtpPort(Number(e.target.value))} required className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings.smtp_username_label')} *</label>
+                <input value={smtpUsername} onChange={(e) => setSmtpUsername(e.target.value)} required placeholder="user@gmail.com" className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {t('settings.smtp_password')}
+                  {smtpEditing && <span className="ml-1 text-gray-400 text-xs">{t('settings.api_token_note')}</span>}
+                </label>
+                <input type="password" value={smtpPassword} onChange={(e) => setSmtpPassword(e.target.value)} required={!smtpEditing} placeholder="••••••••" className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings.smtp_from_email')} *</label>
+                  <input type="email" value={smtpFromEmail} onChange={(e) => setSmtpFromEmail(e.target.value)} required placeholder="noreply@company.com" className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings.smtp_from_name')}</label>
+                  <input value={smtpFromName} onChange={(e) => setSmtpFromName(e.target.value)} placeholder="Team App" className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="smtp_tls" checked={smtpUseTls} onChange={(e) => setSmtpUseTls(e.target.checked)} className="rounded" />
+                <label htmlFor="smtp_tls" className="text-sm text-gray-700 dark:text-gray-300">{t('settings.smtp_use_tls')}</label>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setSmtpShowForm(false)} className="flex-1 py-2 px-4 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium">{t('common.cancel')}</button>
+                <button type="submit" disabled={createSmtp.isPending || updateSmtp.isPending} className="flex-1 py-2 px-4 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium disabled:opacity-50">
+                  {createSmtp.isPending || updateSmtp.isPending ? t('common.saving') : t('common.save')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Jira Config Form Modal */}
       {showForm && (

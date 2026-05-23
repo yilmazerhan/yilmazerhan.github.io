@@ -68,7 +68,7 @@ async def login(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = AuthService(db)
-    user, access_token, raw_refresh = await svc.login(body.email, body.password)
+    user, access_token, raw_refresh = await svc.login(body.username, body.password)
 
     response = JSONResponse(content={
         "access_token": access_token,

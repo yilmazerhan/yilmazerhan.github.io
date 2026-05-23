@@ -1,4 +1,7 @@
 import uuid
+import re
+import secrets
+import string
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update
@@ -8,6 +11,14 @@ from app.models.user import User
 from app.models.team import Team
 from app.core.security import hash_password
 from app.core.exceptions import ConflictError, NotFoundError, ForbiddenError, ValidationError
+
+
+def _generate_strong_password(length: int = 12) -> str:
+    alphabet = string.ascii_letters + string.digits
+    while True:
+        pwd = ''.join(secrets.choice(alphabet) for _ in range(length))
+        if any(c.isupper() for c in pwd) and any(c.islower() for c in pwd) and any(c.isdigit() for c in pwd):
+            return pwd
 
 
 class UserService:
@@ -66,6 +77,19 @@ class UserService:
         result = await self.db.execute(query)
         return list(result.scalars().all()), total
 
+    async def _generate_unique_username(self, email: str, hint: Optional[str] = None) -> str:
+        base = hint if hint else email.split('@')[0]
+        base = re.sub(r'[^a-z0-9_]', '', base.lower().replace('.', '_').replace('-', '_'))
+        base = base[:30] or 'user'
+        username = base
+        counter = 1
+        while True:
+            exists = await self.db.execute(select(User).where(User.username == username))
+            if not exists.scalar_one_or_none():
+                return username
+            username = f"{base}{counter}"
+            counter += 1
+
     async def create_user(
         self,
         email: str,
@@ -73,7 +97,7 @@ class UserService:
         role: str = "user",
         team_id: Optional[uuid.UUID] = None,
         preferred_language: str = "tr",
-        send_activation: bool = True,
+        username: Optional[str] = None,
     ) -> tuple[User, str]:
         result = await self.db.execute(
             select(User).where(User.email == email.lower())
@@ -86,35 +110,27 @@ class UserService:
             if not team_exists.scalar_one_or_none():
                 raise NotFoundError("Takım")
 
-        import secrets
-        temp_password = secrets.token_urlsafe(16)
+        # Generate unique username
+        final_username = await self._generate_unique_username(email, hint=username)
+
+        # Check if requested username is already taken
+        if username and final_username != username.lower():
+            raise ConflictError("Bu kullanıcı adı zaten kullanımda.")
+
+        temp_password = _generate_strong_password()
         user = User(
             email=email.lower(),
+            username=final_username,
             hashed_password=hash_password(temp_password),
             full_name=full_name,
             role=role,
             team_id=team_id,
             preferred_language=preferred_language,
-            is_active=not send_activation,
+            is_active=True,
         )
         self.db.add(user)
         await self.db.flush()
-
-        activation_token = ""
-        if send_activation:
-            from app.core.security import generate_secure_token, activation_token_expire
-            from app.models.user import PasswordResetToken
-            raw_token, token_hash = generate_secure_token()
-            record = PasswordResetToken(
-                user_id=user.id,
-                token_hash=token_hash,
-                expires_at=activation_token_expire(),
-            )
-            self.db.add(record)
-            activation_token = raw_token
-
-        await self.db.flush()
-        return user, activation_token
+        return user, temp_password
 
     async def update_user(
         self,

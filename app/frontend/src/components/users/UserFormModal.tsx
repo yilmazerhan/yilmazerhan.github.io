@@ -12,6 +12,8 @@ export default function UserFormModal({ user, onClose }: Props) {
   const { t } = useTranslation()
   const isEdit = !!user
   const [email, setEmail] = useState(user?.email || '')
+  const [username, setUsername] = useState(user?.username || '')
+  const [usernameManual, setUsernameManual] = useState(false)
   const [fullName, setFullName] = useState(user?.full_name || '')
   const [role, setRole] = useState(user?.role || 'user')
   const [isActive, setIsActive] = useState(user?.is_active ?? true)
@@ -20,6 +22,14 @@ export default function UserFormModal({ user, onClose }: Props) {
   const createUser = useCreateUser()
   const updateUser = useUpdateUser(user?.id || '')
 
+  function handleEmailChange(val: string) {
+    setEmail(val)
+    if (!usernameManual) {
+      const base = val.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 30)
+      setUsername(base)
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
@@ -27,7 +37,7 @@ export default function UserFormModal({ user, onClose }: Props) {
       if (isEdit) {
         await updateUser.mutateAsync({ full_name: fullName, role, is_active: isActive })
       } else {
-        await createUser.mutateAsync({ email, full_name: fullName, role })
+        await createUser.mutateAsync({ email, username: username || undefined, full_name: fullName, role })
       }
       onClose()
     } catch (err: any) {
@@ -57,16 +67,29 @@ export default function UserFormModal({ user, onClose }: Props) {
           )}
 
           {!isEdit && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('auth.email')}</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
-            </div>
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('auth.email')}</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => handleEmailChange(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('auth.username')}</label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => { setUsername(e.target.value); setUsernameManual(true) }}
+                  required
+                  placeholder={t('auth.username_placeholder')}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+            </>
           )}
 
           <div>

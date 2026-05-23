@@ -30,6 +30,7 @@ export default function KanbanBoard({ taskParams }: Props) {
   const moveTask = useMoveTask()
 
   const [activeTask, setActiveTask] = useState<Task | null>(null)
+  const [dragSourceColumnId, setDragSourceColumnId] = useState<string | null>(null)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [addColumnId, setAddColumnId] = useState<string | null>(null)
   const [completedTask, setCompletedTask] = useState<Task | null>(null)
@@ -59,8 +60,9 @@ export default function KanbanBoard({ taskParams }: Props) {
 
   function onDragStart(event: DragStartEvent) {
     if (event.active.data.current?.type === 'Task') {
-      setActiveTask(event.active.data.current.task)
-      // snapshot current tasks for optimistic updates
+      const t = event.active.data.current.task as Task
+      setActiveTask(t)
+      setDragSourceColumnId(t.column_id)
       setLocalTasks(tasks.slice())
     }
   }
@@ -95,19 +97,21 @@ export default function KanbanBoard({ taskParams }: Props) {
 
     if (!over || !localTasks) {
       setLocalTasks(null)
+      setDragSourceColumnId(null)
       return
     }
 
     const activeId = active.id as string
     const overId = over.id as string
     const draggedTask = localTasks.find((t) => t.id === activeId)
-    if (!draggedTask) { setLocalTasks(null); return }
+    if (!draggedTask) { setLocalTasks(null); setDragSourceColumnId(null); return }
 
     const overTask = localTasks.find((t) => t.id === overId)
     const overCol = sortedColumns.find((c) => c.id === overId)
     const targetColumnId = overTask ? overTask.column_id : overCol?.id ?? draggedTask.column_id
 
-    const sourceColumn = sortedColumns.find((c) => c.id === draggedTask.column_id)
+    // Use captured source column (before optimistic update changed column_id)
+    const sourceColumn = sortedColumns.find((c) => c.id === dragSourceColumnId)
     const targetColumn = sortedColumns.find((c) => c.id === targetColumnId)
 
     // Determine new sort order
@@ -124,6 +128,7 @@ export default function KanbanBoard({ taskParams }: Props) {
     }
 
     setLocalTasks(null)
+    setDragSourceColumnId(null)
 
     try {
       const movedTask = await moveTask.mutateAsync({ id: activeId, column_id: targetColumnId, sort_order: newSortOrder })

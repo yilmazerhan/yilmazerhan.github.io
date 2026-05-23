@@ -72,16 +72,16 @@ class AuthService:
         await self.db.flush()
         return user
 
-    async def login(self, email: str, password: str) -> tuple[User, str, str]:
+    async def login(self, username: str, password: str) -> tuple[User, str, str]:
         """Returns (user, access_token, raw_refresh_token)."""
         result = await self.db.execute(
-            select(User).where(User.email == email.lower(), User.is_deleted == False)
+            select(User).where(User.username == username.lower(), User.is_deleted == False)
         )
         user = result.scalar_one_or_none()
         if not user or not verify_password(password, user.hashed_password):
-            raise AuthenticationError("Email veya şifre hatalı.")
+            raise AuthenticationError("Kullanıcı adı veya şifre hatalı.")
         if not user.is_active:
-            raise ForbiddenError("Hesabınız henüz aktive edilmemiş. Email adresinizi kontrol edin.")
+            raise ForbiddenError("Hesabınız aktif değil. Lütfen yöneticinizle iletişime geçin.")
 
         # Rehash if algorithm params changed
         if needs_rehash(user.hashed_password):

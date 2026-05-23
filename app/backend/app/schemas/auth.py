@@ -41,7 +41,7 @@ class RegisterRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    username: str
     password: str
 
 
@@ -76,6 +76,7 @@ class TokenResponse(BaseModel):
 class UserPublic(BaseModel):
     id: uuid.UUID
     email: str
+    username: str
     full_name: str
     role: str
     team_id: Optional[uuid.UUID]

@@ -4,6 +4,7 @@ import apiClient from './client'
 export interface User {
   id: string
   email: string
+  username: string
   full_name: string
   role: 'superadmin' | 'team_manager' | 'user'
   team_id: string | null
@@ -24,6 +25,7 @@ export interface UserListResponse {
 
 export interface CreateUserPayload {
   email: string
+  username?: string
   full_name: string
   role?: string
   team_id?: string | null

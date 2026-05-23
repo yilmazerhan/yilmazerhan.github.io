@@ -50,18 +50,20 @@ async def create_user(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = UserService(db)
-    user, activation_token = await svc.create_user(
+    user, temp_password = await svc.create_user(
         email=body.email,
         full_name=body.full_name,
         role=body.role,
         team_id=body.team_id,
         preferred_language=body.preferred_language,
+        username=body.username,
     )
-    from app.tasks.email_tasks import send_activation_email_task
-    send_activation_email_task.delay(
+    from app.tasks.email_tasks import send_new_account_email_task
+    send_new_account_email_task.delay(
         to_email=user.email,
         full_name=user.full_name,
-        activation_token=activation_token,
+        username=user.username,
+        temp_password=temp_password,
     )
     return user
 

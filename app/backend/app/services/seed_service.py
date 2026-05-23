@@ -56,6 +56,7 @@ async def _seed_superadmin(db: AsyncSession) -> None:
 
     admin = User(
         email=settings.SUPERADMIN_EMAIL.lower(),
+        username=settings.SUPERADMIN_EMAIL.lower().split('@')[0],
         hashed_password=hash_password(settings.SUPERADMIN_PASSWORD),
         full_name=settings.SUPERADMIN_FULL_NAME,
         role="superadmin",
@@ -90,6 +91,21 @@ async def _seed_app_settings(db: AsyncSession) -> None:
 
 
 SYSTEM_EMAIL_TEMPLATES = [
+    {
+        "name": "Yeni Hesap Bilgileri",
+        "slug": "new_account",
+        "subject": "Hesabınız Oluşturuldu",
+        "html_body": """<h2>Merhaba {{ full_name }},</h2>
+<p>Hesabınız oluşturuldu. Aşağıdaki bilgilerle giriş yapabilirsiniz:</p>
+<table style="border-collapse:collapse;margin:16px 0;">
+  <tr><td style="padding:4px 12px 4px 0;font-weight:bold;">Kullanıcı Adı:</td><td style="padding:4px 0;font-family:monospace;font-size:1.1em;">{{ username }}</td></tr>
+  <tr><td style="padding:4px 12px 4px 0;font-weight:bold;">Geçici Şifre:</td><td style="padding:4px 0;font-family:monospace;font-size:1.1em;">{{ temp_password }}</td></tr>
+</table>
+<p><a href="{{ login_url }}" style="background:#3b82f6;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Giriş Yap</a></p>
+<p style="color:#6b7280;font-size:0.9em;">Güvenliğiniz için ilk girişinizde şifrenizi değiştirmenizi öneririz.</p>""",
+        "available_vars": {"full_name": "Kullanıcı adı", "username": "Kullanıcı adı", "temp_password": "Geçici şifre", "login_url": "Giriş URL"},
+        "is_system": True,
+    },
     {
         "name": "Hesap Aktivasyonu",
         "slug": "account_activation",
