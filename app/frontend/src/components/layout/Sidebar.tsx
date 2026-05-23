@@ -5,7 +5,7 @@ import axios from 'axios'
 import { useAuthStore } from '@/store/authStore'
 import {
   LayoutDashboard, ClipboardList, Kanban, Users, Users2,
-  Mail, Settings, ScrollText, BarChart3, ShieldCheck
+  Mail, Settings, ScrollText, BarChart3, ShieldCheck, UserCircle, Keyboard,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -79,6 +79,29 @@ export default function Sidebar({ open }: SidebarProps) {
           )
         })}
       </nav>
+
+      {/* Bottom: profile + shortcuts hint */}
+      <div className="px-2 py-3 border-t border-gray-200 dark:border-gray-800 space-y-1">
+        <NavLink
+          to="/profile"
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              isActive
+                ? 'bg-primary-50 dark:bg-primary-100 text-primary-700 dark:text-primary-600'
+                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+            }`
+          }
+        >
+          <UserCircle className="h-5 w-5 flex-shrink-0" />
+          <span>{t('profile.title')}</span>
+        </NavLink>
+
+        <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-gray-400 dark:text-gray-600">
+          <Keyboard className="h-3.5 w-3.5" />
+          <span>{t('shortcuts.hint')}</span>
+          <kbd className="ml-auto bg-gray-100 dark:bg-gray-800 px-1 rounded font-mono">?</kbd>
+        </div>
+      </div>
     </aside>
   )
 }

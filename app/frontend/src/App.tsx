@@ -21,6 +21,7 @@ import SettingsPage from '@/pages/SettingsPage'
 import AuditLogsPage from '@/pages/AuditLogsPage'
 import ReportsPage from '@/pages/ReportsPage'
 import PermissionsPage from '@/pages/PermissionsPage'
+import ProfilePage from '@/pages/ProfilePage'
 
 function BrandingInit() {
   const { data: branding } = useQuery({
@@ -76,6 +77,7 @@ export default function App() {
             <Route path="/settings/email/workflows" element={<EmailWorkflowsPage />} />
             <Route path="/settings/email/logs" element={<EmailLogsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/admin/audit-logs" element={<AuditLogsPage />} />
           </Route>
         </Route>

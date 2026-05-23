@@ -340,6 +340,25 @@
     "total_col": "Total",
     "grand_total": "Grand Total"
   },
+  "profile": {
+    "title": "My Profile",
+    "saved": "Profile updated.",
+    "language": "Language Preference",
+    "password_hint": "Click the button below to change your password."
+  },
+  "search": {
+    "placeholder": "Search or go to page...",
+    "no_results": "No results found.",
+    "navigate": "navigate",
+    "select": "select",
+    "close": "close"
+  },
+  "shortcuts": {
+    "title": "Keyboard Shortcuts",
+    "search": "Open search",
+    "show_help": "Show this help",
+    "hint": "Shortcuts"
+  },
   "theme": {
     "light": "Light Mode",
     "dark": "Dark Mode",

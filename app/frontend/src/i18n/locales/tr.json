@@ -340,6 +340,25 @@
     "total_col": "Toplam",
     "grand_total": "Genel Toplam"
   },
+  "profile": {
+    "title": "Profilim",
+    "saved": "Profil güncellendi.",
+    "language": "Dil Tercihi",
+    "password_hint": "Şifrenizi değiştirmek için aşağıdaki butona tıklayın."
+  },
+  "search": {
+    "placeholder": "Ara veya sayfaya git...",
+    "no_results": "Sonuç bulunamadı.",
+    "navigate": "gezin",
+    "select": "seç",
+    "close": "kapat"
+  },
+  "shortcuts": {
+    "title": "Klavye Kısayolları",
+    "search": "Arama aç",
+    "show_help": "Bu yardımı göster",
+    "hint": "Kısayollar"
+  },
   "theme": {
     "light": "Aydınlık Mod",
     "dark": "Karanlık Mod",
