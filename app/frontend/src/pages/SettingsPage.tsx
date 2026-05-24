@@ -12,6 +12,7 @@ import {
   type WorkType,
 } from '@/api/worklog'
 import {
+  useBoards,
   useColumns,
   useCreateColumn,
   useUpdateColumn,
@@ -201,8 +202,12 @@ export default function SettingsPage() {
     catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
   }
 
-  // Kanban Columns state
-  const { data: columnsData = [] } = useColumns()
+  // Kanban Boards for column filter
+  const { data: boardsData = [] } = useBoards()
+  const [selectedBoardId, setSelectedBoardId] = useState<string>('')
+
+  // Kanban Columns state — filter by selected board
+  const { data: columnsData = [] } = useColumns(selectedBoardId || undefined)
   const createCol = useCreateColumn()
   const updateCol = useUpdateColumn()
   const deleteCol = useDeleteColumn()
@@ -220,8 +225,9 @@ export default function SettingsPage() {
   async function colHandleSubmit(e: React.FormEvent) {
     e.preventDefault(); setColError('')
     try {
+      const boardId = selectedBoardId || (boardsData[0]?.id)
       if (colEditing) await updateCol.mutateAsync({ id: colEditing.id, name: colName, color: colColor, is_terminal: colIsTerminal, sort_order: colSortOrder })
-      else await createCol.mutateAsync({ name: colName, color: colColor, is_terminal: colIsTerminal, sort_order: colSortOrder })
+      else await createCol.mutateAsync({ name: colName, color: colColor, is_terminal: colIsTerminal, sort_order: colSortOrder, board_id: boardId })
       setColShowForm(false)
     } catch (err: any) { setColError(err.response?.data?.detail || t('common.error')) }
   }
@@ -854,13 +860,27 @@ export default function SettingsPage() {
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{t('settings.columns_description')}</p>
             </div>
           </div>
-          <button
-            onClick={colOpenCreate}
-            className="flex items-center gap-2 px-3 py-1.5 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm font-medium"
-          >
-            <Plus className="h-4 w-4" />
-            {t('settings.add_column')}
-          </button>
+          <div className="flex items-center gap-2">
+            {boardsData.length > 1 && (
+              <select
+                value={selectedBoardId}
+                onChange={(e) => setSelectedBoardId(e.target.value)}
+                className="text-sm px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200"
+              >
+                <option value="">{t('kanban.boards_title')}</option>
+                {boardsData.map((b) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+            )}
+            <button
+              onClick={colOpenCreate}
+              className="flex items-center gap-2 px-3 py-1.5 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm font-medium"
+            >
+              <Plus className="h-4 w-4" />
+              {t('settings.add_column')}
+            </button>
+          </div>
         </div>
 
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
@@ -869,6 +889,7 @@ export default function SettingsPage() {
             <thead>
               <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
                 <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('settings.column_name_label')}</th>
+                {!selectedBoardId && <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('kanban.boards_title')}</th>}
                 <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('settings.column_sort_label')}</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('settings.column_terminal_label')}</th>
                 <th className="text-right px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('common.actions')}</th>
@@ -883,6 +904,11 @@ export default function SettingsPage() {
                       <span className="font-medium text-gray-800 dark:text-gray-200">{resolveName(t, col.name, col.name_key)}</span>
                     </span>
                   </td>
+                  {!selectedBoardId && (
+                    <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">
+                      {boardsData.find(b => b.id === col.board_id)?.name ?? '—'}
+                    </td>
+                  )}
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{col.sort_order}</td>
                   <td className="px-4 py-3">
                     {col.is_terminal ? (

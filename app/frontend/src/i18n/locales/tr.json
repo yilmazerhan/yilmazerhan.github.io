@@ -178,7 +178,23 @@
     "col_pending": "Bekleyen",
     "col_in_progress": "Devam Ediyor",
     "col_in_review": "İncelemede",
-    "col_done": "Tamamlandı"
+    "col_done": "Tamamlandı",
+    "boards_title": "Kanban Panoları",
+    "create_board": "Yeni Pano",
+    "edit_board": "Panoyu Düzenle",
+    "board_name": "Pano Adı",
+    "board_name_placeholder": "ör. Sprint 1, Q3 Planlaması...",
+    "board_description": "Açıklama",
+    "board_description_placeholder": "İsteğe bağlı pano açıklaması...",
+    "board_color": "Renk",
+    "custom_color": "Özel renk",
+    "no_boards": "Henüz pano yok.",
+    "create_first_board": "İlk Panoyu Oluştur",
+    "columns_count": "sütun",
+    "tasks_count": "görev",
+    "unarchive": "Arşivden Çıkar",
+    "delete_board_title": "Panoyu Sil",
+    "delete_board_confirm": "\"{{name}}\" panosunu silmek istediğinize emin misiniz? Tüm sütunlar ve görevler kalıcı olarak silinecek."
   },
   "teams": {
     "title": "Takımlar",
@@ -358,7 +374,8 @@
     "next": "Sonraki",
     "optional": "isteğe bağlı",
     "access_denied": "Bu sayfayı görüntüleme yetkiniz yok.",
-    "refresh": "Yenile"
+    "refresh": "Yenile",
+    "deleting": "Siliniyor..."
   },
   "email": {
     "templates_title": "E-posta Şablonları",

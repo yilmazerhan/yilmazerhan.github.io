@@ -178,7 +178,23 @@
     "col_pending": "Pending",
     "col_in_progress": "In Progress",
     "col_in_review": "In Review",
-    "col_done": "Done"
+    "col_done": "Done",
+    "boards_title": "Kanban Boards",
+    "create_board": "New Board",
+    "edit_board": "Edit Board",
+    "board_name": "Board Name",
+    "board_name_placeholder": "e.g. Sprint 1, Q3 Planning...",
+    "board_description": "Description",
+    "board_description_placeholder": "Optional board description...",
+    "board_color": "Color",
+    "custom_color": "Custom color",
+    "no_boards": "No boards yet.",
+    "create_first_board": "Create First Board",
+    "columns_count": "column(s)",
+    "tasks_count": "task(s)",
+    "unarchive": "Unarchive",
+    "delete_board_title": "Delete Board",
+    "delete_board_confirm": "Are you sure you want to delete \"{{name}}\"? All columns and tasks will be permanently deleted."
   },
   "teams": {
     "title": "Teams",
@@ -358,7 +374,8 @@
     "next": "Next",
     "optional": "optional",
     "access_denied": "You do not have permission to view this page.",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "deleting": "Deleting..."
   },
   "email": {
     "templates_title": "Email Templates",

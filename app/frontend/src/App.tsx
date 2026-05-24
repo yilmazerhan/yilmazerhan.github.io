@@ -12,6 +12,7 @@ import ActivateAccountPage from '@/pages/ActivateAccountPage'
 import DashboardPage from '@/pages/DashboardPage'
 import WorkLogPage from '@/pages/WorkLogPage'
 import KanbanPage from '@/pages/KanbanPage'
+import KanbanBoardsPage from '@/pages/KanbanBoardsPage'
 import UsersPage from '@/pages/UsersPage'
 import TeamsPage from '@/pages/TeamsPage'
 import EmailTemplatesPage from '@/pages/EmailTemplatesPage'
@@ -74,7 +75,8 @@ export default function App() {
           <Route element={<AppShell />}>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/worklog" element={<WorkLogPage />} />
-            <Route path="/kanban" element={<KanbanPage />} />
+            <Route path="/kanban" element={<KanbanBoardsPage />} />
+            <Route path="/kanban/:boardId" element={<KanbanPage />} />
             <Route path="/gantt" element={<GanttPage />} />
             <Route path="/timeline" element={<TimelinePage />} />
             <Route path="/leave" element={<LeavePage />} />

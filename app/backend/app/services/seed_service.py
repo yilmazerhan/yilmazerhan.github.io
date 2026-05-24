@@ -3,7 +3,7 @@ from sqlalchemy import select
 
 from app.models.user import User
 from app.models.worklog import WorkType
-from app.models.kanban import KanbanColumn
+from app.models.kanban import KanbanBoard, KanbanColumn
 from app.models.app_setting import AppSetting
 from app.models.email_template import EmailTemplate
 from app.core.security import hash_password
@@ -79,8 +79,16 @@ async def _seed_kanban_columns(db: AsyncSession) -> None:
     if result.scalar_one_or_none():
         return
 
+    # Ensure a default board exists first
+    board_result = await db.execute(select(KanbanBoard).limit(1))
+    board = board_result.scalar_one_or_none()
+    if not board:
+        board = KanbanBoard(name="Genel", description="Varsayılan kanban panosu", color="#6366f1")
+        db.add(board)
+        await db.flush()
+
     for col in DEFAULT_KANBAN_COLUMNS:
-        db.add(KanbanColumn(**col))
+        db.add(KanbanColumn(**col, board_id=board.id))
 
 
 async def _seed_app_settings(db: AsyncSession) -> None:

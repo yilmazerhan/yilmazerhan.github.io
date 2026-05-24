@@ -7,12 +7,50 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 _JIRA_RE = re.compile(r'^[A-Za-z][A-Za-z0-9_]*-\d+$')
 
 
+# ─── Board schemas ────────────────────────────────────────────────────────────
+
+class BoardCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=1000)
+    color: str = "#6366f1"
+
+    @field_validator("color")
+    @classmethod
+    def validate_color(cls, v: str) -> str:
+        if not v.startswith("#") or len(v) not in (4, 7):
+            raise ValueError("Renk geçerli bir HEX değeri olmalıdır.")
+        return v
+
+
+class BoardUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=1000)
+    color: Optional[str] = None
+    is_archived: Optional[bool] = None
+
+
+class BoardResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    description: Optional[str]
+    color: str
+    is_archived: bool
+    created_by: Optional[uuid.UUID]
+    created_at: datetime
+    updated_at: datetime
+    task_count: int = 0
+    column_count: int = 0
+    model_config = {"from_attributes": True}
+
+
+# ─── Column schemas ───────────────────────────────────────────────────────────
 
 class ColumnCreate(BaseModel):
     name: str
     color: str = "#e2e8f0"
     is_terminal: bool = False
     sort_order: int = 0
+    board_id: Optional[uuid.UUID] = None
 
     @field_validator("color")
     @classmethod
@@ -36,6 +74,7 @@ class ColumnReorderItem(BaseModel):
 
 class ColumnResponse(BaseModel):
     id: uuid.UUID
+    board_id: uuid.UUID
     name: str
     name_key: Optional[str] = None
     color: str

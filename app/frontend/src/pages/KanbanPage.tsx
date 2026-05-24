@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Search, CheckSquare, X } from 'lucide-react'
+import { useParams, Link } from 'react-router-dom'
+import { Plus, Search, CheckSquare, X, ChevronLeft } from 'lucide-react'
 import KanbanBoard from '@/components/kanban/KanbanBoard'
 import TaskModal from '@/components/kanban/TaskModal'
-import { useColumns, useBulkUpdateTasks } from '@/api/kanban'
+import { useColumns, useBulkUpdateTasks, useBoard } from '@/api/kanban'
 import { useTeams } from '@/api/teams'
 import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
@@ -11,7 +12,9 @@ import { resolveName } from '@/utils/i18nName'
 
 export default function KanbanPage() {
   const { t } = useTranslation()
-  const { data: columns = [] } = useColumns()
+  const { boardId } = useParams<{ boardId: string }>()
+  const { data: board } = useBoard(boardId)
+  const { data: columns = [] } = useColumns(boardId)
   const { user } = useAuthStore()
   const [addOpen, setAddOpen] = useState(false)
 
@@ -38,8 +41,9 @@ export default function KanbanPage() {
   )
   const teamUsers = usersData?.items ?? []
 
-  // Build task params
-  const taskParams: { team_id?: string; assignee_id?: string; priority?: string; search?: string } = {}
+  // Build task params — always include board_id to scope to this board
+  const taskParams: { team_id?: string; assignee_id?: string; priority?: string; search?: string; board_id?: string } = {}
+  if (boardId) taskParams.board_id = boardId
   if (isSuperAdmin) {
     if (selectedUserId) taskParams.assignee_id = selectedUserId
     else if (selectedTeamId) taskParams.team_id = selectedTeamId
@@ -78,7 +82,27 @@ export default function KanbanPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('kanban.title')}</h1>
+        <div className="flex items-center gap-3">
+          <Link
+            to="/kanban"
+            className="flex items-center gap-1 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            {t('kanban.boards_title')}
+          </Link>
+          <span className="text-gray-300 dark:text-gray-600">/</span>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+            {board ? (
+              <span className="flex items-center gap-2">
+                <span
+                  className="inline-block w-3 h-3 rounded-full"
+                  style={{ backgroundColor: board.color }}
+                />
+                {board.name}
+              </span>
+            ) : t('kanban.title')}
+          </h1>
+        </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => { setSelectionMode(!selectionMode); if (selectionMode) clearSelection() }}
@@ -160,6 +184,7 @@ export default function KanbanPage() {
 
       <KanbanBoard
         taskParams={taskParams}
+        columns={columns}
         selectionMode={selectionMode}
         selectedTaskIds={selectedTaskIds}
         onToggleSelect={(id) => setSelectedTaskIds((prev) => {

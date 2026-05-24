@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.user import User
 from app.schemas.kanban import (
+    BoardCreate, BoardUpdate, BoardResponse,
     ColumnCreate, ColumnUpdate, ColumnReorderItem, ColumnResponse,
     TaskCreate, TaskUpdate, TaskMoveRequest, TaskResponse, TaskListResponse,
     TaskCommentCreate, TaskCommentResponse, TaskHistoryEntry,
@@ -24,15 +25,79 @@ from app.core.dependencies import get_current_user, require_superadmin, require_
 router = APIRouter(prefix="/kanban", tags=["kanban"])
 
 
+# ─── Boards ───────────────────────────────────────────────────────────────────
+
+@router.get("/boards", response_model=list[BoardResponse])
+async def list_boards(
+    _: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    include_archived: bool = Query(False),
+):
+    svc = KanbanService(db)
+    return await svc.list_boards(include_archived=include_archived)
+
+
+@router.post("/boards", response_model=BoardResponse, status_code=201)
+async def create_board(
+    body: BoardCreate,
+    current_user: Annotated[User, Depends(require_manager_or_above)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = KanbanService(db)
+    board = await svc.create_board(body.name, body.description, body.color, current_user.id)
+    boards = await svc.list_boards()
+    return next(b for b in boards if b["id"] == board.id)
+
+
+@router.get("/boards/{board_id}", response_model=BoardResponse)
+async def get_board(
+    board_id: uuid.UUID,
+    _: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = KanbanService(db)
+    boards = await svc.list_boards(include_archived=True)
+    board = next((b for b in boards if b["id"] == board_id), None)
+    if not board:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Pano bulunamadı.")
+    return board
+
+
+@router.patch("/boards/{board_id}", response_model=BoardResponse)
+async def update_board(
+    board_id: uuid.UUID,
+    body: BoardUpdate,
+    _: Annotated[User, Depends(require_manager_or_above)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = KanbanService(db)
+    await svc.update_board(board_id, body.name, body.description, body.color, body.is_archived)
+    boards = await svc.list_boards(include_archived=True)
+    return next(b for b in boards if b["id"] == board_id)
+
+
+@router.delete("/boards/{board_id}", response_model=dict)
+async def delete_board(
+    board_id: uuid.UUID,
+    current_user: Annotated[User, Depends(require_superadmin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = KanbanService(db)
+    await svc.delete_board(board_id, current_user)
+    return {"message": "Pano silindi."}
+
+
 # ─── Columns ──────────────────────────────────────────────────────────────────
 
 @router.get("/columns", response_model=list[ColumnResponse])
 async def list_columns(
     _: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    board_id: Optional[uuid.UUID] = Query(None),
 ):
     svc = KanbanService(db)
-    return await svc.list_columns()
+    return await svc.list_columns(board_id=board_id)
 
 
 @router.post("/columns", response_model=ColumnResponse, status_code=201)
@@ -42,7 +107,7 @@ async def create_column(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = KanbanService(db)
-    return await svc.create_column(body.name, body.color, body.is_terminal, body.sort_order)
+    return await svc.create_column(body.name, body.color, body.is_terminal, body.sort_order, body.board_id)
 
 
 @router.patch("/columns/{col_id}", response_model=ColumnResponse)
@@ -72,9 +137,13 @@ async def reorder_columns(
     body: list[ColumnReorderItem],
     _: Annotated[User, Depends(require_manager_or_above)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    board_id: Optional[uuid.UUID] = Query(None),
 ):
     svc = KanbanService(db)
-    return await svc.reorder_columns([{"id": str(item.id), "sort_order": item.sort_order} for item in body])
+    cols = await svc.reorder_columns([{"id": str(item.id), "sort_order": item.sort_order} for item in body])
+    if board_id:
+        return [c for c in cols if c.board_id == board_id]
+    return cols
 
 
 # ─── Tasks ────────────────────────────────────────────────────────────────────
@@ -86,6 +155,7 @@ async def list_tasks(
     assignee_id: Optional[uuid.UUID] = Query(None),
     team_id: Optional[uuid.UUID] = Query(None),
     column_id: Optional[uuid.UUID] = Query(None),
+    board_id: Optional[uuid.UUID] = Query(None),
     priority: Optional[str] = Query(None),
     due_before: Optional[date] = Query(None),
     include_archived: bool = Query(False),
@@ -99,6 +169,7 @@ async def list_tasks(
         assignee_id=assignee_id,
         team_id=team_id,
         column_id=column_id,
+        board_id=board_id,
         priority=priority,
         due_before=due_before,
         include_archived=include_archived,

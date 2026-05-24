@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update as sa_update, or_
 from sqlalchemy.orm import selectinload
 
-from app.models.kanban import KanbanColumn, Task
+from app.models.kanban import KanbanBoard, KanbanColumn, Task
 from app.models.task_comment import TaskComment
 from app.models.task_history import TaskHistory
 from app.models.task_subtask import TaskSubtask
@@ -35,15 +35,117 @@ class KanbanService:
         )
         self.db.add(entry)
 
-    # ─── Columns ─────────────────────────────────────────────────────────────
-    async def list_columns(self) -> list[KanbanColumn]:
+    # ─── Boards ──────────────────────────────────────────────────────────────
+    async def list_boards(self, include_archived: bool = False) -> list[dict]:
+        q = select(KanbanBoard)
+        if not include_archived:
+            q = q.where(KanbanBoard.is_archived == False)
+        q = q.order_by(KanbanBoard.created_at)
+        result = await self.db.execute(q)
+        boards = list(result.scalars().all())
+
+        board_list = []
+        for board in boards:
+            # Count columns and tasks per board
+            col_count = (
+                await self.db.execute(
+                    select(func.count()).where(KanbanColumn.board_id == board.id)
+                )
+            ).scalar_one()
+            task_count = (
+                await self.db.execute(
+                    select(func.count())
+                    .select_from(Task)
+                    .join(KanbanColumn, Task.column_id == KanbanColumn.id)
+                    .where(KanbanColumn.board_id == board.id, Task.is_archived == False)
+                )
+            ).scalar_one()
+            board_list.append({
+                "id": board.id,
+                "name": board.name,
+                "description": board.description,
+                "color": board.color,
+                "is_archived": board.is_archived,
+                "created_by": board.created_by,
+                "created_at": board.created_at,
+                "updated_at": board.updated_at,
+                "column_count": col_count,
+                "task_count": task_count,
+            })
+        return board_list
+
+    async def get_board(self, board_id: uuid.UUID) -> KanbanBoard:
         result = await self.db.execute(
-            select(KanbanColumn).order_by(KanbanColumn.sort_order)
+            select(KanbanBoard).where(KanbanBoard.id == board_id)
         )
+        board = result.scalar_one_or_none()
+        if not board:
+            raise NotFoundError("Pano")
+        return board
+
+    async def create_board(self, name: str, description: Optional[str], color: str, created_by: uuid.UUID) -> KanbanBoard:
+        board = KanbanBoard(name=name, description=description, color=color, created_by=created_by)
+        self.db.add(board)
+        await self.db.flush()
+
+        # Create default columns for new board
+        default_cols = [
+            KanbanColumn(board_id=board.id, name="Bekleyen", name_key="kanban.col_pending", color="#e2e8f0", sort_order=0),
+            KanbanColumn(board_id=board.id, name="Devam Eden", name_key="kanban.col_in_progress", color="#fef3c7", sort_order=1),
+            KanbanColumn(board_id=board.id, name="İncelemede", name_key="kanban.col_in_review", color="#dbeafe", sort_order=2),
+            KanbanColumn(board_id=board.id, name="Tamamlandı", name_key="kanban.col_done", color="#d1fae5", is_terminal=True, sort_order=3),
+        ]
+        for col in default_cols:
+            self.db.add(col)
+        await self.db.flush()
+        return board
+
+    async def update_board(self, board_id: uuid.UUID, name: Optional[str], description: Optional[str], color: Optional[str], is_archived: Optional[bool]) -> KanbanBoard:
+        board = await self.get_board(board_id)
+        if name is not None:
+            board.name = name
+        if description is not None:
+            board.description = description
+        if color is not None:
+            board.color = color
+        if is_archived is not None:
+            board.is_archived = is_archived
+        await self.db.flush()
+        return board
+
+    async def delete_board(self, board_id: uuid.UUID, requester: User) -> None:
+        if requester.role != "superadmin":
+            raise ForbiddenError("Pano silme yalnızca superadmin tarafından yapılabilir.")
+        board = await self.get_board(board_id)
+        # Check if it's the last board
+        count = (await self.db.execute(
+            select(func.count()).where(KanbanBoard.is_archived == False)
+        )).scalar_one()
+        if count <= 1:
+            raise ValidationError("Son pano silinemez. En az bir pano olmalıdır.")
+        await self.db.delete(board)
+        await self.db.flush()
+
+    # ─── Columns ─────────────────────────────────────────────────────────────
+    async def list_columns(self, board_id: Optional[uuid.UUID] = None) -> list[KanbanColumn]:
+        q = select(KanbanColumn)
+        if board_id is not None:
+            q = q.where(KanbanColumn.board_id == board_id)
+        q = q.order_by(KanbanColumn.sort_order)
+        result = await self.db.execute(q)
         return list(result.scalars().all())
 
-    async def create_column(self, name: str, color: str, is_terminal: bool, sort_order: int) -> KanbanColumn:
-        col = KanbanColumn(name=name, color=color, is_terminal=is_terminal, sort_order=sort_order)
+    async def create_column(self, name: str, color: str, is_terminal: bool, sort_order: int, board_id: Optional[uuid.UUID] = None) -> KanbanColumn:
+        # If no board_id, use the first (default) board
+        if board_id is None:
+            result = await self.db.execute(
+                select(KanbanBoard).order_by(KanbanBoard.created_at).limit(1)
+            )
+            default_board = result.scalar_one_or_none()
+            if not default_board:
+                raise ValidationError("Pano bulunamadı.")
+            board_id = default_board.id
+        col = KanbanColumn(name=name, color=color, is_terminal=is_terminal, sort_order=sort_order, board_id=board_id)
         self.db.add(col)
         await self.db.flush()
         return col
@@ -96,6 +198,7 @@ class KanbanService:
         assignee_id: Optional[uuid.UUID] = None,
         team_id: Optional[uuid.UUID] = None,
         column_id: Optional[uuid.UUID] = None,
+        board_id: Optional[uuid.UUID] = None,
         priority: Optional[str] = None,
         due_before: Optional[date] = None,
         include_archived: bool = False,
@@ -139,6 +242,10 @@ class KanbanService:
             q = q.where(Task.assignee_id == requester.id)
 
         # ── Extra filters ─────────────────────────────────────────────────────
+        if board_id:
+            q = q.join(KanbanColumn, Task.column_id == KanbanColumn.id).where(
+                KanbanColumn.board_id == board_id
+            )
         if column_id:
             q = q.where(Task.column_id == column_id)
         if priority:

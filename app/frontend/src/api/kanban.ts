@@ -1,8 +1,22 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import apiClient from './client'
 
+export interface KanbanBoard {
+  id: string
+  name: string
+  description: string | null
+  color: string
+  is_archived: boolean
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  task_count: number
+  column_count: number
+}
+
 export interface KanbanColumn {
   id: string
+  board_id: string
   name: string
   name_key?: string | null
   color: string
@@ -74,15 +88,64 @@ export interface TaskListResponse {
 
 export const kanbanKeys = {
   all: ['kanban'] as const,
-  columns: () => [...kanbanKeys.all, 'columns'] as const,
+  boards: () => [...kanbanKeys.all, 'boards'] as const,
+  board: (id: string) => [...kanbanKeys.all, 'board', id] as const,
+  columns: (boardId?: string) => boardId ? [...kanbanKeys.all, 'columns', boardId] as const : [...kanbanKeys.all, 'columns'] as const,
   tasks: (params?: object) => [...kanbanKeys.all, 'tasks', params] as const,
   task: (id: string) => [...kanbanKeys.all, 'task', id] as const,
 }
 
-export function useColumns() {
+// ─── Board hooks ──────────────────────────────────────────────────────────────
+
+export function useBoards(params?: { include_archived?: boolean }) {
   return useQuery({
-    queryKey: kanbanKeys.columns(),
-    queryFn: () => apiClient.get<KanbanColumn[]>('/kanban/columns').then((r) => r.data),
+    queryKey: kanbanKeys.boards(),
+    queryFn: () => apiClient.get<KanbanBoard[]>('/kanban/boards', { params }).then((r) => r.data),
+  })
+}
+
+export function useBoard(boardId: string | undefined) {
+  return useQuery({
+    queryKey: kanbanKeys.board(boardId ?? ''),
+    queryFn: () => apiClient.get<KanbanBoard>(`/kanban/boards/${boardId}`).then((r) => r.data),
+    enabled: !!boardId,
+  })
+}
+
+export function useCreateBoard() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { name: string; description?: string | null; color?: string }) =>
+      apiClient.post<KanbanBoard>('/kanban/boards', data).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: kanbanKeys.boards() }),
+  })
+}
+
+export function useUpdateBoard() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: string; name?: string; description?: string | null; color?: string; is_archived?: boolean }) =>
+      apiClient.patch<KanbanBoard>(`/kanban/boards/${id}`, data).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: kanbanKeys.boards() })
+      qc.invalidateQueries({ queryKey: kanbanKeys.all })
+    },
+  })
+}
+
+export function useDeleteBoard() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => apiClient.delete(`/kanban/boards/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: kanbanKeys.boards() }),
+  })
+}
+
+export function useColumns(boardId?: string) {
+  return useQuery({
+    queryKey: kanbanKeys.columns(boardId),
+    queryFn: () =>
+      apiClient.get<KanbanColumn[]>('/kanban/columns', { params: boardId ? { board_id: boardId } : undefined }).then((r) => r.data),
   })
 }
 
@@ -90,6 +153,7 @@ export function useTasks(params?: {
   assignee_id?: string
   team_id?: string
   column_id?: string
+  board_id?: string
   priority?: string
   include_archived?: boolean
   search?: string
@@ -105,9 +169,9 @@ export function useTasks(params?: {
 export function useCreateColumn() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { name: string; color: string; is_terminal: boolean; sort_order: number }) =>
+    mutationFn: (data: { name: string; color: string; is_terminal: boolean; sort_order: number; board_id?: string }) =>
       apiClient.post<KanbanColumn>('/kanban/columns', data).then((r) => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: kanbanKeys.columns() }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: kanbanKeys.all }),
   })
 }
 
@@ -116,7 +180,7 @@ export function useUpdateColumn() {
   return useMutation({
     mutationFn: ({ id, ...data }: { id: string; name?: string; color?: string; is_terminal?: boolean; sort_order?: number }) =>
       apiClient.patch<KanbanColumn>(`/kanban/columns/${id}`, data).then((r) => r.data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: kanbanKeys.columns() }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: kanbanKeys.all }),
   })
 }
 

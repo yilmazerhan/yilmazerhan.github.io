@@ -11,7 +11,7 @@ import {
   closestCorners,
 } from '@dnd-kit/core'
 import { useTranslation } from 'react-i18next'
-import { useColumns, useTasks, useMoveTask, type Task } from '@/api/kanban'
+import { useColumns, useTasks, useMoveTask, type Task, type KanbanColumn } from '@/api/kanban'
 import KanbanColumnComp from './KanbanColumn'
 import TaskCard from './TaskCard'
 import TaskModal from './TaskModal'
@@ -19,15 +19,18 @@ import WorkLogFromTaskModal from './WorkLogFromTaskModal'
 
 interface Props {
   onAddTask?: (columnId: string) => void
-  taskParams?: { assignee_id?: string; team_id?: string; priority?: string; search?: string }
+  taskParams?: { assignee_id?: string; team_id?: string; priority?: string; search?: string; board_id?: string }
+  columns?: KanbanColumn[]
   selectionMode?: boolean
   selectedTaskIds?: Set<string>
   onToggleSelect?: (id: string) => void
 }
 
-export default function KanbanBoard({ taskParams, selectionMode, selectedTaskIds, onToggleSelect }: Props) {
+export default function KanbanBoard({ taskParams, columns: columnsProp, selectionMode, selectedTaskIds, onToggleSelect }: Props) {
   const { t } = useTranslation()
-  const { data: columns = [], isLoading: colLoading } = useColumns()
+  // Use passed columns (board-scoped) or fall back to fetching all columns
+  const { data: columnsFromQuery = [], isLoading: colLoading } = useColumns(taskParams?.board_id)
+  const columns = columnsProp ?? columnsFromQuery
   const { data: tasksData, isLoading: taskLoading } = useTasks(taskParams)
   const moveTask = useMoveTask()
 
