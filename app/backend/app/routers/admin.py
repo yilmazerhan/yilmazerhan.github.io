@@ -139,6 +139,12 @@ async def list_audit_logs(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
 ):
+    from sqlalchemy import outerjoin, literal_column
+    from sqlalchemy.orm import aliased
+
+    UserAlias = aliased(User, flat=True)
+
+    # Base filter query on AuditLog
     q = select(AuditLog)
     if user_id:
         q = q.where(AuditLog.user_id == user_id)
@@ -155,7 +161,32 @@ async def list_audit_logs(
     total = total_result.scalar_one()
 
     items_result = await db.execute(q.order_by(AuditLog.created_at.desc()).offset(skip).limit(limit))
-    items = items_result.scalars().all()
+    logs = items_result.scalars().all()
+
+    # Batch-fetch usernames for all user_ids in the current page
+    user_ids = {log.user_id for log in logs if log.user_id}
+    username_map: dict[uuid.UUID, str] = {}
+    if user_ids:
+        u_result = await db.execute(
+            select(User.id, User.username).where(User.id.in_(user_ids))
+        )
+        for uid, uname in u_result:
+            username_map[uid] = uname
+
+    # Build response dicts enriched with username
+    items = []
+    for log in logs:
+        items.append({
+            "id": log.id,
+            "user_id": log.user_id,
+            "username": username_map.get(log.user_id) if log.user_id else None,
+            "action": log.action,
+            "table_name": log.table_name,
+            "record_id": log.record_id,
+            "ip_address": log.ip_address,
+            "user_agent": log.user_agent,
+            "created_at": log.created_at,
+        })
 
     return {"items": items, "total": total, "skip": skip, "limit": limit}
 

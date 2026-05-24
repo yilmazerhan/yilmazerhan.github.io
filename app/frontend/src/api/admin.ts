@@ -19,6 +19,7 @@ export interface BrandingData {
 export interface AuditLog {
   id: string
   user_id: string | null
+  username: string | null
   action: 'create' | 'update' | 'delete'
   table_name: string
   record_id: string

@@ -28,6 +28,7 @@ class BrandingUpdate(BaseModel):
 class AuditLogResponse(BaseModel):
     id: uuid.UUID
     user_id: Optional[uuid.UUID]
+    username: Optional[str] = None
     action: str
     table_name: str
     record_id: str

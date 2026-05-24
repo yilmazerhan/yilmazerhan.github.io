@@ -542,7 +542,8 @@
     "user_id": "User ID",
     "ip": "IP",
     "no_records": "No records found.",
-    "page_of": "Page {{current}} / {{total}}"
+    "page_of": "Page {{current}} / {{total}}",
+    "user": "User"
   },
   "kanban_tabs": {
     "details": "Details"

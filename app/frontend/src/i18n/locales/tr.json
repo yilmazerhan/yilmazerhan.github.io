@@ -542,7 +542,8 @@
     "user_id": "Kullanıcı ID",
     "ip": "IP",
     "no_records": "Kayıt bulunamadı.",
-    "page_of": "Sayfa {{current}} / {{total}}"
+    "page_of": "Sayfa {{current}} / {{total}}",
+    "user": "Kullanıcı"
   },
   "kanban_tabs": {
     "details": "Detaylar"

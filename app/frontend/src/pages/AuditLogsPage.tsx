@@ -113,7 +113,7 @@ export default function AuditLogsPage() {
                 <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('audit.action_label')}</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('audit.table')}</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('audit.record_id')}</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('audit.user_id')}</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('audit.user')}</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('audit.ip')}</th>
               </tr>
             </thead>
@@ -146,8 +146,12 @@ export default function AuditLogsPage() {
                       <td className="px-4 py-2.5 font-mono text-xs text-gray-500 dark:text-gray-400 max-w-[140px] truncate">
                         {log.record_id || '—'}
                       </td>
-                      <td className="px-4 py-2.5 font-mono text-xs text-gray-500 dark:text-gray-400 max-w-[140px] truncate">
-                        {log.user_id || '—'}
+                      <td className="px-4 py-2.5 text-xs text-gray-700 dark:text-gray-300 max-w-[140px] truncate">
+                        {log.username
+                          ? <span className="font-medium">{log.username}</span>
+                          : log.user_id
+                            ? <span className="font-mono text-gray-400 dark:text-gray-500 text-[11px]">{log.user_id.slice(0, 8)}…</span>
+                            : '—'}
                       </td>
                       <td className="px-4 py-2.5 text-xs text-gray-500 dark:text-gray-400">
                         {log.ip_address || '—'}
