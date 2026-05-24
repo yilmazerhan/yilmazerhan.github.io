@@ -35,6 +35,7 @@ dependencies = [
     # Background tasks
     "celery[redis]==5.4.0",
     "redis==5.2.1",
+    "apscheduler==3.11.2",
 
     # Rate limiting
     "slowapi==0.1.9",

@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +9,71 @@ from app.core.middleware import SecurityHeadersMiddleware, AuditLogMiddleware
 from app.core.rate_limit import limiter, rate_limit_exceeded_handler
 from app.routers import auth, users, teams, permissions, worklog, kanban, jira, email, admin, notifications
 from app.routers.leave import router as leave_router
+from app.routers.backup import router as backup_router
+
+logger = logging.getLogger(__name__)
+
+
+def _start_scheduler():
+    """Start APScheduler for periodic backups."""
+    try:
+        from apscheduler.schedulers.asyncio import AsyncIOScheduler
+        from apscheduler.triggers.cron import CronTrigger
+
+        scheduler = AsyncIOScheduler()
+
+        async def _run_scheduled_backup():
+            """Read schedule settings and run backup if it's time."""
+            from datetime import datetime as _dt
+            try:
+                from app.database import AsyncSessionLocal
+                from app.services import backup_service
+                async with AsyncSessionLocal() as db:
+                    schedule = await backup_service.get_schedule(db)
+                    if schedule.get("backup_enabled", "false").lower() != "true":
+                        return
+
+                    now = _dt.utcnow()
+                    backup_hour = int(schedule.get("backup_hour", "2"))
+                    frequency = schedule.get("backup_frequency", "daily")
+
+                    # Only run at the configured hour
+                    if now.hour != backup_hour:
+                        return
+
+                    # For weekly: only run on the configured day (0=Mon … 6=Sun)
+                    if frequency == "weekly":
+                        backup_dow = int(schedule.get("backup_day_of_week", "0"))
+                        if now.weekday() != backup_dow:
+                            return
+
+                    # Check if a backup already ran in the last 23h to avoid duplicates
+                    from app.models.backup_record import BackupRecord
+                    from sqlalchemy import select
+                    from datetime import timedelta
+                    cutoff = now - timedelta(hours=23)
+                    result = await db.execute(
+                        select(BackupRecord)
+                        .where(BackupRecord.backup_type == "scheduled")
+                        .where(BackupRecord.created_at >= cutoff)
+                    )
+                    if result.scalar_one_or_none() is not None:
+                        logger.debug("Scheduled backup already ran recently; skipping.")
+                        return
+
+                    logger.info("Running scheduled backup (frequency=%s hour=%d)…", frequency, backup_hour)
+                    await backup_service.create_backup(db, backup_type="scheduled", notes="Otomatik zamanlı yedek")
+            except Exception as exc:
+                logger.error("Scheduled backup failed: %s", exc, exc_info=True)
+
+        # Check every hour on the hour
+        scheduler.add_job(_run_scheduled_backup, CronTrigger(minute=0), id="hourly_backup_check")
+        scheduler.start()
+        logger.info("APScheduler started (hourly backup check job).")
+        return scheduler
+    except Exception as exc:
+        logger.warning("Could not start APScheduler: %s", exc)
+        return None
 
 
 @asynccontextmanager
@@ -17,8 +83,13 @@ async def lifespan(app: FastAPI):
     from app.services.seed_service import seed_initial_data
     async with AsyncSessionLocal() as db:
         await seed_initial_data(db)
+
+    # Start periodic backup scheduler
+    scheduler = _start_scheduler()
     yield
-    # Shutdown: cleanup if needed
+    # Shutdown
+    if scheduler:
+        scheduler.shutdown(wait=False)
 
 
 app = FastAPI(
@@ -62,6 +133,7 @@ app.include_router(email.router, prefix="/api/v1")
 app.include_router(admin.router, prefix="/api/v1")
 app.include_router(notifications.router, prefix="/api/v1")
 app.include_router(leave_router, prefix="/api/v1")
+app.include_router(backup_router, prefix="/api/v1")
 
 
 # ─── Health check ─────────────────────────────────────────────────────────
