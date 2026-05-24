@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from app.database import Base
+from app.models.task_label import task_label_assignments
 
 
 class KanbanBoard(Base):
@@ -91,3 +92,4 @@ class Task(Base):
     subtasks: Mapped[list["TaskSubtask"]] = relationship("TaskSubtask", back_populates="task", cascade="all, delete-orphan", lazy="selectin", order_by="TaskSubtask.sort_order")  # type: ignore[name-defined]
     work_logs: Mapped[list["WorkLog"]] = relationship("WorkLog", back_populates="task", lazy="selectin")  # type: ignore[name-defined]
     attachments: Mapped[list["TaskAttachment"]] = relationship("TaskAttachment", back_populates="task", cascade="all, delete-orphan", lazy="selectin", order_by="TaskAttachment.created_at")  # type: ignore[name-defined]
+    labels: Mapped[list["TaskLabel"]] = relationship("TaskLabel", secondary=task_label_assignments, back_populates="tasks", lazy="selectin")  # type: ignore[name-defined]

@@ -1,14 +1,16 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, Link } from 'react-router-dom'
-import { Plus, Search, CheckSquare, X, ChevronLeft } from 'lucide-react'
+import { Plus, Search, CheckSquare, X, ChevronLeft, Tag } from 'lucide-react'
 import KanbanBoard from '@/components/kanban/KanbanBoard'
 import TaskModal from '@/components/kanban/TaskModal'
-import { useColumns, useBulkUpdateTasks, useBoard } from '@/api/kanban'
+import { useColumns, useBulkUpdateTasks, useBoard, useLabels } from '@/api/kanban'
 import { useTeams } from '@/api/teams'
 import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
 import { resolveName } from '@/utils/i18nName'
+import ExportButton from '@/components/ui/ExportButton'
+import { exportTasks } from '@/api/export'
 
 export default function KanbanPage() {
   const { t } = useTranslation()
@@ -23,6 +25,9 @@ export default function KanbanPage() {
   const [selectedUserId, setSelectedUserId] = useState<string>('')
   const [selectedPriority, setSelectedPriority] = useState<string>('')
   const [searchText, setSearchText] = useState<string>('')
+  const [selectedLabelId, setSelectedLabelId] = useState<string>('')
+
+  const { data: labels = [] } = useLabels()
 
   // Bulk selection
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set())
@@ -42,7 +47,7 @@ export default function KanbanPage() {
   const teamUsers = usersData?.items ?? []
 
   // Build task params — always include board_id to scope to this board
-  const taskParams: { team_id?: string; assignee_id?: string; priority?: string; search?: string; board_id?: string } = {}
+  const taskParams: { team_id?: string; assignee_id?: string; priority?: string; search?: string; board_id?: string; label_id?: string } = {}
   if (boardId) taskParams.board_id = boardId
   if (isSuperAdmin) {
     if (selectedUserId) taskParams.assignee_id = selectedUserId
@@ -52,6 +57,7 @@ export default function KanbanPage() {
   }
   if (selectedPriority) taskParams.priority = selectedPriority
   if (searchText.trim()) taskParams.search = searchText.trim()
+  if (selectedLabelId) taskParams.label_id = selectedLabelId
 
   const PRIORITIES = ['low', 'medium', 'high', 'critical'] as const
 
@@ -77,7 +83,7 @@ export default function KanbanPage() {
     clearSelection()
   }
 
-  const hasFilters = selectedTeamId || selectedUserId || selectedPriority || searchText
+  const hasFilters = selectedTeamId || selectedUserId || selectedPriority || searchText || selectedLabelId
 
   return (
     <div className="space-y-4">
@@ -104,6 +110,14 @@ export default function KanbanPage() {
           </h1>
         </div>
         <div className="flex items-center gap-2">
+          <ExportButton
+            onExport={(fmt) => exportTasks({
+              board_id: boardId,
+              assignee_id: selectedUserId || undefined,
+              priority: selectedPriority || undefined,
+              format: fmt,
+            })}
+          />
           <button
             onClick={() => { setSelectionMode(!selectionMode); if (selectionMode) clearSelection() }}
             title={t('kanban.selection_mode')}
@@ -172,9 +186,26 @@ export default function KanbanPage() {
           ))}
         </select>
 
+        {/* Label filter */}
+        {labels.length > 0 && (
+          <div className="flex items-center gap-1">
+            <Tag className="h-3.5 w-3.5 text-gray-400" />
+            <select
+              value={selectedLabelId}
+              onChange={(e) => setSelectedLabelId(e.target.value)}
+              className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200"
+            >
+              <option value="">{t('kanban.filter_all_labels')}</option>
+              {labels.map((label) => (
+                <option key={label.id} value={label.id}>{label.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {hasFilters && (
           <button
-            onClick={() => { setSelectedTeamId(''); setSelectedUserId(''); setSelectedPriority(''); setSearchText('') }}
+            onClick={() => { setSelectedTeamId(''); setSelectedUserId(''); setSelectedPriority(''); setSearchText(''); setSelectedLabelId('') }}
             className="px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 underline"
           >
             {t('common.clear_filters')}

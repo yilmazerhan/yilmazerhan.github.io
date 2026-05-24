@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { AlertCircle, Clock, Link, CheckSquare, Square, ListChecks } from 'lucide-react'
 import type { Task } from '@/api/kanban'
 import { useTaskSubtasks } from '@/api/kanban'
+import LabelChip from './LabelChip'
 
 const PRIORITY_CONFIG = {
   low: { label: 'priority_low', cls: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' },
@@ -90,6 +91,15 @@ export default function TaskCard({ task, onClick, isDragOverlay = false, selecti
       )}
 
       <div className="space-y-2">
+        {/* Labels */}
+        {task.labels && task.labels.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {task.labels.map((label) => (
+              <LabelChip key={label.id} label={label} small />
+            ))}
+          </div>
+        )}
+
         {/* Title */}
         <p className={`text-sm font-medium text-gray-900 dark:text-white leading-snug line-clamp-2 ${selectionMode ? 'pr-6' : ''}`}>
           {task.title}

@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { X, Trash2, Send, History, MessageSquare, ClipboardList, CheckSquare, Square, ListChecks, Plus, Paperclip, Download } from 'lucide-react'
+import { X, Trash2, Send, History, MessageSquare, ClipboardList, CheckSquare, Square, ListChecks, Plus, Paperclip, Download, Tag } from 'lucide-react'
 import { format } from 'date-fns'
 import { useTranslation } from 'react-i18next'
 import {
@@ -7,12 +7,14 @@ import {
   useTaskComments, useCreateComment, useDeleteComment,
   useTaskHistory, useTaskSubtasks, useCreateSubtask, useUpdateSubtask, useDeleteSubtask,
   useTaskAttachments, useUploadAttachment, useDeleteAttachment, getAttachmentDownloadUrl,
+  useLabels,
   type Task, type TaskHistoryEntry,
 } from '@/api/kanban'
 import type { KanbanColumn } from '@/api/kanban'
 import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
 import { resolveName } from '@/utils/i18nName'
+import LabelChip from './LabelChip'
 
 interface Props {
   task?: Task | null
@@ -159,7 +161,11 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
   const [dueDate, setDueDate] = useState(task?.due_date ?? '')
   const [startDate, setStartDate] = useState(task?.start_date ?? '')
   const [jiraTicket, setJiraTicket] = useState(task?.jira_ticket ?? '')
+  const [selectedLabelIds, setSelectedLabelIds] = useState<string[]>(task?.labels?.map((l) => l.id) ?? [])
+  const [labelDropdownOpen, setLabelDropdownOpen] = useState(false)
   const [error, setError] = useState('')
+
+  const { data: allLabels = [] } = useLabels()
 
   const { data: usersData } = useUsers({ limit: 200 })
   const createTask = useCreateTask()
@@ -236,6 +242,7 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
           due_date: dueDate || null,
           start_date: startDate || null,
           jira_ticket: jiraTicket.trim() || null,
+          label_ids: selectedLabelIds,
         })
 
         let finalTask: Task = task
@@ -259,6 +266,7 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
           due_date: dueDate || undefined,
           start_date: startDate || undefined,
           jira_ticket: jiraTicket.trim() || undefined,
+          label_ids: selectedLabelIds.length > 0 ? selectedLabelIds : undefined,
         })
       }
       onClose()
@@ -451,6 +459,69 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
                   placeholder={t('kanban.optional_description')}
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none disabled:opacity-60"
                 />
+              </div>
+
+              {/* Labels */}
+              <div className="relative">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {t('kanban.labels')}
+                </label>
+                <div className="flex flex-wrap gap-1 mb-1">
+                  {selectedLabelIds.map((lid) => {
+                    const label = allLabels.find((l) => l.id === lid)
+                    if (!label) return null
+                    return (
+                      <LabelChip
+                        key={lid}
+                        label={label}
+                        onRemove={canEdit ? () => setSelectedLabelIds((prev) => prev.filter((id) => id !== lid)) : undefined}
+                      />
+                    )
+                  })}
+                </div>
+                {canEdit && (
+                  <button
+                    type="button"
+                    onClick={() => setLabelDropdownOpen((o) => !o)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 text-xs text-gray-500 dark:text-gray-400 hover:border-primary-400 hover:text-primary-600 transition-colors"
+                  >
+                    <Tag className="h-3 w-3" />
+                    {t('kanban.add_label')}
+                  </button>
+                )}
+                {labelDropdownOpen && (
+                  <div className="absolute top-full mt-1 left-0 z-20 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden">
+                    {allLabels.map((label) => {
+                      const checked = selectedLabelIds.includes(label.id)
+                      return (
+                        <button
+                          key={label.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedLabelIds((prev) =>
+                              checked ? prev.filter((id) => id !== label.id) : [...prev, label.id]
+                            )
+                          }}
+                          className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 ${checked ? 'bg-gray-50 dark:bg-gray-700/50' : ''}`}
+                        >
+                          <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: label.color }} />
+                          <span className="flex-1 text-left text-gray-700 dark:text-gray-300">{label.name}</span>
+                          {checked && <span className="text-primary-500">✓</span>}
+                        </button>
+                      )
+                    })}
+                    {allLabels.length === 0 && (
+                      <p className="text-xs text-gray-400 p-3 text-center">{t('kanban.no_labels')}</p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setLabelDropdownOpen(false)}
+                      className="w-full px-3 py-2 text-xs text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 border-t border-gray-100 dark:border-gray-700"
+                    >
+                      {t('common.close')}
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div>

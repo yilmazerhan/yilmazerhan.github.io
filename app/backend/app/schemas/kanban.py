@@ -7,6 +7,34 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 _JIRA_RE = re.compile(r'^[A-Za-z][A-Za-z0-9_]*-\d+$')
 
 
+# ─── Label schemas ────────────────────────────────────────────────────────────
+
+class LabelCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    color: str = "#6366f1"
+
+    @field_validator("color")
+    @classmethod
+    def validate_color(cls, v: str) -> str:
+        if not v.startswith("#") or len(v) not in (4, 7):
+            raise ValueError("Renk geçerli bir HEX değeri olmalıdır.")
+        return v
+
+
+class LabelUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    color: Optional[str] = None
+
+
+class LabelResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    color: str
+    created_by: Optional[uuid.UUID]
+    created_at: datetime
+    model_config = {"from_attributes": True}
+
+
 # ─── Board schemas ────────────────────────────────────────────────────────────
 
 class BoardCreate(BaseModel):
@@ -99,6 +127,7 @@ class TaskCreate(BaseModel):
     due_date: Optional[date] = None
     start_date: Optional[date] = None
     jira_ticket: Optional[str] = Field(None, max_length=50)
+    label_ids: list[uuid.UUID] = Field(default_factory=list)
 
     @field_validator("priority")
     @classmethod
@@ -134,6 +163,7 @@ class TaskUpdate(BaseModel):
     start_date: Optional[date] = None
     jira_ticket: Optional[str] = Field(None, max_length=50)
     is_archived: Optional[bool] = None
+    label_ids: Optional[list[uuid.UUID]] = None  # None = don't change; [] = clear all
 
     @field_validator("jira_ticket")
     @classmethod
@@ -170,6 +200,7 @@ class TaskResponse(BaseModel):
     is_archived: bool
     created_at: datetime
     updated_at: datetime
+    labels: list[LabelResponse] = Field(default_factory=list)
     model_config = {"from_attributes": True}
 
 

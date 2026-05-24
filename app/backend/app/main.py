@@ -10,6 +10,7 @@ from app.core.rate_limit import limiter, rate_limit_exceeded_handler
 from app.routers import auth, users, teams, permissions, worklog, kanban, jira, email, admin, notifications
 from app.routers.leave import router as leave_router
 from app.routers.backup import router as backup_router
+from app.routers.export import router as export_router
 
 logger = logging.getLogger(__name__)
 
@@ -143,6 +144,7 @@ app.include_router(admin.router, prefix="/api/v1")
 app.include_router(notifications.router, prefix="/api/v1")
 app.include_router(leave_router, prefix="/api/v1")
 app.include_router(backup_router, prefix="/api/v1")
+app.include_router(export_router, prefix="/api/v1")
 
 
 # ─── Health check ─────────────────────────────────────────────────────────

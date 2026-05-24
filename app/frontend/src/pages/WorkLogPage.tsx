@@ -8,6 +8,8 @@ import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
 import WorkLogModal from '@/components/worklog/WorkLogModal'
 import { resolveName } from '@/utils/i18nName'
+import ExportButton from '@/components/ui/ExportButton'
+import { exportWorklogs } from '@/api/export'
 
 type ViewMode = 'list' | 'calendar'
 
@@ -172,6 +174,14 @@ export default function WorkLogPage() {
               <CalendarDays className="h-4 w-4" />
             </button>
           </div>
+          <ExportButton
+            onExport={(fmt) => exportWorklogs({
+              date_from: dateFrom,
+              date_to: dateTo,
+              user_id: selectedUserId || undefined,
+              format: fmt,
+            })}
+          />
           <button
             onClick={() => setCreateOpen(true)}
             className="flex items-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm font-medium"

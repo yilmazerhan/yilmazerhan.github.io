@@ -1,34 +1,18 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format, startOfMonth } from 'date-fns'
-import { Clock, Users, FileText, TrendingUp, Download, CalendarClock, Plus, Trash2, Play, Pencil } from 'lucide-react'
+import { Clock, Users, FileText, TrendingUp, CalendarClock, Plus, Trash2, Play, Pencil } from 'lucide-react'
 import { useWorkLogs } from '@/api/worklog'
 import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
+import ExportButton from '@/components/ui/ExportButton'
+import { exportWorklogs } from '@/api/export'
 import {
   useReportSchedules, useCreateReportSchedule, useUpdateReportSchedule,
   useDeleteReportSchedule, useRunReportSchedule, type ReportSchedule,
 } from '@/api/admin'
 import { resolveName } from '@/utils/i18nName'
 
-function exportCSV(logs: any[], dateFrom: string, dateTo: string, t: (key: string) => string) {
-  const header = [t('reports.csv_date'), t('reports.csv_user'), t('reports.csv_work_type'), t('reports.csv_duration'), t('reports.csv_description')]
-  const rows = logs.map((l) => [
-    l.log_date,
-    l.user.full_name,
-    l.work_type.name,
-    l.duration_hours.toString(),
-    `"${(l.description ?? '').replace(/"/g, '""')}"`,
-  ])
-  const csv = [header, ...rows].map((r) => r.join(',')).join('\n')
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `worklog_${dateFrom}_${dateTo}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
-}
 
 const FREQ_OPTIONS = ['daily', 'weekly', 'monthly'] as const
 const DOW_OPTIONS = [
@@ -271,15 +255,14 @@ export default function ReportsPage() {
     <div className="space-y-6 max-w-5xl">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('reports.title')}</h1>
-        {logs.length > 0 && (
-          <button
-            onClick={() => exportCSV(logs, dateFrom, dateTo, t)}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
-          >
-            <Download className="h-4 w-4" />
-            {t('reports.export_csv')}
-          </button>
-        )}
+        <ExportButton
+          onExport={(fmt) => exportWorklogs({
+            date_from: dateFrom,
+            date_to: dateTo,
+            user_id: selectedUserId || undefined,
+            format: fmt,
+          })}
+        />
       </div>
 
       {/* Filters */}

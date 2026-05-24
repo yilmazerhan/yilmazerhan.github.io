@@ -17,7 +17,12 @@ import {
   useCreateColumn,
   useUpdateColumn,
   useDeleteColumn,
+  useLabels,
+  useCreateLabel,
+  useUpdateLabel,
+  useDeleteLabel,
   type KanbanColumn,
+  type TaskLabel,
 } from '@/api/kanban'
 import {
   useJiraConfigs,
@@ -235,6 +240,35 @@ export default function SettingsPage() {
   async function colHandleDelete(id: string) {
     if (!confirm(t('settings.confirm_delete_column'))) return
     try { await deleteCol.mutateAsync(id) }
+    catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
+  }
+
+  // Task Labels state
+  const { data: labelsData = [] } = useLabels()
+  const createLabel = useCreateLabel()
+  const updateLabel = useUpdateLabel()
+  const deleteLabel = useDeleteLabel()
+  const [labelShowForm, setLabelShowForm] = useState(false)
+  const [labelEditing, setLabelEditing] = useState<TaskLabel | null>(null)
+  const [labelName, setLabelName] = useState('')
+  const [labelColor, setLabelColor] = useState('#6366f1')
+  const [labelError, setLabelError] = useState('')
+
+  function labelOpenCreate() { setLabelEditing(null); setLabelName(''); setLabelColor('#6366f1'); setLabelError(''); setLabelShowForm(true) }
+  function labelOpenEdit(label: TaskLabel) { setLabelEditing(label); setLabelName(label.name); setLabelColor(label.color); setLabelError(''); setLabelShowForm(true) }
+
+  async function labelHandleSubmit(e: React.FormEvent) {
+    e.preventDefault(); setLabelError('')
+    try {
+      if (labelEditing) await updateLabel.mutateAsync({ id: labelEditing.id, name: labelName, color: labelColor })
+      else await createLabel.mutateAsync({ name: labelName, color: labelColor })
+      setLabelShowForm(false)
+    } catch (err: any) { setLabelError(err.response?.data?.detail || t('common.error')) }
+  }
+
+  async function labelHandleDelete(id: string) {
+    if (!confirm(t('kanban.delete_label_confirm'))) return
+    try { await deleteLabel.mutateAsync(id) }
     catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
   }
 
@@ -969,6 +1003,82 @@ export default function SettingsPage() {
                 <button type="button" onClick={() => setColShowForm(false)} className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium">{t('common.cancel')}</button>
                 <button type="submit" disabled={createCol.isPending || updateCol.isPending} className="px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium disabled:opacity-50">
                   {createCol.isPending || updateCol.isPending ? t('common.saving') : t('common.save')}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+      </section>
+
+      {/* Task Labels Section */}
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Tag className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('kanban.manage_labels')}</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{t('settings.labels_description', 'Manage task labels for filtering and categorization.')}</p>
+            </div>
+          </div>
+          <button
+            onClick={labelOpenCreate}
+            className="flex items-center gap-2 px-3 py-1.5 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm font-medium"
+          >
+            <Plus className="h-4 w-4" />
+            {t('kanban.create_label')}
+          </button>
+        </div>
+
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+          {labelsData.length === 0 ? (
+            <div className="text-center py-8 text-gray-400 dark:text-gray-500 text-sm">{t('kanban.no_labels')}</div>
+          ) : (
+            <div className="divide-y divide-gray-100 dark:divide-gray-800">
+              {labelsData.map((label) => (
+                <div key={label.id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                  <span className="flex items-center gap-3">
+                    <span className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: label.color }} />
+                    <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{label.name}</span>
+                    <span className="text-xs text-gray-400 font-mono">{label.color}</span>
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => labelOpenEdit(label)} className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20" title={t('common.edit')}>
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => labelHandleDelete(label.id)} className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" title={t('common.delete')}>
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {labelShowForm && (
+          <div className="mt-4 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+            <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+              {labelEditing ? t('kanban.edit_label') : t('kanban.create_label')}
+            </h3>
+            {labelError && <p className="text-sm text-red-600 mb-3">{labelError}</p>}
+            <form onSubmit={labelHandleSubmit} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t('kanban.label_name')} *</label>
+                  <input type="text" value={labelName} onChange={(e) => setLabelName(e.target.value)} required className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">{t('kanban.label_color')}</label>
+                  <div className="flex items-center gap-2">
+                    <input type="color" value={labelColor} onChange={(e) => setLabelColor(e.target.value)} className="w-10 h-9 rounded border border-gray-300 dark:border-gray-700 cursor-pointer" />
+                    <input type="text" value={labelColor} onChange={(e) => setLabelColor(e.target.value)} className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setLabelShowForm(false)} className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium">{t('common.cancel')}</button>
+                <button type="submit" disabled={createLabel.isPending || updateLabel.isPending} className="px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium disabled:opacity-50">
+                  {createLabel.isPending || updateLabel.isPending ? t('common.saving') : t('common.save')}
                 </button>
               </div>
             </form>

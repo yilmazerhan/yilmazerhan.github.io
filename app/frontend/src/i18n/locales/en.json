@@ -194,7 +194,17 @@
     "tasks_count": "task(s)",
     "unarchive": "Unarchive",
     "delete_board_title": "Delete Board",
-    "delete_board_confirm": "Are you sure you want to delete \"{{name}}\"? All columns and tasks will be permanently deleted."
+    "delete_board_confirm": "Are you sure you want to delete \"{{name}}\"? All columns and tasks will be permanently deleted.",
+    "labels": "Labels",
+    "add_label": "Add Label",
+    "no_labels": "No labels yet.",
+    "create_label": "New Label",
+    "edit_label": "Edit Label",
+    "label_name": "Label Name",
+    "label_color": "Color",
+    "delete_label_confirm": "Are you sure you want to delete this label?",
+    "filter_all_labels": "All Labels",
+    "manage_labels": "Labels"
   },
   "teams": {
     "title": "Teams",
@@ -375,7 +385,10 @@
     "optional": "optional",
     "access_denied": "You do not have permission to view this page.",
     "refresh": "Refresh",
-    "deleting": "Deleting..."
+    "deleting": "Deleting...",
+    "export": "Export",
+    "export_csv": "Export CSV",
+    "export_excel": "Export Excel"
   },
   "email": {
     "templates_title": "Email Templates",

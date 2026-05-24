@@ -9,6 +9,7 @@ from app.models.kanban import KanbanBoard, KanbanColumn, Task
 from app.models.task_comment import TaskComment
 from app.models.task_history import TaskHistory
 from app.models.task_subtask import TaskSubtask
+from app.models.task_label import TaskLabel
 from app.models.user import User
 from app.core.permissions import can_edit_task, can_delete_task
 from app.core.exceptions import NotFoundError, ForbiddenError, ValidationError
@@ -191,6 +192,39 @@ class KanbanService:
         await self.db.flush()
         return await self.list_columns()
 
+    # ─── Labels ──────────────────────────────────────────────────────────────
+    async def list_labels(self) -> list[TaskLabel]:
+        result = await self.db.execute(select(TaskLabel).order_by(TaskLabel.name))
+        return list(result.scalars().all())
+
+    async def create_label(self, name: str, color: str, created_by: uuid.UUID) -> TaskLabel:
+        label = TaskLabel(name=name, color=color, created_by=created_by)
+        self.db.add(label)
+        await self.db.flush()
+        await self.db.refresh(label)
+        return label
+
+    async def update_label(self, label_id: uuid.UUID, name: Optional[str], color: Optional[str]) -> TaskLabel:
+        result = await self.db.execute(select(TaskLabel).where(TaskLabel.id == label_id))
+        label = result.scalar_one_or_none()
+        if not label:
+            raise NotFoundError("Etiket")
+        if name is not None:
+            label.name = name
+        if color is not None:
+            label.color = color
+        await self.db.flush()
+        await self.db.refresh(label)
+        return label
+
+    async def delete_label(self, label_id: uuid.UUID) -> None:
+        result = await self.db.execute(select(TaskLabel).where(TaskLabel.id == label_id))
+        label = result.scalar_one_or_none()
+        if not label:
+            raise NotFoundError("Etiket")
+        await self.db.delete(label)
+        await self.db.flush()
+
     # ─── Tasks ────────────────────────────────────────────────────────────────
     async def list_tasks(
         self,
@@ -203,6 +237,7 @@ class KanbanService:
         due_before: Optional[date] = None,
         include_archived: bool = False,
         search: Optional[str] = None,
+        label_id: Optional[uuid.UUID] = None,
         skip: int = 0,
         limit: int = 200,
     ) -> tuple[list[Task], int]:
@@ -211,7 +246,12 @@ class KanbanService:
 
         q = (
             select(Task)
-            .options(selectinload(Task.assignee), selectinload(Task.creator), selectinload(Task.column))
+            .options(
+                selectinload(Task.assignee),
+                selectinload(Task.creator),
+                selectinload(Task.column),
+                selectinload(Task.labels),
+            )
         )
 
         if not include_archived:
@@ -254,6 +294,11 @@ class KanbanService:
             q = q.where(Task.due_date <= due_before)
         if search:
             q = q.where(Task.title.ilike(f"%{search}%"))
+        if label_id:
+            from app.models.task_label import task_label_assignments
+            q = q.join(task_label_assignments, Task.id == task_label_assignments.c.task_id).where(
+                task_label_assignments.c.label_id == label_id
+            )
 
         total = (await self.db.execute(select(func.count()).select_from(q.subquery()))).scalar_one()
         q = q.order_by(Task.column_id, Task.sort_order).offset(skip).limit(limit)
@@ -263,7 +308,12 @@ class KanbanService:
     async def _get_task(self, task_id: uuid.UUID) -> Task:
         result = await self.db.execute(
             select(Task)
-            .options(selectinload(Task.assignee), selectinload(Task.creator), selectinload(Task.column))
+            .options(
+                selectinload(Task.assignee),
+                selectinload(Task.creator),
+                selectinload(Task.column),
+                selectinload(Task.labels),
+            )
             .where(Task.id == task_id)
         )
         task = result.scalar_one_or_none()
@@ -285,6 +335,7 @@ class KanbanService:
         due_date: Optional[date] = None,
         jira_ticket: Optional[str] = None,
         start_date: Optional[date] = None,
+        label_ids: Optional[list[uuid.UUID]] = None,
     ) -> Task:
         col = await self.db.execute(select(KanbanColumn).where(KanbanColumn.id == column_id))
         if not col.scalar_one_or_none():
@@ -310,7 +361,14 @@ class KanbanService:
         )
         self.db.add(task)
         await self.db.flush()
-        await self.db.refresh(task, ["created_at", "updated_at", "assignee", "creator", "column"])
+
+        # Assign labels
+        if label_ids:
+            result = await self.db.execute(select(TaskLabel).where(TaskLabel.id.in_(label_ids)))
+            labels = list(result.scalars().all())
+            task.labels = labels
+
+        await self.db.refresh(task, ["created_at", "updated_at", "assignee", "creator", "column", "labels"])
         await self._write_history(task.id, created_by, "created")
         # Notify assigned user
         if assignee_id and assignee_id != created_by:
@@ -336,6 +394,7 @@ class KanbanService:
         start_date: object = ...,    # Ellipsis = not sent; None = clear
         jira_ticket: Optional[str] = None,
         is_archived: Optional[bool] = None,
+        label_ids: Optional[list[uuid.UUID]] = None,  # None = no change; [] = clear
     ) -> Task:
         task = await self._get_task(task_id)
         if not can_edit_task(requester, task):
@@ -382,8 +441,12 @@ class KanbanService:
             changes.append({"field": "archived", "old": str(task.is_archived), "new": str(is_archived)})
             task.is_archived = is_archived
 
+        if label_ids is not None:
+            result = await self.db.execute(select(TaskLabel).where(TaskLabel.id.in_(label_ids)))
+            task.labels = list(result.scalars().all())
+
         await self.db.flush()
-        await self.db.refresh(task, ["updated_at", "assignee", "creator", "column"])
+        await self.db.refresh(task, ["updated_at", "assignee", "creator", "column", "labels"])
 
         if changes:
             # Resolve assignee name for display now that relationships are loaded

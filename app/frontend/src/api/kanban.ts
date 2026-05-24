@@ -30,6 +30,14 @@ export interface TaskUser {
   email: string
 }
 
+export interface TaskLabel {
+  id: string
+  name: string
+  color: string
+  created_by: string | null
+  created_at: string
+}
+
 export interface Task {
   id: string
   title: string
@@ -50,6 +58,7 @@ export interface Task {
   is_archived: boolean
   created_at: string
   updated_at: string
+  labels: TaskLabel[]
 }
 
 export interface Attachment {
@@ -93,6 +102,7 @@ export const kanbanKeys = {
   columns: (boardId?: string) => boardId ? [...kanbanKeys.all, 'columns', boardId] as const : [...kanbanKeys.all, 'columns'] as const,
   tasks: (params?: object) => [...kanbanKeys.all, 'tasks', params] as const,
   task: (id: string) => [...kanbanKeys.all, 'task', id] as const,
+  labels: () => [...kanbanKeys.all, 'labels'] as const,
 }
 
 // ─── Board hooks ──────────────────────────────────────────────────────────────
@@ -157,6 +167,7 @@ export function useTasks(params?: {
   priority?: string
   include_archived?: boolean
   search?: string
+  label_id?: string
   limit?: number
 }) {
   return useQuery({
@@ -213,6 +224,7 @@ export function useCreateTask() {
       due_date?: string
       start_date?: string
       jira_ticket?: string
+      label_ids?: string[]
     }) => apiClient.post<Task>('/kanban/tasks', data).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: kanbanKeys.all }),
   })
@@ -231,6 +243,7 @@ export function useUpdateTask() {
       start_date?: string | null
       jira_ticket?: string | null
       is_archived?: boolean
+      label_ids?: string[] | null
     }) => apiClient.patch<Task>(`/kanban/tasks/${id}`, data).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: kanbanKeys.all }),
   })
@@ -429,6 +442,44 @@ export function useDeleteAttachment(taskId: string) {
 
 export function getAttachmentDownloadUrl(taskId: string, attId: string) {
   return `/api/v1/kanban/tasks/${taskId}/attachments/${attId}/download`
+}
+
+// ─── Labels ───────────────────────────────────────────────────────────────────
+
+export function useLabels() {
+  return useQuery({
+    queryKey: kanbanKeys.labels(),
+    queryFn: () => apiClient.get<TaskLabel[]>('/kanban/labels').then((r) => r.data),
+  })
+}
+
+export function useCreateLabel() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: { name: string; color: string }) =>
+      apiClient.post<TaskLabel>('/kanban/labels', data).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: kanbanKeys.labels() }),
+  })
+}
+
+export function useUpdateLabel() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, ...data }: { id: string; name?: string; color?: string }) =>
+      apiClient.patch<TaskLabel>(`/kanban/labels/${id}`, data).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: kanbanKeys.labels() }),
+  })
+}
+
+export function useDeleteLabel() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => apiClient.delete(`/kanban/labels/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: kanbanKeys.labels() })
+      qc.invalidateQueries({ queryKey: kanbanKeys.all }) // refresh tasks that had this label
+    },
+  })
 }
 
 // ─── Activity Feed ────────────────────────────────────────────────────────────

@@ -194,7 +194,17 @@
     "tasks_count": "görev",
     "unarchive": "Arşivden Çıkar",
     "delete_board_title": "Panoyu Sil",
-    "delete_board_confirm": "\"{{name}}\" panosunu silmek istediğinize emin misiniz? Tüm sütunlar ve görevler kalıcı olarak silinecek."
+    "delete_board_confirm": "\"{{name}}\" panosunu silmek istediğinize emin misiniz? Tüm sütunlar ve görevler kalıcı olarak silinecek.",
+    "labels": "Etiketler",
+    "add_label": "Etiket Ekle",
+    "no_labels": "Henüz etiket yok.",
+    "create_label": "Yeni Etiket",
+    "edit_label": "Etiketi Düzenle",
+    "label_name": "Etiket Adı",
+    "label_color": "Renk",
+    "delete_label_confirm": "Bu etiketi silmek istediğinize emin misiniz?",
+    "filter_all_labels": "Tüm Etiketler",
+    "manage_labels": "Etiketler"
   },
   "teams": {
     "title": "Takımlar",
@@ -375,7 +385,10 @@
     "optional": "isteğe bağlı",
     "access_denied": "Bu sayfayı görüntüleme yetkiniz yok.",
     "refresh": "Yenile",
-    "deleting": "Siliniyor..."
+    "deleting": "Siliniyor...",
+    "export": "Dışa Aktar",
+    "export_csv": "CSV İndir",
+    "export_excel": "Excel İndir"
   },
   "email": {
     "templates_title": "E-posta Şablonları",

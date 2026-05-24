@@ -16,6 +16,7 @@ from app.schemas.kanban import (
     TaskCommentCreate, TaskCommentResponse, TaskHistoryEntry,
     SubtaskCreate, SubtaskUpdate, SubtaskResponse,
     AttachmentResponse,
+    LabelCreate, LabelUpdate, LabelResponse,
 )
 from pydantic import BaseModel as _BaseModel
 from app.schemas.auth import MessageResponse
@@ -86,6 +87,49 @@ async def delete_board(
     svc = KanbanService(db)
     await svc.delete_board(board_id, current_user)
     return {"message": "Pano silindi."}
+
+
+# ─── Labels ───────────────────────────────────────────────────────────────────
+
+@router.get("/labels", response_model=list[LabelResponse])
+async def list_labels(
+    _: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = KanbanService(db)
+    return await svc.list_labels()
+
+
+@router.post("/labels", response_model=LabelResponse, status_code=201)
+async def create_label(
+    body: LabelCreate,
+    current_user: Annotated[User, Depends(require_manager_or_above)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = KanbanService(db)
+    return await svc.create_label(body.name, body.color, current_user.id)
+
+
+@router.patch("/labels/{label_id}", response_model=LabelResponse)
+async def update_label(
+    label_id: uuid.UUID,
+    body: LabelUpdate,
+    _: Annotated[User, Depends(require_manager_or_above)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = KanbanService(db)
+    return await svc.update_label(label_id, body.name, body.color)
+
+
+@router.delete("/labels/{label_id}", response_model=dict)
+async def delete_label(
+    label_id: uuid.UUID,
+    _: Annotated[User, Depends(require_manager_or_above)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = KanbanService(db)
+    await svc.delete_label(label_id)
+    return {"message": "Etiket silindi."}
 
 
 # ─── Columns ──────────────────────────────────────────────────────────────────
@@ -160,6 +204,7 @@ async def list_tasks(
     due_before: Optional[date] = Query(None),
     include_archived: bool = Query(False),
     search: Optional[str] = Query(None, max_length=200),
+    label_id: Optional[uuid.UUID] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(200, ge=1, le=500),
 ):
@@ -174,6 +219,7 @@ async def list_tasks(
         due_before=due_before,
         include_archived=include_archived,
         search=search,
+        label_id=label_id,
         skip=skip,
         limit=limit,
     )
@@ -197,6 +243,7 @@ async def create_task(
         due_date=body.due_date,
         start_date=body.start_date,
         jira_ticket=body.jira_ticket,
+        label_ids=body.label_ids if body.label_ids else None,
     )
 
 
@@ -256,6 +303,7 @@ async def update_task(
         start_date=body.start_date if "start_date" in sent else ...,
         jira_ticket=body.jira_ticket,
         is_archived=body.is_archived,
+        label_ids=body.label_ids,
     )
 
 

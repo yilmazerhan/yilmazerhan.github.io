@@ -6,6 +6,8 @@ import { format, subDays } from 'date-fns'
 import { ArrowLeft, Clock, CheckSquare, AlertTriangle, Archive } from 'lucide-react'
 import apiClient from '@/api/client'
 import { resolveName } from '@/utils/i18nName'
+import ExportButton from '@/components/ui/ExportButton'
+import { exportUserActivity } from '@/api/export'
 
 interface ActivityReport {
   user: {
@@ -79,6 +81,14 @@ export default function UserActivityPage() {
           <input type="date" value={dateTo} max={today} onChange={(e) => setDateTo(e.target.value)}
             className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
         </div>
+        <ExportButton
+          onExport={(fmt) => exportUserActivity({
+            user_id: userId,
+            date_from: dateFrom,
+            date_to: dateTo,
+            format: fmt,
+          })}
+        />
       </div>
 
       {isLoading ? (
