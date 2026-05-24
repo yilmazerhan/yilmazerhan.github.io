@@ -106,9 +106,18 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 # CORS
+_cors_origins = [settings.FRONTEND_URL]
+# Allow common local dev origins so Playwright and hot-reload work
+for _dev_origin in [
+    "http://localhost:5173", "http://localhost:3000",
+    "http://127.0.0.1:5173", "http://127.0.0.1:3000",
+]:
+    if _dev_origin not in _cors_origins:
+        _cors_origins.append(_dev_origin)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
