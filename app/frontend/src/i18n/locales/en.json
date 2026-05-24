@@ -35,7 +35,15 @@
     "password_updated_title": "Password Updated!",
     "redirecting": "You will be redirected to the login page in 3 seconds...",
     "invalid_link": "Invalid link. Please use the link from your email.",
-    "update_password": "Update Password"
+    "update_password": "Update Password",
+    "activate_loading": "Activating account...",
+    "activate_success_title": "Activation Successful!",
+    "activate_success_msg": "Your account has been successfully activated. You can now sign in.",
+    "activate_redirect": "You will be redirected to the login page in 3 seconds...",
+    "activate_error_title": "Activation Failed",
+    "activate_error_default": "Activation failed. The link may be invalid or expired.",
+    "activate_invalid_link": "Invalid activation link.",
+    "go_to_login": "Go to Login"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -335,7 +343,8 @@
     "previous": "Previous",
     "next": "Next",
     "optional": "optional",
-    "access_denied": "You do not have permission to view this page."
+    "access_denied": "You do not have permission to view this page.",
+    "refresh": "Refresh"
   },
   "email": {
     "templates_title": "Email Templates",
@@ -500,7 +509,11 @@
     "retention_count": "Keep Last N Backups",
     "retention_count_desc": "Older backups are automatically deleted (1–100).",
     "schedule_saved": "Schedule saved successfully.",
-    "error_schedule": "Failed to save schedule."
+    "error_schedule": "Failed to save schedule.",
+    "status_ok": "OK",
+    "status_failed": "Failed",
+    "type_scheduled": "Scheduled",
+    "type_manual": "Manual"
   },
   "audit": {
     "action_create": "Create",
