@@ -362,13 +362,29 @@ class KanbanService:
         self.db.add(task)
         await self.db.flush()
 
-        # Assign labels
+        # Assign labels via association table to avoid lazy-load greenlet issues
         if label_ids:
-            result = await self.db.execute(select(TaskLabel).where(TaskLabel.id.in_(label_ids)))
-            labels = list(result.scalars().all())
-            task.labels = labels
+            from app.models.task_label import task_label_assignments as tla
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+            await self.db.execute(
+                pg_insert(tla).values(
+                    [{'task_id': task.id, 'label_id': lid} for lid in label_ids]
+                ).on_conflict_do_nothing()
+            )
 
-        await self.db.refresh(task, ["created_at", "updated_at", "assignee", "creator", "column", "labels"])
+        await self.db.flush()
+        # Re-query the task to include all loaded relationships (including labels)
+        result = await self.db.execute(
+            select(Task)
+            .options(
+                selectinload(Task.assignee),
+                selectinload(Task.creator),
+                selectinload(Task.column),
+                selectinload(Task.labels),
+            )
+            .where(Task.id == task.id)
+        )
+        task = result.scalar_one()
         await self._write_history(task.id, created_by, "created")
         # Notify assigned user
         if assignee_id and assignee_id != created_by:
@@ -442,11 +458,38 @@ class KanbanService:
             task.is_archived = is_archived
 
         if label_ids is not None:
-            result = await self.db.execute(select(TaskLabel).where(TaskLabel.id.in_(label_ids)))
-            task.labels = list(result.scalars().all())
+            # Use association table directly to avoid async lazy-load issues
+            from app.models.task_label import task_label_assignments as tla
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+            # Delete all existing label assignments
+            await self.db.execute(
+                tla.delete().where(tla.c.task_id == task_id)
+            )
+            # Insert new ones
+            if label_ids:
+                await self.db.execute(
+                    pg_insert(tla).values(
+                        [{'task_id': task_id, 'label_id': lid} for lid in label_ids]
+                    ).on_conflict_do_nothing()
+                )
 
         await self.db.flush()
-        await self.db.refresh(task, ["updated_at", "assignee", "creator", "column", "labels"])
+        # Expire the cached task so the re-query fetches fresh relationship data
+        # (especially the labels collection which was modified via raw SQL above)
+        self.db.expire(task)
+        # Re-query to get fresh state with all relationships loaded (avoids async lazy-load issues)
+        result = await self.db.execute(
+            select(Task)
+            .options(
+                selectinload(Task.assignee),
+                selectinload(Task.creator),
+                selectinload(Task.column),
+                selectinload(Task.labels),
+            )
+            .where(Task.id == task_id)
+            .execution_options(populate_existing=True)
+        )
+        task = result.scalar_one()
 
         if changes:
             # Resolve assignee name for display now that relationships are loaded
