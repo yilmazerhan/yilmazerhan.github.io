@@ -1,3 +1,4 @@
+import re
 import uuid
 from datetime import date
 from typing import Annotated, Optional
@@ -149,6 +150,7 @@ async def bulk_update_tasks(
         assignee_id=body.assignee_id,
         priority=body.priority,
         is_archived=body.is_archived,
+        requester=current_user,
     )
     return {"updated": count}
 
@@ -275,7 +277,7 @@ async def create_subtask(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = KanbanService(db)
-    return await svc.create_subtask(task_id, body)
+    return await svc.create_subtask(task_id, body, requester=current_user)
 
 
 @router.patch("/tasks/{task_id}/subtasks/{subtask_id}", response_model=SubtaskResponse)
@@ -287,7 +289,7 @@ async def update_subtask(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = KanbanService(db)
-    return await svc.update_subtask(task_id, subtask_id, body)
+    return await svc.update_subtask(task_id, subtask_id, body, requester=current_user)
 
 
 @router.delete("/tasks/{task_id}/subtasks/{subtask_id}", status_code=204)
@@ -298,7 +300,7 @@ async def delete_subtask(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = KanbanService(db)
-    await svc.delete_subtask(task_id, subtask_id)
+    await svc.delete_subtask(task_id, subtask_id, requester=current_user)
 
 
 # ─── Activity Timeline ────────────────────────────────────────────────────────
@@ -344,6 +346,11 @@ async def list_attachments(
     return await svc.list_attachments(task_id)
 
 
+_MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
+_UPLOAD_DIR = "/app/uploads"
+_ALLOWED_EXT = re.compile(r'^\.[a-zA-Z0-9]{1,8}$')
+
+
 @router.post("/tasks/{task_id}/attachments", response_model=AttachmentResponse, status_code=201)
 async def upload_attachment(
     task_id: uuid.UUID,
@@ -353,30 +360,43 @@ async def upload_attachment(
 ):
     import os
     import uuid as _uuid
+    from fastapi import HTTPException
 
-    # Max 10MB
-    content = await file.read()
-    if len(content) > 10 * 1024 * 1024:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=413, detail="Dosya 10MB'dan büyük olamaz.")
+    # ── Verify the user can access this task ──────────────────────────────────
+    svc = KanbanService(db)
+    await svc.get_task(task_id, current_user)  # raises 403/404 if inaccessible
 
-    # Ensure upload directory exists
-    upload_dir = "/app/uploads"
-    os.makedirs(upload_dir, exist_ok=True)
+    # ── Stream-read in chunks with hard cap to avoid memory exhaustion ────────
+    content = b""
+    chunk_size = 65536  # 64 KB per read
+    while True:
+        chunk = await file.read(chunk_size)
+        if not chunk:
+            break
+        content += chunk
+        if len(content) > _MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="Dosya 10 MB'dan büyük olamaz.")
 
-    # Generate unique stored filename
-    ext = os.path.splitext(file.filename or "")[-1][:10]
+    if not content:
+        raise HTTPException(status_code=400, detail="Dosya boş olamaz.")
+
+    # ── Sanitise extension (allow only safe alphanumeric extensions) ───────────
+    raw_ext = os.path.splitext(file.filename or "")[-1].lower()[:10]
+    ext = raw_ext if _ALLOWED_EXT.match(raw_ext) else ""
     stored_name = f"{_uuid.uuid4()}{ext}"
-    file_path = os.path.join(upload_dir, stored_name)
 
+    # ── Write to disk ─────────────────────────────────────────────────────────
+    os.makedirs(_UPLOAD_DIR, exist_ok=True)
+    file_path = os.path.join(_UPLOAD_DIR, stored_name)
     with open(file_path, "wb") as f:
         f.write(content)
 
-    svc = KanbanService(db)
+    # ── Persist record ────────────────────────────────────────────────────────
+    safe_original = os.path.basename(file.filename or stored_name)[:255]
     return await svc.create_attachment(
         task_id=task_id,
         filename=stored_name,
-        original_filename=file.filename or stored_name,
+        original_filename=safe_original,
         file_size=len(content),
         mime_type=file.content_type or "application/octet-stream",
         uploaded_by=current_user.id,
@@ -387,13 +407,18 @@ async def upload_attachment(
 async def download_attachment(
     task_id: uuid.UUID,
     att_id: uuid.UUID,
-    _: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     import os
+    from urllib.parse import quote
     from fastapi import HTTPException
     from fastapi.responses import FileResponse
     from app.models.task_attachment import TaskAttachment
+
+    # ── Verify task access ────────────────────────────────────────────────────
+    svc = KanbanService(db)
+    await svc.get_task(task_id, current_user)  # raises 403/404 if inaccessible
 
     result = await db.execute(
         select(TaskAttachment).where(
@@ -405,15 +430,20 @@ async def download_attachment(
     if not att:
         raise HTTPException(status_code=404, detail="Dosya eki bulunamadı.")
 
-    file_path = os.path.join("/app/uploads", att.filename)
+    # ── Path traversal guard ──────────────────────────────────────────────────
+    upload_dir = os.path.realpath(_UPLOAD_DIR)
+    file_path = os.path.realpath(os.path.join(upload_dir, att.filename))
+    if not file_path.startswith(upload_dir + os.sep):
+        raise HTTPException(status_code=400, detail="Geçersiz dosya.")
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Dosya bulunamadı.")
 
+    # ── RFC 5987 encoded Content-Disposition (prevents header injection) ──────
+    safe_name = quote(att.original_filename, safe="")
     return FileResponse(
         file_path,
-        media_type=att.mime_type,
-        filename=att.original_filename,
-        headers={"Content-Disposition": f'attachment; filename="{att.original_filename}"'},
+        media_type=att.mime_type or "application/octet-stream",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{safe_name}"},
     )
 
 
@@ -421,8 +451,10 @@ async def download_attachment(
 async def delete_attachment(
     task_id: uuid.UUID,
     att_id: uuid.UUID,
-    _: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
+    # ── Verify task access before deletion ────────────────────────────────────
     svc = KanbanService(db)
+    await svc.get_task(task_id, current_user)  # raises 403/404 if inaccessible
     await svc.delete_attachment(task_id, att_id)

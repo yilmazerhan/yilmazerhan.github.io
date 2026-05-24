@@ -38,7 +38,9 @@ def _clear_refresh_cookie(response: Response) -> None:
 
 
 @router.post("/register", response_model=MessageResponse, status_code=201)
+@limiter.limit("5/hour")
 async def register(
+    request: Request,
     body: RegisterRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
@@ -137,7 +139,8 @@ async def forgot_password(
 
 
 @router.post("/reset-password", response_model=MessageResponse)
-async def reset_password(body: ResetPasswordRequest, db: Annotated[AsyncSession, Depends(get_db)]):
+@limiter.limit("10/hour")
+async def reset_password(request: Request, body: ResetPasswordRequest, db: Annotated[AsyncSession, Depends(get_db)]):
     svc = AuthService(db)
     await svc.reset_password(body.token, body.new_password)
     return {"message": "Şifreniz başarıyla sıfırlandı. Yeni şifrenizle giriş yapabilirsiniz."}

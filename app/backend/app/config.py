@@ -1,6 +1,9 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from typing import Literal
+
+
+_DEFAULT_SECRET = "dev-secret-key-change-in-production"
 
 
 class Settings(BaseSettings):
@@ -8,7 +11,7 @@ class Settings(BaseSettings):
 
     # App
     ENVIRONMENT: Literal["development", "testing", "production"] = "development"
-    SECRET_KEY: str = "dev-secret-key-change-in-production"
+    SECRET_KEY: str = _DEFAULT_SECRET
     FRONTEND_URL: str = "https://localhost:3000"
 
     # Database
@@ -44,6 +47,18 @@ class Settings(BaseSettings):
         if not v.startswith("postgresql"):
             raise ValueError("DATABASE_URL must be a PostgreSQL connection string")
         return v
+
+    @model_validator(mode="after")
+    def validate_production_secrets(self) -> "Settings":
+        if self.ENVIRONMENT == "production":
+            if self.SECRET_KEY == _DEFAULT_SECRET or len(self.SECRET_KEY) < 32:
+                raise ValueError(
+                    "SECRET_KEY must be a strong random value (≥32 chars) in production. "
+                    "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+                )
+            if not self.SUPERADMIN_PASSWORD:
+                raise ValueError("SUPERADMIN_PASSWORD must be set in production.")
+        return self
 
     @property
     def is_development(self) -> bool:

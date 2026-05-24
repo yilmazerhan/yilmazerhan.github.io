@@ -133,7 +133,7 @@ async def list_audit_logs(
     db: Annotated[AsyncSession, Depends(get_db)],
     user_id: Optional[uuid.UUID] = Query(None),
     action: Optional[str] = Query(None),
-    table_name: Optional[str] = Query(None),
+    table_name: Optional[str] = Query(None, max_length=100),
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
     skip: int = Query(0, ge=0),
@@ -260,13 +260,18 @@ async def download_backup(
         raise HTTPException(status_code=501, detail="pg_dump binary not available in this environment.")
 
     if proc.returncode != 0:
-        raise HTTPException(status_code=500, detail=f"pg_dump failed: {stderr.decode()[:500]}")
+        import logging
+        logging.getLogger(__name__).error(
+            "pg_dump exited %d — details omitted for security", proc.returncode
+        )
+        raise HTTPException(status_code=500, detail="Veritabanı yedeği alınamadı.")
 
     filename = f"backup_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.sql"
     return FastAPIResponse(
         content=stdout,
         media_type="application/octet-stream",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        # Plain ASCII filename — no injection risk, no RFC 5987 encoding needed
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 

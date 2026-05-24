@@ -122,5 +122,8 @@ async def _write_audit(
                 user_agent=user_agent,
             ))
             await db.commit()
-    except Exception:
-        pass  # audit failures must never crash the app
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).warning(
+            "Audit log write failed (non-critical): %s", exc, exc_info=False
+        )

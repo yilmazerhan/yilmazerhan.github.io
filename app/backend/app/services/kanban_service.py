@@ -408,15 +408,21 @@ class KanbanService:
         )
         return list(result.scalars().all())
 
-    async def create_subtask(self, task_id: uuid.UUID, data: SubtaskCreate) -> TaskSubtask:
+    async def create_subtask(self, task_id: uuid.UUID, data: SubtaskCreate, requester: Optional[User] = None) -> TaskSubtask:
+        # Verify task access
+        if requester:
+            await self.get_task(task_id, requester)
         subtask = TaskSubtask(task_id=task_id, **data.model_dump())
         self.db.add(subtask)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(subtask)
         return subtask
 
-    async def update_subtask(self, task_id: uuid.UUID, subtask_id: uuid.UUID, data: SubtaskUpdate) -> TaskSubtask:
+    async def update_subtask(self, task_id: uuid.UUID, subtask_id: uuid.UUID, data: SubtaskUpdate, requester: Optional[User] = None) -> TaskSubtask:
         from fastapi import HTTPException
+        # Verify task access
+        if requester:
+            await self.get_task(task_id, requester)
         result = await self.db.execute(
             select(TaskSubtask).where(TaskSubtask.id == subtask_id, TaskSubtask.task_id == task_id)
         )
@@ -425,12 +431,15 @@ class KanbanService:
             raise HTTPException(status_code=404, detail="Alt görev bulunamadı.")
         for k, v in data.model_dump(exclude_none=True).items():
             setattr(subtask, k, v)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(subtask)
         return subtask
 
-    async def delete_subtask(self, task_id: uuid.UUID, subtask_id: uuid.UUID) -> None:
+    async def delete_subtask(self, task_id: uuid.UUID, subtask_id: uuid.UUID, requester: Optional[User] = None) -> None:
         from fastapi import HTTPException
+        # Verify task access
+        if requester:
+            await self.get_task(task_id, requester)
         result = await self.db.execute(
             select(TaskSubtask).where(TaskSubtask.id == subtask_id, TaskSubtask.task_id == task_id)
         )
@@ -438,7 +447,7 @@ class KanbanService:
         if not subtask:
             raise HTTPException(status_code=404, detail="Alt görev bulunamadı.")
         await self.db.delete(subtask)
-        await self.db.commit()
+        await self.db.flush()
 
     async def list_all_history(
         self,
@@ -492,13 +501,13 @@ class KanbanService:
             uploaded_by=uploaded_by,
         )
         self.db.add(att)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(att)
         return att
 
     async def delete_attachment(self, task_id: uuid.UUID, attachment_id: uuid.UUID) -> None:
-        from app.models.task_attachment import TaskAttachment
         import os
+        from app.models.task_attachment import TaskAttachment
         result = await self.db.execute(
             select(TaskAttachment).where(
                 TaskAttachment.id == attachment_id,
@@ -508,12 +517,13 @@ class KanbanService:
         att = result.scalar_one_or_none()
         if not att:
             raise NotFoundError("Dosya eki")
-        # Delete file from disk
-        file_path = os.path.join("/app/uploads", att.filename)
-        if os.path.exists(file_path):
+        # Path traversal guard before deleting from disk
+        upload_dir = os.path.realpath("/app/uploads")
+        file_path = os.path.realpath(os.path.join(upload_dir, att.filename))
+        if file_path.startswith(upload_dir + os.sep) and os.path.exists(file_path):
             os.remove(file_path)
         await self.db.delete(att)
-        await self.db.commit()
+        await self.db.flush()
 
     # ─── Bulk Operations ──────────────────────────────────────────────────────
 
@@ -524,12 +534,23 @@ class KanbanService:
         assignee_id: Optional[uuid.UUID] = None,
         priority: Optional[str] = None,
         is_archived: Optional[bool] = None,
+        requester: Optional[User] = None,
     ) -> int:
         if not task_ids:
             return 0
+        # Limit to prevent DoS via large batch
+        if len(task_ids) > 200:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=400, detail="En fazla 200 görev aynı anda güncellenebilir.")
         result = await self.db.execute(select(Task).where(Task.id.in_(task_ids)))
         tasks = list(result.scalars().all())
+        is_manager = requester and requester.role in ("superadmin", "team_manager")
         for task in tasks:
+            # Authorization: regular users can only bulk-update tasks they created or are assigned to
+            if requester and not is_manager:
+                if task.created_by != requester.id and task.assignee_id != requester.id:
+                    from fastapi import HTTPException
+                    raise HTTPException(status_code=403, detail="Bazı görevler için güncelleme yetkiniz yok.")
             if column_id is not None:
                 task.column_id = column_id
             if assignee_id is not None:
@@ -538,5 +559,5 @@ class KanbanService:
                 task.priority = priority
             if is_archived is not None:
                 task.is_archived = is_archived
-        await self.db.commit()
+        await self.db.flush()
         return len(tasks)

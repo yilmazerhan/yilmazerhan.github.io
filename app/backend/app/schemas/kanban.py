@@ -1,7 +1,10 @@
+import re
 import uuid
 from datetime import date, datetime
 from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+_JIRA_RE = re.compile(r'^[A-Za-z][A-Za-z0-9_]*-\d+$')
 
 
 
@@ -48,14 +51,14 @@ class UserBasic(BaseModel):
 
 
 class TaskCreate(BaseModel):
-    title: str
+    title: str = Field(..., min_length=2, max_length=500)
     column_id: uuid.UUID
-    description: Optional[str] = None
+    description: Optional[str] = Field(None, max_length=50000)
     assignee_id: Optional[uuid.UUID] = None
     priority: str = "medium"
     due_date: Optional[date] = None
     start_date: Optional[date] = None
-    jira_ticket: Optional[str] = None
+    jira_ticket: Optional[str] = Field(None, max_length=50)
 
     @field_validator("priority")
     @classmethod
@@ -72,16 +75,34 @@ class TaskCreate(BaseModel):
             raise ValueError("Başlık en az 2 karakter olmalıdır.")
         return v
 
+    @field_validator("jira_ticket")
+    @classmethod
+    def validate_jira_ticket(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v = v.strip()
+            if v and not _JIRA_RE.match(v):
+                raise ValueError("Jira ticket formatı geçersiz (örn: PROJ-123).")
+        return v or None
+
 
 class TaskUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
+    title: Optional[str] = Field(None, min_length=2, max_length=500)
+    description: Optional[str] = Field(None, max_length=50000)
     assignee_id: Optional[uuid.UUID] = None
     priority: Optional[str] = None
     due_date: Optional[date] = None
     start_date: Optional[date] = None
-    jira_ticket: Optional[str] = None
+    jira_ticket: Optional[str] = Field(None, max_length=50)
     is_archived: Optional[bool] = None
+
+    @field_validator("jira_ticket")
+    @classmethod
+    def validate_jira_ticket(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            v = v.strip()
+            if v and not _JIRA_RE.match(v):
+                raise ValueError("Jira ticket formatı geçersiz (örn: PROJ-123).")
+        return v or None
 
 
 class TaskMoveRequest(BaseModel):
