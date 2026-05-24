@@ -325,7 +325,8 @@ export default function BackupPage() {
                 <p className="text-sm">{t('backup.no_backups')}</p>
               </div>
             ) : (
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[640px]">
                 <thead>
                   <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
                     <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('backup.col_name')}</th>
@@ -442,6 +443,7 @@ export default function BackupPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
 

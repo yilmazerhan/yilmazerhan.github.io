@@ -292,7 +292,7 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-lg shadow-xl max-h-[90vh] flex flex-col">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-2xl shadow-xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-200 dark:border-gray-800 flex-shrink-0">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -316,12 +316,12 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
 
         {/* Tabs (only when editing) */}
         {isEdit && (
-          <div className="flex border-b border-gray-200 dark:border-gray-800 flex-shrink-0 px-6">
+          <div className="flex border-b border-gray-200 dark:border-gray-800 flex-shrink-0 px-4 overflow-x-auto">
             {TABS.map(({ key, icon: Icon, labelKey, count }) => (
               <button
                 key={key}
                 onClick={() => setActiveTab(key)}
-                className={`flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap flex-shrink-0 ${
                   activeTab === key
                     ? 'border-primary-500 text-primary-600 dark:text-primary-400'
                     : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'

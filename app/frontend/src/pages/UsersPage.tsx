@@ -88,7 +88,8 @@ export default function UsersPage() {
 
       {/* Table */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
-        <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[640px]">
           <thead>
             <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
               <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('auth.full_name')}</th>
@@ -107,9 +108,9 @@ export default function UsersPage() {
               <tr><td colSpan={7} className="text-center py-8 text-gray-400">{t('users.not_found')}</td></tr>
             ) : data?.items.map((user) => (
               <tr key={user.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30">
-                <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{user.full_name}</td>
+                <td className="px-4 py-3 font-medium text-gray-900 dark:text-white max-w-[160px] truncate" title={user.full_name}>{user.full_name}</td>
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-400 font-mono text-xs">{user.username}</td>
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{user.email}</td>
+                <td className="px-4 py-3 text-gray-600 dark:text-gray-400 max-w-[200px] truncate" title={user.email}>{user.email}</td>
                 <td className="px-4 py-3">
                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                     user.role === 'superadmin' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' :
@@ -176,6 +177,7 @@ export default function UsersPage() {
             ))}
           </tbody>
         </table>
+        </div>
         {data && (
           <div className="px-4 py-3 border-t border-gray-100 dark:border-gray-800 text-xs text-gray-500 dark:text-gray-400">
             {t('users.user_count', { count: data.total })}

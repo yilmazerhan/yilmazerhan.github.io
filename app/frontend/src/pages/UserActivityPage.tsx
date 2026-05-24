@@ -153,7 +153,8 @@ export default function UserActivityPage() {
               <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-800">
                 <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">{t('activity.recent_logs')}</h2>
               </div>
-              <table className="w-full text-sm">
+              <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[500px]">
                 <thead>
                   <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
                     <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500">{t('worklog.date')}</th>
@@ -177,6 +178,7 @@ export default function UserActivityPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </>

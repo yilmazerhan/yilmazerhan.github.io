@@ -763,7 +763,8 @@ export default function SettingsPage() {
         </div>
 
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[480px]">
             <thead>
               <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
                 <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('settings.work_type_name')}</th>
@@ -806,6 +807,7 @@ export default function SettingsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
 
         {wtShowForm && (
@@ -861,7 +863,8 @@ export default function SettingsPage() {
         </div>
 
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[480px]">
             <thead>
               <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
                 <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('settings.column_name_label')}</th>
@@ -903,6 +906,7 @@ export default function SettingsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
 
         {colShowForm && (
