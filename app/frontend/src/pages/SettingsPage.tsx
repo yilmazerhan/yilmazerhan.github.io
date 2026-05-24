@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { format } from 'date-fns'
 import { tr, enUS } from 'date-fns/locale'
 import { Plus, Pencil, Trash2, CheckCircle, XCircle, Loader2, ShieldCheck, Upload, Building2, MessageSquare, Mail, Layers, Tag } from 'lucide-react'
+import { resolveName } from '@/utils/i18nName'
 import {
   useWorkTypes,
   useCreateWorkType,
@@ -781,7 +782,7 @@ export default function SettingsPage() {
                   <td className="px-4 py-3">
                     <span className="inline-flex items-center gap-2">
                       <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: wt.color }} />
-                      <span className="font-medium text-gray-800 dark:text-gray-200">{wt.name}</span>
+                      <span className="font-medium text-gray-800 dark:text-gray-200">{resolveName(t, wt.name, wt.name_key)}</span>
                     </span>
                   </td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{wt.sort_order}</td>
@@ -879,7 +880,7 @@ export default function SettingsPage() {
                   <td className="px-4 py-3">
                     <span className="inline-flex items-center gap-2">
                       <span className="w-3 h-3 rounded flex-shrink-0" style={{ backgroundColor: col.color }} />
-                      <span className="font-medium text-gray-800 dark:text-gray-200">{col.name}</span>
+                      <span className="font-medium text-gray-800 dark:text-gray-200">{resolveName(t, col.name, col.name_key)}</span>
                     </span>
                   </td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{col.sort_order}</td>

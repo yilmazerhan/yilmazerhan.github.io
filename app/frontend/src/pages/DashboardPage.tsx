@@ -7,6 +7,7 @@ import { useTasks } from '@/api/kanban'
 import { useWorkLogs } from '@/api/worklog'
 import { useAuthStore } from '@/store/authStore'
 import { useDashboardStats } from '@/api/admin'
+import { resolveName } from '@/utils/i18nName'
 
 const WIDGET_KEYS = ['db_stats', 'charts', 'overdue', 'recent_logs'] as const
 type WidgetKey = typeof WIDGET_KEYS[number]
@@ -69,10 +70,10 @@ export default function DashboardPage() {
 
   const workTypeBreakdown = useMemo(() => {
     const logs = logsData?.items ?? []
-    const map: Record<string, { name: string; color: string; hours: number }> = {}
+    const map: Record<string, { name: string; name_key?: string | null; color: string; hours: number }> = {}
     for (const log of logs) {
       const key = log.work_type_id
-      if (!map[key]) map[key] = { name: log.work_type.name, color: log.work_type.color, hours: 0 }
+      if (!map[key]) map[key] = { name: log.work_type.name, name_key: log.work_type.name_key, color: log.work_type.color, hours: 0 }
       map[key].hours += log.duration_hours
     }
     return Object.values(map).sort((a, b) => b.hours - a.hours)
@@ -222,7 +223,7 @@ export default function DashboardPage() {
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: wt.color }} />
-                      <span className="text-sm text-gray-700 dark:text-gray-300 truncate max-w-[160px]">{wt.name}</span>
+                      <span className="text-sm text-gray-700 dark:text-gray-300 truncate max-w-[160px]">{resolveName(t, wt.name, wt.name_key)}</span>
                     </div>
                     <span className="text-sm font-medium text-gray-900 dark:text-white ml-2 flex-shrink-0">
                       {wt.hours.toFixed(1)}{hourAbbr}
@@ -287,7 +288,7 @@ export default function DashboardPage() {
                         <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: log.work_type.color }} />
                         <div className="min-w-0">
                           <p className="text-sm text-gray-700 dark:text-gray-300 truncate">{log.description}</p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">{log.user.full_name} · {log.work_type.name}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400">{log.user.full_name} · {resolveName(t, log.work_type.name, log.work_type.name_key)}</p>
                         </div>
                       </div>
                       <div className="text-right flex-shrink-0">

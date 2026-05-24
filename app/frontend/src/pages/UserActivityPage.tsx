@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query'
 import { format, subDays } from 'date-fns'
 import { ArrowLeft, Clock, CheckSquare, AlertTriangle, Archive } from 'lucide-react'
 import apiClient from '@/api/client'
+import { resolveName } from '@/utils/i18nName'
 
 interface ActivityReport {
   user: {
@@ -14,11 +15,11 @@ interface ActivityReport {
   work_log_summary: {
     total_hours: number
     entry_count: number
-    hours_by_type: { name: string; color: string; hours: number; count: number }[]
+    hours_by_type: { name: string; name_key?: string | null; color: string; hours: number; count: number }[]
   }
   task_summary: {
     active: number; archived: number; overdue: number
-    by_column: { name: string; color: string; count: number }[]
+    by_column: { name: string; name_key?: string | null; color: string; count: number }[]
   }
   recent_logs: {
     log_date: string; work_type: string; work_type_color: string; duration_hours: number; description: string
@@ -117,7 +118,7 @@ export default function UserActivityPage() {
                     .map((wt) => (
                     <div key={wt.name} className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: wt.color }} />
-                      <span className="text-sm text-gray-600 dark:text-gray-400 flex-1 truncate">{wt.name}</span>
+                      <span className="text-sm text-gray-600 dark:text-gray-400 flex-1 truncate">{resolveName(t, wt.name, wt.name_key)}</span>
                       <div className="w-24 bg-gray-100 dark:bg-gray-800 rounded-full h-2">
                         <div className="h-2 rounded-full" style={{ width: `${(wt.hours / maxHours) * 100}%`, backgroundColor: wt.color }} />
                       </div>
@@ -138,7 +139,7 @@ export default function UserActivityPage() {
                   {data.task_summary.by_column.map((col) => (
                     <div key={col.name} className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: col.color }} />
-                      <span className="text-sm text-gray-600 dark:text-gray-400 flex-1">{col.name}</span>
+                      <span className="text-sm text-gray-600 dark:text-gray-400 flex-1">{resolveName(t, col.name, col.name_key)}</span>
                       <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{col.count}</span>
                     </div>
                   ))}

@@ -112,7 +112,17 @@
     "for_user": "Kişi Adına",
     "myself": "Kendin",
     "view_list": "Liste Görünümü",
-    "view_calendar": "Takvim Görünümü"
+    "view_calendar": "Takvim Görünümü",
+    "wt_client_meeting": "Müşteri Toplantısı",
+    "wt_presentation": "Sunum Hazırlığı",
+    "wt_bug_review": "Production Bug İncelemesi",
+    "wt_analysis": "Analiz",
+    "wt_development": "Geliştirme",
+    "wt_testing": "Test",
+    "wt_release_testing": "Release Testi",
+    "wt_documentation": "Dokümantasyon",
+    "wt_code_review": "Code Review",
+    "wt_training": "Eğitim / Araştırma"
   },
   "kanban": {
     "title": "Görev Panosu",
@@ -164,7 +174,11 @@
     "bulk_move_to": "Taşı...",
     "bulk_archive": "Seçilileri arşivle",
     "selection_mode": "Seçim Modu",
-    "empty_column": "+ Görev ekle"
+    "empty_column": "+ Görev ekle",
+    "col_pending": "Bekleyen",
+    "col_in_progress": "Devam Ediyor",
+    "col_in_review": "İncelemede",
+    "col_done": "Tamamlandı"
   },
   "teams": {
     "title": "Takımlar",

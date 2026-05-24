@@ -318,7 +318,7 @@ async def user_activity_report(
     for l in logs:
         k = str(l.work_type_id)
         if k not in hours_by_type:
-            hours_by_type[k] = {"name": l.work_type.name, "color": l.work_type.color, "hours": 0, "count": 0}
+            hours_by_type[k] = {"name": l.work_type.name, "name_key": l.work_type.name_key, "color": l.work_type.color, "hours": 0, "count": 0}
         hours_by_type[k]["hours"] += l.duration_hours
         hours_by_type[k]["count"] += 1
 
@@ -337,11 +337,12 @@ async def user_activity_report(
 
     tasks_by_column: dict[str, dict] = {}
     for t in active_tasks:
-        col_name = t.column.name if t.column else "Bilinmeyen"
+        col_name = t.column.name if t.column else "Unknown"
+        col_name_key = t.column.name_key if t.column else None
         col_color = t.column.color if t.column else "#888"
         k = str(t.column_id)
         if k not in tasks_by_column:
-            tasks_by_column[k] = {"name": col_name, "color": col_color, "count": 0}
+            tasks_by_column[k] = {"name": col_name, "name_key": col_name_key, "color": col_color, "count": 0}
         tasks_by_column[k]["count"] += 1
 
     return {

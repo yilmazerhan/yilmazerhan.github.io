@@ -7,6 +7,7 @@ import { useWorkLogs, useDeleteWorkLog, type WorkLog } from '@/api/worklog'
 import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
 import WorkLogModal from '@/components/worklog/WorkLogModal'
+import { resolveName } from '@/utils/i18nName'
 
 type ViewMode = 'list' | 'calendar'
 
@@ -264,7 +265,7 @@ export default function WorkLogPage() {
                         className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white"
                         style={{ backgroundColor: log.work_type.color }}
                       >
-                        {log.work_type.name}
+                        {resolveName(t, log.work_type.name, log.work_type.name_key)}
                       </span>
                     </td>
                     <td className="px-4 py-3">

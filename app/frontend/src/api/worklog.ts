@@ -4,6 +4,7 @@ import apiClient from './client'
 export interface WorkType {
   id: string
   name: string
+  name_key?: string | null
   color: string
   is_active: boolean
   sort_order: number

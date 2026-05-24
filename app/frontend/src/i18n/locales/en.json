@@ -112,7 +112,17 @@
     "description_min_length": "Description must be at least 5 characters.",
     "filter_all_users": "All Users",
     "for_user": "On Behalf Of",
-    "myself": "Myself"
+    "myself": "Myself",
+    "wt_client_meeting": "Client Meeting",
+    "wt_presentation": "Presentation Preparation",
+    "wt_bug_review": "Production Bug Review",
+    "wt_analysis": "Analysis",
+    "wt_development": "Development",
+    "wt_testing": "Testing",
+    "wt_release_testing": "Release Testing",
+    "wt_documentation": "Documentation",
+    "wt_code_review": "Code Review",
+    "wt_training": "Training / Research"
   },
   "kanban": {
     "title": "Task Board",
@@ -164,7 +174,11 @@
     "bulk_move_to": "Move to...",
     "bulk_archive": "Archive selected",
     "selection_mode": "Selection Mode",
-    "empty_column": "+ Add task"
+    "empty_column": "+ Add task",
+    "col_pending": "Pending",
+    "col_in_progress": "In Progress",
+    "col_in_review": "In Review",
+    "col_done": "Done"
   },
   "teams": {
     "title": "Teams",

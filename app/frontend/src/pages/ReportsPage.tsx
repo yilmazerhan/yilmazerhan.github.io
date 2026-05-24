@@ -9,6 +9,7 @@ import {
   useReportSchedules, useCreateReportSchedule, useUpdateReportSchedule,
   useDeleteReportSchedule, useRunReportSchedule, type ReportSchedule,
 } from '@/api/admin'
+import { resolveName } from '@/utils/i18nName'
 
 function exportCSV(logs: any[], dateFrom: string, dateTo: string, t: (key: string) => string) {
   const header = [t('reports.csv_date'), t('reports.csv_user'), t('reports.csv_work_type'), t('reports.csv_duration'), t('reports.csv_description')]
@@ -227,7 +228,7 @@ export default function ReportsPage() {
     if (!logs.length) return null
 
     const users: Record<string, { name: string; byType: Record<string, number>; total: number }> = {}
-    const types: Record<string, { name: string; color: string }> = {}
+    const types: Record<string, { name: string; name_key?: string | null; color: string }> = {}
 
     for (const log of logs) {
       if (!users[log.user_id]) {
@@ -236,7 +237,7 @@ export default function ReportsPage() {
       users[log.user_id].byType[log.work_type_id] = (users[log.user_id].byType[log.work_type_id] ?? 0) + log.duration_hours
       users[log.user_id].total += log.duration_hours
       if (!types[log.work_type_id]) {
-        types[log.work_type_id] = { name: log.work_type.name, color: log.work_type.color }
+        types[log.work_type_id] = { name: log.work_type.name, name_key: log.work_type.name_key, color: log.work_type.color }
       }
     }
 
@@ -402,7 +403,7 @@ export default function ReportsPage() {
                       <th key={typeId} className="text-right px-4 py-3 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">
                         <span className="flex items-center justify-end gap-1.5">
                           <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: type.color }} />
-                          {type.name}
+                          {resolveName(t, type.name, type.name_key)}
                         </span>
                       </th>
                     ))}

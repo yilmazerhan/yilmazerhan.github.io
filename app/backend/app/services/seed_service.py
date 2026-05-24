@@ -11,23 +11,23 @@ from app.config import settings
 
 
 DEFAULT_WORK_TYPES = [
-    {"name": "Müşteri Toplantısı", "color": "#3b82f6", "sort_order": 1},
-    {"name": "Sunum Hazırlığı", "color": "#8b5cf6", "sort_order": 2},
-    {"name": "Production Bug İncelemesi", "color": "#ef4444", "sort_order": 3},
-    {"name": "Analiz", "color": "#f59e0b", "sort_order": 4},
-    {"name": "Geliştirme", "color": "#10b981", "sort_order": 5},
-    {"name": "Test", "color": "#06b6d4", "sort_order": 6},
-    {"name": "Release Testi", "color": "#f97316", "sort_order": 7},
-    {"name": "Dokümantasyon", "color": "#6366f1", "sort_order": 8},
-    {"name": "Code Review", "color": "#84cc16", "sort_order": 9},
-    {"name": "Eğitim / Araştırma", "color": "#ec4899", "sort_order": 10},
+    {"name": "Müşteri Toplantısı", "color": "#3b82f6", "sort_order": 1, "name_key": "worklog.wt_client_meeting"},
+    {"name": "Sunum Hazırlığı", "color": "#8b5cf6", "sort_order": 2, "name_key": "worklog.wt_presentation"},
+    {"name": "Production Bug İncelemesi", "color": "#ef4444", "sort_order": 3, "name_key": "worklog.wt_bug_review"},
+    {"name": "Analiz", "color": "#f59e0b", "sort_order": 4, "name_key": "worklog.wt_analysis"},
+    {"name": "Geliştirme", "color": "#10b981", "sort_order": 5, "name_key": "worklog.wt_development"},
+    {"name": "Test", "color": "#06b6d4", "sort_order": 6, "name_key": "worklog.wt_testing"},
+    {"name": "Release Testi", "color": "#f97316", "sort_order": 7, "name_key": "worklog.wt_release_testing"},
+    {"name": "Dokümantasyon", "color": "#6366f1", "sort_order": 8, "name_key": "worklog.wt_documentation"},
+    {"name": "Code Review", "color": "#84cc16", "sort_order": 9, "name_key": "worklog.wt_code_review"},
+    {"name": "Eğitim / Araştırma", "color": "#ec4899", "sort_order": 10, "name_key": "worklog.wt_training"},
 ]
 
 DEFAULT_KANBAN_COLUMNS = [
-    {"name": "Bekleyen", "color": "#e2e8f0", "sort_order": 0, "is_terminal": False},
-    {"name": "Devam Ediyor", "color": "#bfdbfe", "sort_order": 1, "is_terminal": False},
-    {"name": "İncelemede", "color": "#fef9c3", "sort_order": 2, "is_terminal": False},
-    {"name": "Tamamlandı", "color": "#bbf7d0", "sort_order": 3, "is_terminal": True},
+    {"name": "Bekleyen", "color": "#e2e8f0", "sort_order": 0, "is_terminal": False, "name_key": "kanban.col_pending"},
+    {"name": "Devam Ediyor", "color": "#bfdbfe", "sort_order": 1, "is_terminal": False, "name_key": "kanban.col_in_progress"},
+    {"name": "İncelemede", "color": "#fef9c3", "sort_order": 2, "is_terminal": False, "name_key": "kanban.col_in_review"},
+    {"name": "Tamamlandı", "color": "#bbf7d0", "sort_order": 3, "is_terminal": True, "name_key": "kanban.col_done"},
 ]
 
 DEFAULT_APP_SETTINGS = {

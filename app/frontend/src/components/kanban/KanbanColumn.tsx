@@ -3,6 +3,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useTranslation } from 'react-i18next'
 import { Plus } from 'lucide-react'
 import type { KanbanColumn as ColType, Task } from '@/api/kanban'
+import { resolveName } from '@/utils/i18nName'
 import TaskCard from './TaskCard'
 
 interface Props {
@@ -31,7 +32,7 @@ export default function KanbanColumnComp({ column, tasks, onAddTask, onTaskClick
             className="w-2.5 h-2.5 rounded-full flex-shrink-0"
             style={{ backgroundColor: column.color }}
           />
-          <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">{column.name}</span>
+          <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">{resolveName(t, column.name, column.name_key)}</span>
           <span className="text-xs text-gray-500 dark:text-gray-400 font-medium bg-white/60 dark:bg-gray-800/60 px-1.5 py-0.5 rounded-full">
             {tasks.length}
           </span>

@@ -13,6 +13,7 @@ class KanbanColumn(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
+    name_key: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     color: Mapped[str] = mapped_column(String(7), nullable=False, default="#e2e8f0")
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_terminal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

@@ -37,6 +37,7 @@ class ColumnReorderItem(BaseModel):
 class ColumnResponse(BaseModel):
     id: uuid.UUID
     name: str
+    name_key: Optional[str] = None
     color: str
     is_terminal: bool
     sort_order: int

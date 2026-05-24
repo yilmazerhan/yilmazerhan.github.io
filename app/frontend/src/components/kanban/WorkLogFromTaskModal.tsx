@@ -4,6 +4,7 @@ import { format } from 'date-fns'
 import { useTranslation } from 'react-i18next'
 import { useWorkTypes, useCreateWorkLog } from '@/api/worklog'
 import type { Task } from '@/api/kanban'
+import { resolveName } from '@/utils/i18nName'
 
 interface Props {
   task: Task
@@ -103,7 +104,7 @@ export default function WorkLogFromTaskModal({ task, onClose }: Props) {
                     className="w-3 h-3 rounded-full flex-shrink-0"
                     style={{ backgroundColor: wt.color }}
                   />
-                  <span className="truncate text-gray-700 dark:text-gray-300">{wt.name}</span>
+                  <span className="truncate text-gray-700 dark:text-gray-300">{resolveName(t, wt.name, wt.name_key)}</span>
                 </button>
               ))}
             </div>

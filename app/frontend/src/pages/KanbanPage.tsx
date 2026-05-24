@@ -7,6 +7,7 @@ import { useColumns, useBulkUpdateTasks } from '@/api/kanban'
 import { useTeams } from '@/api/teams'
 import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
+import { resolveName } from '@/utils/i18nName'
 
 export default function KanbanPage() {
   const { t } = useTranslation()
@@ -183,7 +184,7 @@ export default function KanbanPage() {
           >
             <option value="">{t('kanban.bulk_move_to')}</option>
             {[...columns].sort((a, b) => a.sort_order - b.sort_order).map((col) => (
-              <option key={col.id} value={col.id}>{col.name}</option>
+              <option key={col.id} value={col.id}>{resolveName(t, col.name, col.name_key)}</option>
             ))}
           </select>
           <button

@@ -27,6 +27,7 @@ class WorkTypeUpdate(BaseModel):
 class WorkTypeResponse(BaseModel):
     id: uuid.UUID
     name: str
+    name_key: Optional[str] = None
     color: str
     is_active: bool
     sort_order: int

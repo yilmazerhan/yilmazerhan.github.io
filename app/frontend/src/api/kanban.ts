@@ -4,6 +4,7 @@ import apiClient from './client'
 export interface KanbanColumn {
   id: string
   name: string
+  name_key?: string | null
   color: string
   is_terminal: boolean
   sort_order: number
