@@ -136,6 +136,15 @@ export function useHardDeleteUser() {
   })
 }
 
+export function usePermissions(userId: string, enabled = true) {
+  return useQuery({
+    queryKey: userKeys.permissions(userId),
+    queryFn: () =>
+      apiClient.get<PermissionOverride[]>(`/permissions/users/${userId}`).then((r) => r.data),
+    enabled,
+  })
+}
+
 export function useEffectivePermissions(userId: string, enabled = true) {
   return useQuery({
     queryKey: userKeys.effectivePermissions(userId),
@@ -167,6 +176,7 @@ export function useSetPermissions(userId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: userKeys.permissions(userId) })
       qc.invalidateQueries({ queryKey: userKeys.effectivePermissions(userId) })
+      qc.invalidateQueries({ queryKey: userKeys.all })
     },
   })
 }

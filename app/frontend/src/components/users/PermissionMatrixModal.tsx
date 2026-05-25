@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import { X, Save } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { X, Save, Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useEffectivePermissions, useSetPermissions, type User } from '@/api/users'
+import { useEffectivePermissions, useSetPermissions, usePermissions, type User } from '@/api/users'
 
 interface Props {
   user: User
@@ -12,6 +12,7 @@ type Override = { module: string; action: string; is_allowed: boolean }
 
 export default function PermissionMatrixModal({ user, onClose }: Props) {
   const { t } = useTranslation()
+  const { data: savedOverrides, isLoading: loadingOverrides } = usePermissions(user.id)
   const { data: effectivePerms } = useEffectivePermissions(user.id)
   const setPermissions = useSetPermissions(user.id)
 
@@ -33,13 +34,26 @@ export default function PermissionMatrixModal({ user, onClose }: Props) {
   ]
 
   const [overrides, setOverrides] = useState<Map<string, boolean | null>>(new Map())
+  const [initialized, setInitialized] = useState(false)
   const [saved, setSaved] = useState(false)
+
+  // Initialize overrides Map from DB data when it loads
+  useEffect(() => {
+    if (savedOverrides !== undefined && !initialized) {
+      const newMap = new Map<string, boolean | null>()
+      savedOverrides.forEach((o) => {
+        newMap.set(`${o.module}:${o.action}`, o.is_allowed)
+      })
+      setOverrides(newMap)
+      setInitialized(true)
+    }
+  }, [savedOverrides, initialized])
 
   const key = (module: string, action: string) => `${module}:${action}`
 
   const getState = (module: string, action: string): boolean | null => {
     const k = key(module, action)
-    return overrides.has(k) ? overrides.get(k)! : null
+    return overrides.has(k) ? (overrides.get(k) as boolean | null) : null
   }
 
   const cycle = (module: string, action: string) => {
@@ -58,8 +72,10 @@ export default function PermissionMatrixModal({ user, onClose }: Props) {
   async function handleSave() {
     const payload: Override[] = []
     overrides.forEach((is_allowed, k) => {
-      const [module, action] = k.split(':')
-      payload.push({ module, action, is_allowed: is_allowed as boolean })
+      if (is_allowed !== null) {
+        const [module, action] = k.split(':')
+        payload.push({ module, action, is_allowed: is_allowed as boolean })
+      }
     })
     await setPermissions.mutateAsync(payload)
     setSaved(true)
@@ -94,49 +110,57 @@ export default function PermissionMatrixModal({ user, onClose }: Props) {
         </div>
 
         <div className="flex-1 overflow-auto p-6">
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
-            {t('permissions.click_cycle_hint')} <span className="text-blue-600">{t('permissions.default_label')}</span> → <span className="text-green-600">{t('permissions.grant_label')}</span> → <span className="text-red-600">{t('permissions.deny_label')}</span> → {t('permissions.default_label')}
-          </p>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr>
-                  <th className="text-left pb-3 text-gray-600 dark:text-gray-400 font-medium">{t('permissions.module_label')}</th>
-                  {ACTIONS.map((a) => (
-                    <th key={a.key} className="pb-3 text-center text-gray-600 dark:text-gray-400 font-medium px-2">
-                      {a.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="space-y-1">
-                {MODULES.map((mod) => (
-                  <tr key={mod.key} className="border-t border-gray-100 dark:border-gray-800">
-                    <td className="py-2 pr-4 font-medium text-gray-700 dark:text-gray-300">{mod.label}</td>
-                    {ACTIONS.map((act) => {
-                      const state = getState(mod.key, act.key)
-                      const defaultAllow = effectivePerms?.permissions?.[mod.key]?.[act.key] ?? false
-                      return (
-                        <td key={act.key} className="py-2 px-2 text-center">
-                          {user.role === 'superadmin' ? (
-                            <span className="text-xs text-gray-400">{t('permissions.superadmin_note')}</span>
-                          ) : (
-                            <button
-                              onClick={() => cycle(mod.key, act.key)}
-                              className={`text-xs px-2 py-1 rounded-md font-medium transition-all ${cellClass(state, defaultAllow)}`}
-                              title={`${t('permissions.click_cycle_hint')} ${t('permissions.default_label')} → ${t('permissions.grant_label')} → ${t('permissions.deny_label')}`}
-                            >
-                              {cellLabel(state, defaultAllow)}
-                            </button>
-                          )}
-                        </td>
-                      )
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {loadingOverrides ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-primary-500" />
+            </div>
+          ) : (
+            <>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                {t('permissions.click_cycle_hint')} <span className="text-blue-600">{t('permissions.default_label')}</span> → <span className="text-green-600">{t('permissions.grant_label')}</span> → <span className="text-red-600">{t('permissions.deny_label')}</span> → {t('permissions.default_label')}
+              </p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr>
+                      <th className="text-left pb-3 text-gray-600 dark:text-gray-400 font-medium">{t('permissions.module_label')}</th>
+                      {ACTIONS.map((a) => (
+                        <th key={a.key} className="pb-3 text-center text-gray-600 dark:text-gray-400 font-medium px-2">
+                          {a.label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="space-y-1">
+                    {MODULES.map((mod) => (
+                      <tr key={mod.key} className="border-t border-gray-100 dark:border-gray-800">
+                        <td className="py-2 pr-4 font-medium text-gray-700 dark:text-gray-300">{mod.label}</td>
+                        {ACTIONS.map((act) => {
+                          const state = getState(mod.key, act.key)
+                          const defaultAllow = effectivePerms?.permissions?.[mod.key]?.[act.key] ?? false
+                          return (
+                            <td key={act.key} className="py-2 px-2 text-center">
+                              {user.role === 'superadmin' ? (
+                                <span className="text-xs text-gray-400">{t('permissions.superadmin_note')}</span>
+                              ) : (
+                                <button
+                                  onClick={() => cycle(mod.key, act.key)}
+                                  className={`text-xs px-2 py-1 rounded-md font-medium transition-all ${cellClass(state, defaultAllow)}`}
+                                  title={`${t('permissions.click_cycle_hint')} ${t('permissions.default_label')} → ${t('permissions.grant_label')} → ${t('permissions.deny_label')}`}
+                                >
+                                  {cellLabel(state, defaultAllow)}
+                                </button>
+                              )}
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-800">
@@ -147,7 +171,7 @@ export default function PermissionMatrixModal({ user, onClose }: Props) {
           {user.role !== 'superadmin' && (
             <button
               onClick={handleSave}
-              disabled={setPermissions.isPending}
+              disabled={setPermissions.isPending || loadingOverrides}
               className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium disabled:opacity-50"
             >
               <Save className="h-4 w-4" />
