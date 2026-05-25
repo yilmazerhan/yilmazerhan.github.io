@@ -75,7 +75,7 @@ class BoardResponse(BaseModel):
 # ─── Column schemas ───────────────────────────────────────────────────────────
 
 class ColumnCreate(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1, max_length=100)
     color: str = "#e2e8f0"
     is_terminal: bool = False
     sort_order: int = 0
@@ -90,7 +90,7 @@ class ColumnCreate(BaseModel):
 
 
 class ColumnUpdate(BaseModel):
-    name: Optional[str] = None
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
     color: Optional[str] = None
     is_terminal: Optional[bool] = None
     sort_order: Optional[int] = None

@@ -4,7 +4,8 @@ from datetime import date
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, Query, UploadFile, File
-from sqlalchemy import select
+from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -345,10 +346,11 @@ async def delete_task(
 @router.get("/tasks/{task_id}/history", response_model=list[TaskHistoryEntry])
 async def get_task_history(
     task_id: uuid.UUID,
-    _: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = KanbanService(db)
+    await svc.get_task(task_id, current_user)  # raises 403/404 if inaccessible
     return await svc.list_history(task_id)
 
 
@@ -357,10 +359,11 @@ async def get_task_history(
 @router.get("/tasks/{task_id}/comments", response_model=list[TaskCommentResponse])
 async def list_comments(
     task_id: uuid.UUID,
-    _: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = KanbanService(db)
+    await svc.get_task(task_id, current_user)  # raises 403/404 if inaccessible
     return await svc.list_comments(task_id)
 
 
@@ -392,10 +395,11 @@ async def delete_comment(
 @router.get("/tasks/{task_id}/subtasks", response_model=list[SubtaskResponse])
 async def list_subtasks(
     task_id: uuid.UUID,
-    _: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = KanbanService(db)
+    await svc.get_task(task_id, current_user)  # raises 403/404 if inaccessible
     return await svc.list_subtasks(task_id)
 
 
@@ -442,9 +446,38 @@ async def list_activity(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
 ):
-    svc = KanbanService(db)
-    items, total = await svc.list_all_history(limit=limit, skip=skip)
+    from app.models.task_history import TaskHistory as TH
     from app.models.kanban import Task as TaskModel
+    from app.models.user_team import user_teams as ut
+
+    # Build role-scoped subquery to filter visible tasks
+    task_ids_q = select(TaskModel.id)
+    if current_user.role == "team_manager":
+        my_team_member_ids = (
+            select(ut.c.user_id)
+            .where(
+                ut.c.team_id.in_(
+                    select(ut.c.team_id).where(ut.c.user_id == current_user.id)
+                )
+            )
+            .scalar_subquery()
+        )
+        task_ids_q = task_ids_q.where(TaskModel.assignee_id.in_(my_team_member_ids))
+    elif current_user.role != "superadmin":
+        task_ids_q = task_ids_q.where(TaskModel.assignee_id == current_user.id)
+
+    visible_task_ids = task_ids_q.scalar_subquery()
+
+    q = (
+        select(TH)
+        .options(selectinload(TH.actor))
+        .where(TH.task_id.in_(visible_task_ids))
+        .order_by(TH.created_at.desc())
+    )
+    total_result = await db.execute(select(func.count()).select_from(q.subquery()))
+    total = total_result.scalar_one()
+    items_result = await db.execute(q.offset(skip).limit(limit))
+    items = list(items_result.scalars().all())
 
     result_items = []
     for h in items:

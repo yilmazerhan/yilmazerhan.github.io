@@ -417,7 +417,31 @@ class KanbanService:
         return task
 
     async def get_task(self, task_id: uuid.UUID, requester: User) -> Task:
-        return await self._get_task(task_id)
+        task = await self._get_task(task_id)
+        # Enforce same role-based access as list_tasks
+        if requester.role == "superadmin":
+            return task
+        if requester.role == "team_manager":
+            # Team manager can see tasks of users in any of their teams
+            if task.assignee_id is not None:
+                in_team = await self.db.execute(
+                    select(user_teams.c.user_id).where(
+                        user_teams.c.user_id == task.assignee_id,
+                        user_teams.c.team_id.in_(
+                            select(user_teams.c.team_id).where(user_teams.c.user_id == requester.id)
+                        ),
+                    ).limit(1)
+                )
+                if in_team.scalar_one_or_none():
+                    return task
+            # Manager created the task themselves
+            if task.created_by == requester.id:
+                return task
+            raise ForbiddenError("Bu göreve erişim yetkiniz yok.")
+        # Regular user: only own assigned tasks or created tasks
+        if task.assignee_id == requester.id or task.created_by == requester.id:
+            return task
+        raise ForbiddenError("Bu göreve erişim yetkiniz yok.")
 
     async def create_task(
         self,

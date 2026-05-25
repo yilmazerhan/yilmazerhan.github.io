@@ -26,7 +26,7 @@ async def list_users(
     team_id: Optional[uuid.UUID] = Query(None),
     role: Optional[str] = Query(None),
     is_active: Optional[bool] = Query(None),
-    search: Optional[str] = Query(None),
+    search: Optional[str] = Query(None, max_length=200),
     include_deleted: bool = Query(False),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
@@ -117,7 +117,24 @@ async def get_user(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = UserService(db)
-    return await svc.get_by_id(user_id)
+    target = await svc.get_by_id(user_id)
+    # Team managers may only view users who belong to one of their teams
+    if current_user.role == "team_manager":
+        from sqlalchemy import select as sa_select
+        from app.models.user_team import user_teams as ut
+        # Check if target user shares a team with the requester
+        shared = await db.execute(
+            sa_select(ut.c.team_id).where(
+                ut.c.user_id == current_user.id,
+                ut.c.team_id.in_(
+                    sa_select(ut.c.team_id).where(ut.c.user_id == user_id)
+                ),
+            ).limit(1)
+        )
+        if not shared.scalar_one_or_none():
+            from app.core.exceptions import ForbiddenError
+            raise ForbiddenError("Yalnızca kendi takımınızdaki kullanıcıları görüntüleyebilirsiniz.")
+    return target
 
 
 @router.patch("/{user_id}", response_model=UserResponse)

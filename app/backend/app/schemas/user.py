@@ -1,14 +1,14 @@
 import uuid
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel, EmailStr, field_validator
+from typing import Optional, Annotated
+from pydantic import BaseModel, EmailStr, Field, field_validator
 import re
 
 
 class UserCreate(BaseModel):
     email: EmailStr
-    username: Optional[str] = None
-    full_name: str
+    username: Optional[Annotated[str, Field(max_length=100)]] = None
+    full_name: Annotated[str, Field(min_length=2, max_length=255)]
     role: str = "user"
     team_id: Optional[uuid.UUID] = None
     preferred_language: str = "tr"
@@ -31,7 +31,7 @@ class UserCreate(BaseModel):
 
 class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
-    full_name: Optional[str] = None
+    full_name: Optional[Annotated[str, Field(min_length=2, max_length=255)]] = None
     role: Optional[str] = None
     team_id: Optional[uuid.UUID] = None
     is_active: Optional[bool] = None
@@ -47,7 +47,7 @@ class UserUpdate(BaseModel):
 
 
 class ProfileUpdate(BaseModel):
-    full_name: Optional[str] = None
+    full_name: Optional[Annotated[str, Field(min_length=2, max_length=255)]] = None
     preferred_language: Optional[str] = None
     preferred_theme: Optional[str] = None
 

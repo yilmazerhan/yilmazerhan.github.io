@@ -77,7 +77,7 @@ async def test_smtp(
 
 @router.get("/templates", response_model=list[EmailTemplateResponse])
 async def list_templates(
-    _: Annotated[User, Depends(get_current_user)],
+    _: Annotated[User, Depends(require_superadmin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = EmailService(db)

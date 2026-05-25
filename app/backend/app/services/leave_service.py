@@ -35,7 +35,7 @@ class LeaveService:
             start_date=start_date,
             end_date=end_date,
             reason=reason,
-            status="approved",
+            status="pending",  # Requires manager/superadmin approval via PATCH /leave/{id}/review
         )
         self.db.add(leave)
         await self.db.flush()

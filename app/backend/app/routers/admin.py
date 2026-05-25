@@ -111,17 +111,37 @@ async def upload_logo(
     db: Annotated[AsyncSession, Depends(get_db)],
     logo: UploadFile = File(...),
 ):
-    if logo.content_type not in ("image/png", "image/jpeg", "image/svg+xml", "image/webp"):
+    # SVG is intentionally excluded — SVG files can contain JavaScript (XSS).
+    if logo.content_type not in ("image/png", "image/jpeg", "image/webp"):
         from app.core.exceptions import ValidationError
-        raise ValidationError("Logo PNG, JPEG, SVG veya WebP formatında olmalıdır.")
+        raise ValidationError("Logo PNG, JPEG veya WebP formatında olmalıdır. (SVG güvenlik nedeniyle kabul edilmez.)")
 
     data = await logo.read()
     if len(data) > 1_048_576:  # 1MB
         from app.core.exceptions import ValidationError
         raise ValidationError("Logo dosyası 1MB'dan küçük olmalıdır.")
 
+    # Validate file magic bytes — never trust Content-Type alone (client-controlled)
+    _MAGIC = {
+        b"\x89PNG\r\n\x1a\n": "image/png",   # PNG
+        b"\xff\xd8\xff": "image/jpeg",          # JPEG
+        b"RIFF": "image/webp",                   # WebP (RIFF....WEBP)
+    }
+    def _check_magic(raw: bytes) -> str | None:
+        for sig, mime in _MAGIC.items():
+            if raw[:len(sig)] == sig:
+                if mime == "image/webp" and raw[8:12] != b"WEBP":
+                    continue
+                return mime
+        return None
+
+    from app.core.exceptions import ValidationError as _VE
+    detected_type = _check_magic(data)
+    if not detected_type:
+        raise _VE("Logo geçerli bir PNG, JPEG veya WebP dosyası olmalıdır.")
+    # Use the detected type (not the client-supplied one) for the data URI
     b64 = base64.b64encode(data).decode()
-    logo_url = f"data:{logo.content_type};base64,{b64}"
+    logo_url = f"data:{detected_type};base64,{b64}"
     return await update_logo(db, current_user.id, logo_url)
 
 
@@ -320,11 +340,26 @@ async def user_activity_report(
     from app.models.kanban import Task, KanbanColumn
 
     # Fetch subject user
-    u_result = await db.execute(select(User).where(User.id == user_id))
+    u_result = await db.execute(select(User).where(User.id == user_id, User.is_deleted == False))
     subject = u_result.scalar_one_or_none()
     if not subject:
         from app.core.exceptions import NotFoundError
         raise NotFoundError("Kullanıcı")
+
+    # Team managers may only view reports for users in their own teams
+    if current_user.role == "team_manager":
+        from app.models.user_team import user_teams as ut
+        from app.core.exceptions import ForbiddenError as _ForbiddenError
+        shared = await db.execute(
+            select(ut.c.team_id).where(
+                ut.c.user_id == current_user.id,
+                ut.c.team_id.in_(
+                    select(ut.c.team_id).where(ut.c.user_id == user_id)
+                ),
+            ).limit(1)
+        )
+        if not shared.scalar_one_or_none():
+            raise _ForbiddenError("Yalnızca kendi takımınızdaki kullanıcıların raporlarına erişebilirsiniz.")
 
     # Default: last 30 days
     end = date_to or date.today()

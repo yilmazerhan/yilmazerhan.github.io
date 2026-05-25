@@ -1,18 +1,18 @@
 import uuid
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel
+from typing import Optional, Annotated
+from pydantic import BaseModel, Field
 
 
 class TeamCreate(BaseModel):
-    name: str
-    description: Optional[str] = None
+    name: Annotated[str, Field(min_length=1, max_length=100)]
+    description: Optional[Annotated[str, Field(max_length=500)]] = None
     manager_id: Optional[uuid.UUID] = None
 
 
 class TeamUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
+    name: Optional[Annotated[str, Field(min_length=1, max_length=100)]] = None
+    description: Optional[Annotated[str, Field(max_length=500)]] = None
     manager_id: Optional[uuid.UUID] = None
     is_active: Optional[bool] = None
 

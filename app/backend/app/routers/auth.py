@@ -34,7 +34,14 @@ def _set_refresh_cookie(response: Response, token: str) -> None:
 
 
 def _clear_refresh_cookie(response: Response) -> None:
-    response.delete_cookie(key=REFRESH_COOKIE, path="/api/v1/auth")
+    # Must match the original cookie attributes so the browser removes it correctly
+    response.delete_cookie(
+        key=REFRESH_COOKIE,
+        path="/api/v1/auth",
+        httponly=True,
+        secure=True,
+        samesite="strict",
+    )
 
 
 @router.post("/register", response_model=MessageResponse, status_code=201)
@@ -46,17 +53,26 @@ async def register(
 ):
     svc = AuthService(db)
     user, activation_token = await svc.register(body.email, body.password, body.full_name, body.preferred_language)
-    from app.tasks.email_tasks import send_activation_email_task
-    send_activation_email_task.delay(
-        to_email=user.email,
-        full_name=user.full_name,
-        activation_token=activation_token,
-    )
+    try:
+        from app.tasks.email_tasks import send_activation_email_task
+        send_activation_email_task.delay(
+            to_email=user.email,
+            full_name=user.full_name,
+            activation_token=activation_token,
+        )
+    except Exception:
+        # Email queue unavailable (e.g. Redis/Celery not running in dev) — log and continue.
+        # The activation token is stored in DB; the admin can resend manually.
+        import logging
+        logging.getLogger(__name__).warning(
+            "Activation email queuing failed for %s (Celery unavailable?)", user.email
+        )
     return {"message": "Kayıt başarılı. Email adresinize aktivasyon bağlantısı gönderildi."}
 
 
 @router.post("/activate/{token}", response_model=MessageResponse)
-async def activate_account(token: str, db: Annotated[AsyncSession, Depends(get_db)]):
+@limiter.limit("10/hour")
+async def activate_account(request: Request, token: str, db: Annotated[AsyncSession, Depends(get_db)]):
     svc = AuthService(db)
     await svc.activate_account(token)
     return {"message": "Hesabınız başarıyla aktive edildi. Giriş yapabilirsiniz."}
@@ -82,7 +98,9 @@ async def login(
 
 
 @router.post("/refresh", response_model=TokenResponse)
+@limiter.limit("30/minute")
 async def refresh(
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     refresh_token: Annotated[Optional[str], Cookie(alias=REFRESH_COOKIE)] = None,
 ):

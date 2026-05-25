@@ -43,7 +43,12 @@ def create_access_token(user_id: uuid.UUID, role: str) -> str:
 
 
 def decode_access_token(token: str) -> dict:
-    return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+    # Reject tokens that are not explicitly typed as access tokens
+    # (prevents using a fabricated or wrong-type token as an auth bearer)
+    if payload.get("type") != "access":
+        raise JWTError("Token tipi geçersiz.")
+    return payload
 
 
 # ─── Refresh Token ─────────────────────────────────────────────────────────

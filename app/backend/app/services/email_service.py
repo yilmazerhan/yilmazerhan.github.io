@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 from jinja2 import Environment, BaseLoader, TemplateError
+from jinja2.sandbox import SandboxedEnvironment
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
@@ -197,7 +198,9 @@ class EmailService:
     async def preview_template(self, template_id: uuid.UUID, variables: dict) -> str:
         tmpl = await self.get_template(template_id)
         try:
-            env = Environment(loader=BaseLoader())
+            # Use SandboxedEnvironment to prevent SSTI — blocks access to __class__,
+            # __mro__, os module, etc.  autoescape=True additionally escapes HTML.
+            env = SandboxedEnvironment(loader=BaseLoader(), autoescape=True)
             html = env.from_string(tmpl.html_body).render(**variables)
             return html
         except TemplateError as e:
@@ -336,7 +339,8 @@ class EmailService:
     # ─── Rendering ────────────────────────────────────────────────────────────
 
     def render_template(self, template: EmailTemplate, variables: dict) -> tuple[str, str]:
-        env = Environment(loader=BaseLoader(), autoescape=True)
+        # SandboxedEnvironment prevents SSTI; autoescape=True escapes HTML in output
+        env = SandboxedEnvironment(loader=BaseLoader(), autoescape=True)
         subject = env.from_string(template.subject).render(**variables)
         html_body = env.from_string(template.html_body).render(**variables)
         return subject, html_body

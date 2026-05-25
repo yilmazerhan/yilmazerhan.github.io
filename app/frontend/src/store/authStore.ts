@@ -14,6 +14,9 @@ export interface CurrentUser {
 
 interface AuthState {
   user: CurrentUser | null
+  // NOTE: accessToken is intentionally NOT persisted to localStorage to prevent
+  // XSS-based token theft. The token lives only in memory and is refreshed via
+  // the httpOnly refresh cookie on each page load (see api/client.ts).
   accessToken: string | null
   setAuth: (user: CurrentUser, token: string) => void
   setToken: (token: string) => void
@@ -44,7 +47,10 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      partialize: (state) => ({ user: state.user, accessToken: state.accessToken }),
+      // Only persist the user profile (no role-sensitive data) — NOT the access token.
+      // The access token stays in memory only; the httpOnly refresh cookie is used
+      // to obtain a new one on page load without exposing the JWT to JavaScript.
+      partialize: (state) => ({ user: state.user }),
     }
   )
 )

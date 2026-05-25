@@ -55,8 +55,9 @@ class UserService:
         if not include_deleted:
             query = query.where(User.is_deleted == False)
 
-        # Managers can only see users in any of their teams (via junction table)
+        # Role-based scoping: users only see colleagues in their teams
         if requester.role == "team_manager":
+            # Managers see users in any of their teams (via junction table)
             my_team_ids = (
                 select(user_teams.c.team_id)
                 .where(user_teams.c.user_id == requester.id)
@@ -64,6 +65,23 @@ class UserService:
             )
             query = query.join(user_teams, User.id == user_teams.c.user_id).where(
                 user_teams.c.team_id.in_(my_team_ids)
+            )
+        elif requester.role == "user":
+            # Regular users see only their own team members (to enable task assignment)
+            # If they have no team they see only themselves.
+            # Use IN subquery to avoid duplicate rows from multiple shared teams.
+            my_team_ids = (
+                select(user_teams.c.team_id)
+                .where(user_teams.c.user_id == requester.id)
+                .scalar_subquery()
+            )
+            visible_user_ids = (
+                select(user_teams.c.user_id)
+                .where(user_teams.c.team_id.in_(my_team_ids))
+                .scalar_subquery()
+            )
+            query = query.where(
+                (User.id.in_(visible_user_ids)) | (User.id == requester.id)
             )
         elif team_id:
             # Superadmin filtering by team_id: use junction table
@@ -76,7 +94,10 @@ class UserService:
         if is_active is not None:
             query = query.where(User.is_active == is_active)
         if search:
-            pattern = f"%{search}%"
+            # Escape LIKE wildcard characters so that user-supplied % and _ are treated
+            # as literals, not wildcards (prevents catastrophic backtracking / ReDoS on DB)
+            safe_search = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{safe_search}%"
             query = query.where(
                 (User.full_name.ilike(pattern)) | (User.email.ilike(pattern))
             )
@@ -193,9 +214,18 @@ class UserService:
     ) -> User:
         user = await self.get_by_id(user_id)
 
-        # Managers can only update users in their team
+        # Managers can only update users who share one of their managed teams (junction table)
         if requester.role == "team_manager":
-            if user.team_id != requester.team_id:
+            # Use junction table — not the denormalized team_id FK which may lag behind
+            my_team_ids_q = select(user_teams.c.team_id).where(user_teams.c.user_id == requester.id)
+            target_team_ids_q = select(user_teams.c.team_id).where(user_teams.c.user_id == user_id)
+            shared_q = await self.db.execute(
+                select(user_teams.c.team_id).where(
+                    user_teams.c.team_id.in_(my_team_ids_q),
+                    user_teams.c.team_id.in_(target_team_ids_q),
+                ).limit(1)
+            )
+            if not shared_q.scalar_one_or_none():
                 raise ForbiddenError("Yalnızca kendi takımınızdaki kullanıcıları düzenleyebilirsiniz.")
             if role and role in ("superadmin", "team_manager"):
                 raise ForbiddenError("Takım yöneticisi kullanıcı rolünü yükseltemez.")
