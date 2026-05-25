@@ -24,9 +24,10 @@ interface Props {
   selectionMode?: boolean
   selectedTaskIds?: Set<string>
   onToggleSelect?: (id: string) => void
+  isPersonalBoard?: boolean
 }
 
-export default function KanbanBoard({ taskParams, columns: columnsProp, selectionMode, selectedTaskIds, onToggleSelect }: Props) {
+export default function KanbanBoard({ taskParams, columns: columnsProp, selectionMode, selectedTaskIds, onToggleSelect, isPersonalBoard }: Props) {
   const { t } = useTranslation()
   // Use passed columns (board-scoped) or fall back to fetching all columns
   const { data: columnsFromQuery = [], isLoading: colLoading } = useColumns(taskParams?.board_id)
@@ -202,6 +203,7 @@ export default function KanbanBoard({ taskParams, columns: columnsProp, selectio
           columns={sortedColumns}
           onClose={() => { setSelectedTask(null); setAddColumnId(null) }}
           onTaskCompleted={(task) => { setSelectedTask(null); setAddColumnId(null); setCompletedTask(task) }}
+          isPersonalBoard={isPersonalBoard}
         />
       )}
 

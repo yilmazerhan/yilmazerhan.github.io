@@ -33,9 +33,14 @@ async def list_boards(
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     include_archived: bool = Query(False),
+    personal_owner_id: Optional[uuid.UUID] = Query(None),
 ):
     svc = KanbanService(db)
-    return await svc.list_boards(requester=current_user, include_archived=include_archived)
+    return await svc.list_boards(
+        requester=current_user,
+        include_archived=include_archived,
+        personal_owner_id=personal_owner_id,
+    )
 
 
 @router.post("/boards", response_model=BoardResponse, status_code=201)
@@ -57,10 +62,16 @@ async def get_board(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = KanbanService(db)
-    boards = await svc.list_boards(requester=current_user, include_archived=True)
+    # Fetch the board directly; managers/superadmin can view personal boards of managed users
+    raw = await svc.get_board(board_id)
+    from fastapi import HTTPException
+    if raw.is_personal:
+        # Allow access if: own board, or manager who manages the owner, or superadmin
+        if not await svc._can_see_board(raw, current_user):
+            raise HTTPException(status_code=403, detail="Bu panoya erişim izniniz yok.")
+    boards = await svc.list_boards(requester=current_user, include_archived=True, personal_owner_id=raw.created_by)
     board = next((b for b in boards if b["id"] == board_id), None)
     if not board:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Pano bulunamadı.")
     return board
 

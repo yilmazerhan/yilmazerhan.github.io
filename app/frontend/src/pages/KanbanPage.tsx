@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, Link } from 'react-router-dom'
 import { Plus, Search, CheckSquare, X, ChevronLeft, Tag } from 'lucide-react'
@@ -23,6 +23,13 @@ export default function KanbanPage() {
   // Filters
   const [selectedTeamId, setSelectedTeamId] = useState<string>('')
   const [selectedUserId, setSelectedUserId] = useState<string>('')
+
+  // On personal boards, default the user filter to the board owner
+  useEffect(() => {
+    if (board?.is_personal && board.created_by) {
+      setSelectedUserId(board.created_by)
+    }
+  }, [board?.id, board?.is_personal, board?.created_by])
   const [selectedPriority, setSelectedPriority] = useState<string>('')
   const [searchText, setSearchText] = useState<string>('')
   const [selectedLabelId, setSelectedLabelId] = useState<string>('')
@@ -229,6 +236,7 @@ export default function KanbanPage() {
           else next.add(id)
           return next
         })}
+        isPersonalBoard={board?.is_personal}
       />
 
       {/* Bulk actions bar */}
@@ -265,6 +273,7 @@ export default function KanbanPage() {
         <TaskModal
           columns={[...columns].sort((a, b) => a.sort_order - b.sort_order)}
           onClose={() => setAddOpen(false)}
+          isPersonalBoard={board?.is_personal}
         />
       )}
     </div>
