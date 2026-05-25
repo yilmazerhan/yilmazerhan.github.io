@@ -22,6 +22,8 @@ interface Props {
   columns: KanbanColumn[]
   onClose: () => void
   onTaskCompleted?: (task: Task) => void
+  /** Pass true when the task belongs to a personal board */
+  isPersonalBoard?: boolean
 }
 
 const PRIORITIES = ['low', 'medium', 'high', 'critical'] as const
@@ -147,16 +149,26 @@ function HistoryTimeline({ entries }: { entries: TaskHistoryEntry[] }) {
 
 // ─── Main modal ───────────────────────────────────────────────────────────────
 
-export default function TaskModal({ task, defaultColumnId, columns, onClose, onTaskCompleted }: Props) {
+export default function TaskModal({ task, defaultColumnId, columns, onClose, onTaskCompleted, isPersonalBoard }: Props) {
   const { t } = useTranslation()
   const user = useAuthStore((s) => s.user)
   const isEdit = !!task
+  const isSuperAdmin = user?.role === 'superadmin'
+  const isTeamManager = user?.role === 'team_manager'
+  const canPickAnyAssignee = isSuperAdmin || isTeamManager || !isPersonalBoard
   const [activeTab, setActiveTab] = useState<Tab>('details')
 
   const [title, setTitle] = useState(task?.title ?? '')
   const [description, setDescription] = useState(task?.description ?? '')
   const [columnId, setColumnId] = useState(task?.column_id ?? defaultColumnId ?? columns[0]?.id ?? '')
-  const [assigneeId, setAssigneeId] = useState(task?.assignee_id ?? (isEdit ? '' : (user?.id ?? '')))
+  // On personal boards for regular users, always assign to self
+  const defaultAssignee = (() => {
+    if (task?.assignee_id !== undefined) return task.assignee_id ?? ''
+    if (isEdit) return ''
+    if (isPersonalBoard && !isSuperAdmin && !isTeamManager) return user?.id ?? ''
+    return user?.id ?? ''
+  })()
+  const [assigneeId, setAssigneeId] = useState(defaultAssignee)
   const [priority, setPriority] = useState<typeof PRIORITIES[number]>(task?.priority ?? 'medium')
   const [dueDate, setDueDate] = useState(task?.due_date ?? '')
   const [startDate, setStartDate] = useState(task?.start_date ?? '')
@@ -434,17 +446,24 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   {t('kanban.assignee')}
                 </label>
-                <select
-                  value={assigneeId}
-                  onChange={(e) => setAssigneeId(e.target.value)}
-                  disabled={!canEdit}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-60"
-                >
-                  <option value="">{t('kanban.unassigned')}</option>
-                  {usersData?.items.map((u) => (
-                    <option key={u.id} value={u.id}>{u.full_name}</option>
-                  ))}
-                </select>
+                {canPickAnyAssignee ? (
+                  <select
+                    value={assigneeId}
+                    onChange={(e) => setAssigneeId(e.target.value)}
+                    disabled={!canEdit}
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-60"
+                  >
+                    <option value="">{t('kanban.unassigned')}</option>
+                    {usersData?.items.map((u) => (
+                      <option key={u.id} value={u.id}>{u.full_name}</option>
+                    ))}
+                  </select>
+                ) : (
+                  /* Personal board + regular user: locked to self */
+                  <div className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-sm text-gray-700 dark:text-gray-300">
+                    {usersData?.items.find((u) => u.id === user?.id)?.full_name ?? user?.full_name ?? t('kanban.me')}
+                  </div>
+                )}
               </div>
 
               <div>

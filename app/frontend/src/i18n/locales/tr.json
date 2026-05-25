@@ -209,6 +209,9 @@
     "personal_boards": "Kişisel Panolar",
     "shared_boards": "Paylaşımlı Panolar",
     "personal_board_note": "Bu pano yalnızca size özeldir. Paylaşılamaz ve silinemez.",
+    "my_personal_board": "Kendi Kişisel Panom",
+    "no_personal_board_for_user": "Bu kullanıcının kişisel panosu bulunamadı.",
+    "me": "Ben",
     "archived": "Arşivlendi"
   },
   "teams": {

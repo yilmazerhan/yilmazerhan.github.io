@@ -208,7 +208,10 @@
     "personal": "Personal",
     "personal_boards": "Personal Boards",
     "shared_boards": "Shared Boards",
-    "personal_board_note": "This board is private to you. It cannot be shared or deleted."
+    "personal_board_note": "This board is private to you. It cannot be shared or deleted.",
+    "my_personal_board": "My Personal Board",
+    "no_personal_board_for_user": "No personal board found for this user.",
+    "me": "Me"
   },
   "teams": {
     "title": "Teams",

@@ -79,7 +79,12 @@ class KanbanService:
             return await self._requester_manages_user(requester.id, board.created_by)
         return False
 
-    async def list_boards(self, requester: User, include_archived: bool = False) -> list[dict]:
+    async def list_boards(
+        self,
+        requester: User,
+        include_archived: bool = False,
+        personal_owner_id: Optional[uuid.UUID] = None,
+    ) -> list[dict]:
         q = select(KanbanBoard)
         if not include_archived:
             q = q.where(KanbanBoard.is_archived == False)
@@ -89,8 +94,23 @@ class KanbanService:
 
         board_list = []
         for board in boards:
-            if not await self._can_see_board(board, requester):
-                continue
+            if board.is_personal:
+                # Personal boards: only show your own unless personal_owner_id is given
+                if board.created_by == requester.id:
+                    pass  # always show own personal board
+                elif personal_owner_id and board.created_by == personal_owner_id:
+                    # Managers/superadmin explicitly requested another user's board
+                    if requester.role == "superadmin":
+                        pass  # allowed
+                    elif requester.role == "team_manager" and board.created_by:
+                        if not await self._requester_manages_user(requester.id, board.created_by):
+                            continue  # manager doesn't manage this user
+                    else:
+                        continue  # regular user can't see others' personal boards
+                else:
+                    continue  # skip other users' personal boards
+            else:
+                pass  # shared boards always visible
             col_count = (
                 await self.db.execute(
                     select(func.count()).where(KanbanColumn.board_id == board.id)

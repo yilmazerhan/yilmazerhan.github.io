@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { Kanban, Plus, Pencil, Trash2, Archive, ArchiveRestore, Columns, CheckSquare, Lock } from 'lucide-react'
+import { Kanban, Plus, Pencil, Trash2, Archive, ArchiveRestore, Columns, CheckSquare, Lock, Users } from 'lucide-react'
 import { useBoards, useCreateBoard, useUpdateBoard, useDeleteBoard, KanbanBoard } from '@/api/kanban'
+import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
 
 interface BoardFormData {
@@ -126,7 +127,20 @@ export default function KanbanBoardsPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const currentUser = useAuthStore((s) => s.user)
-  const { data: boards = [], isLoading } = useBoards()
+  const isSuperAdmin = currentUser?.role === 'superadmin'
+  const isManager = currentUser?.role === 'team_manager' || isSuperAdmin
+
+  // Manager/superadmin can browse another user's personal board
+  const [viewPersonalOwnerId, setViewPersonalOwnerId] = useState<string>('')
+
+  // Load all users for the picker (managers/superadmin only)
+  const { data: usersData } = useUsers({ is_active: true, limit: 500 }, isManager)
+  const allUsers = usersData?.items ?? []
+
+  const boardParams: { include_archived?: boolean; personal_owner_id?: string } = {}
+  if (viewPersonalOwnerId) boardParams.personal_owner_id = viewPersonalOwnerId
+
+  const { data: boards = [], isLoading } = useBoards(boardParams)
   const createBoard = useCreateBoard()
   const updateBoard = useUpdateBoard()
   const deleteBoard = useDeleteBoard()
@@ -134,9 +148,6 @@ export default function KanbanBoardsPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [editBoard, setEditBoard] = useState<KanbanBoard | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<KanbanBoard | null>(null)
-
-  const isSuperAdmin = currentUser?.role === 'superadmin'
-  const isManager = currentUser?.role === 'team_manager' || isSuperAdmin
 
   /** Can the current user manage (edit/delete/archive) a given board? */
   function canManageBoard(board: KanbanBoard): boolean {
@@ -286,40 +297,62 @@ export default function KanbanBoardsPage() {
       ) : (
         <>
           {/* Personal board section */}
-          {personalBoards.length > 0 && (
-            <div className="space-y-3">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Lock className="h-4 w-4 text-violet-500" />
                 <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
                   {t('kanban.personal_boards')}
                 </h2>
               </div>
+              {/* Manager/superadmin can browse other users' personal boards */}
+              {isManager && allUsers.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Users className="h-3.5 w-3.5 text-gray-400" />
+                  <select
+                    value={viewPersonalOwnerId}
+                    onChange={(e) => setViewPersonalOwnerId(e.target.value)}
+                    className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200"
+                  >
+                    <option value="">{t('kanban.my_personal_board')}</option>
+                    {allUsers
+                      .filter((u) => u.id !== currentUser?.id)
+                      .map((u) => (
+                        <option key={u.id} value={u.id}>{u.full_name}</option>
+                      ))}
+                  </select>
+                </div>
+              )}
+            </div>
+            {personalBoards.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {personalBoards.map((board) => (
                   <BoardCard key={board.id} board={board} />
                 ))}
               </div>
-            </div>
-          )}
+            ) : viewPersonalOwnerId ? (
+              <p className="text-sm text-gray-400 dark:text-gray-500 py-4">
+                {t('kanban.no_personal_board_for_user')}
+              </p>
+            ) : null}
+          </div>
 
           {/* Shared boards section */}
           {sharedBoards.length > 0 ? (
             <div className="space-y-3">
-              {personalBoards.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <Kanban className="h-4 w-4 text-primary-500" />
-                  <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
-                    {t('kanban.shared_boards')}
-                  </h2>
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                <Kanban className="h-4 w-4 text-primary-500" />
+                <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                  {t('kanban.shared_boards')}
+                </h2>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {sharedBoards.map((board) => (
                   <BoardCard key={board.id} board={board} />
                 ))}
               </div>
             </div>
-          ) : personalBoards.length === 0 ? (
+          ) : personalBoards.length === 0 && !viewPersonalOwnerId ? (
             <div className="text-center py-16">
               <Kanban className="h-12 w-12 text-gray-300 mx-auto mb-4" />
               <p className="text-gray-500 dark:text-gray-400">{t('kanban.no_boards')}</p>
