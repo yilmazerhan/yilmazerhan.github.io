@@ -8,6 +8,26 @@ interface Props {
   onClose: () => void
 }
 
+/** Normalize a string to a username-safe base using dot separators. */
+function toUsernameBase(raw: string): string {
+  let s = raw.toLowerCase()
+  const trMap: [string, string][] = [
+    ['ı','i'],['i̇','i'],['ğ','g'],['ü','u'],['ş','s'],['ö','o'],['ç','c'],
+  ]
+  for (const [src, dst] of trMap) s = s.split(src).join(dst)
+  s = s.replace(/[\s\-_]+/g, '.').replace(/[^a-z0-9.]/g, '').replace(/\.{2,}/g, '.').replace(/^\.+|\.+$/g, '')
+  return s.slice(0, 30) || 'user'
+}
+
+/** Generate firstname.lastname from "First Last" full name string. */
+function fullNameToUsername(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return ''
+  if (parts.length === 1) return toUsernameBase(parts[0])
+  // first word + last word → firstname.lastname
+  return toUsernameBase(parts[0]) + '.' + toUsernameBase(parts[parts.length - 1])
+}
+
 export default function UserFormModal({ user, onClose }: Props) {
   const { t } = useTranslation()
   const isEdit = !!user
@@ -25,8 +45,19 @@ export default function UserFormModal({ user, onClose }: Props) {
   function handleEmailChange(val: string) {
     setEmail(val)
     if (!usernameManual) {
-      const base = val.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 30)
+      // Prefer full name for username; fall back to email local part
+      const base = fullName.trim()
+        ? fullNameToUsername(fullName)
+        : toUsernameBase(val.split('@')[0])
       setUsername(base)
+    }
+  }
+
+  function handleFullNameChange(val: string) {
+    setFullName(val)
+    if (!usernameManual) {
+      const generated = fullNameToUsername(val)
+      if (generated) setUsername(generated)
     }
   }
 
@@ -97,7 +128,7 @@ export default function UserFormModal({ user, onClose }: Props) {
             <input
               type="text"
               value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+              onChange={(e) => handleFullNameChange(e.target.value)}
               required
               className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             />

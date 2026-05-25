@@ -77,17 +77,31 @@ class UserService:
         result = await self.db.execute(query)
         return list(result.scalars().all()), total
 
+    @staticmethod
+    def _normalize_username_base(raw: str) -> str:
+        """Convert raw string to a clean username base using dot separator."""
+        s = raw.lower()
+        # Transliterate Turkish characters
+        for src, dst in [('ı','i'),('i̇','i'),('ğ','g'),('ğ','g'),
+                         ('ü','u'),('ş','s'),('ö','o'),('ç','c')]:
+            s = s.replace(src, dst)
+        # Replace spaces, hyphens, underscores with dot
+        s = s.replace(' ', '.').replace('-', '.').replace('_', '.')
+        # Keep only [a-z0-9.]
+        s = re.sub(r'[^a-z0-9.]', '', s)
+        # Collapse consecutive dots, strip leading/trailing dots
+        s = re.sub(r'\.{2,}', '.', s).strip('.')
+        return (s[:30] or 'user')
+
     async def _generate_unique_username(self, email: str, hint: Optional[str] = None) -> str:
-        base = hint if hint else email.split('@')[0]
-        base = re.sub(r'[^a-z0-9_]', '', base.lower().replace('.', '_').replace('-', '_'))
-        base = base[:30] or 'user'
+        base = self._normalize_username_base(hint if hint else email.split('@')[0])
         username = base
         counter = 1
         while True:
             exists = await self.db.execute(select(User).where(User.username == username))
             if not exists.scalar_one_or_none():
                 return username
-            username = f"{base}{counter}"
+            username = f"{base}.{counter}"
             counter += 1
 
     async def create_user(
@@ -113,9 +127,9 @@ class UserService:
         # Generate unique username
         final_username = await self._generate_unique_username(email, hint=username)
 
-        # Check if requested username is already taken (normalize hint the same way _generate_unique_username does)
+        # Check if requested username is already taken (normalize hint same way as _generate_unique_username)
         if username:
-            normalized_hint = re.sub(r'[^a-z0-9_]', '', username.lower().replace('.', '_').replace('-', '_'))[:30] or 'user'
+            normalized_hint = self._normalize_username_base(username)
             if final_username != normalized_hint:
                 raise ConflictError("Bu kullanıcı adı zaten kullanımda.")
 
