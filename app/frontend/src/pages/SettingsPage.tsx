@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format } from 'date-fns'
 import { tr, enUS } from 'date-fns/locale'
@@ -152,6 +152,14 @@ export default function SettingsPage() {
   const [companyName, setCompanyName] = useState(branding?.company_name ?? '')
   const [primaryColor, setPrimaryColor] = useState(branding?.primary_color ?? '#3b82f6')
   const [brandingError, setBrandingError] = useState('')
+
+  // Sync branding form state when server data loads
+  useEffect(() => {
+    if (branding) {
+      setCompanyName(branding.company_name ?? '')
+      setPrimaryColor(branding.primary_color ?? '#3b82f6')
+    }
+  }, [branding?.company_name, branding?.primary_color])
 
   async function handleSslUpload(e: React.FormEvent) {
     e.preventDefault(); setSslError('')

@@ -33,7 +33,7 @@ class TeamService:
         skip: int = 0,
         limit: int = 50,
     ) -> tuple[list[Team], int]:
-        query = select(Team).options(selectinload(Team.manager))
+        query = select(Team).options(selectinload(Team.manager), selectinload(Team.members))
 
         if requester.role == "team_manager":
             # Show all teams the manager belongs to (via junction table)
