@@ -204,7 +204,11 @@
     "label_color": "Color",
     "delete_label_confirm": "Are you sure you want to delete this label?",
     "filter_all_labels": "All Labels",
-    "manage_labels": "Labels"
+    "manage_labels": "Labels",
+    "personal": "Personal",
+    "personal_boards": "Personal Boards",
+    "shared_boards": "Shared Boards",
+    "personal_board_note": "This board is private to you. It cannot be shared or deleted."
   },
   "teams": {
     "title": "Teams",

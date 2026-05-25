@@ -63,6 +63,7 @@ class BoardResponse(BaseModel):
     description: Optional[str]
     color: str
     is_archived: bool
+    is_personal: bool = False
     created_by: Optional[uuid.UUID]
     created_at: datetime
     updated_at: datetime

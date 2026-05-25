@@ -204,7 +204,12 @@
     "label_color": "Renk",
     "delete_label_confirm": "Bu etiketi silmek istediğinize emin misiniz?",
     "filter_all_labels": "Tüm Etiketler",
-    "manage_labels": "Etiketler"
+    "manage_labels": "Etiketler",
+    "personal": "Kişisel",
+    "personal_boards": "Kişisel Panolar",
+    "shared_boards": "Paylaşımlı Panolar",
+    "personal_board_note": "Bu pano yalnızca size özeldir. Paylaşılamaz ve silinemez.",
+    "archived": "Arşivlendi"
   },
   "teams": {
     "title": "Takımlar",

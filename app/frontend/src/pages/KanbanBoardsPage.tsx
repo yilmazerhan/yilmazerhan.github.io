@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { Kanban, Plus, Pencil, Trash2, Archive, ArchiveRestore, Columns, CheckSquare } from 'lucide-react'
+import { Kanban, Plus, Pencil, Trash2, Archive, ArchiveRestore, Columns, CheckSquare, Lock } from 'lucide-react'
 import { useBoards, useCreateBoard, useUpdateBoard, useDeleteBoard, KanbanBoard } from '@/api/kanban'
+import { useAuthStore } from '@/store/authStore'
 
 interface BoardFormData {
   name: string
@@ -124,6 +125,7 @@ function BoardFormModal({
 export default function KanbanBoardsPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const currentUser = useAuthStore((s) => s.user)
   const { data: boards = [], isLoading } = useBoards()
   const createBoard = useCreateBoard()
   const updateBoard = useUpdateBoard()
@@ -132,6 +134,17 @@ export default function KanbanBoardsPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [editBoard, setEditBoard] = useState<KanbanBoard | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<KanbanBoard | null>(null)
+
+  const isSuperAdmin = currentUser?.role === 'superadmin'
+  const isManager = currentUser?.role === 'team_manager' || isSuperAdmin
+
+  /** Can the current user manage (edit/delete/archive) a given board? */
+  function canManageBoard(board: KanbanBoard): boolean {
+    if (isSuperAdmin) return true
+    if (board.created_by === currentUser?.id) return true
+    if (isManager) return true  // simplified: managers can manage all boards they can see
+    return false
+  }
 
   async function handleCreate(data: BoardFormData) {
     const board = await createBoard.mutateAsync({ ...data, description: data.description || null })
@@ -155,8 +168,105 @@ export default function KanbanBoardsPage() {
     setConfirmDelete(null)
   }
 
+  // Separate personal boards from shared
+  const personalBoards = boards.filter((b) => b.is_personal)
+  const sharedBoards = boards.filter((b) => !b.is_personal)
+
+  function BoardCard({ board }: { board: KanbanBoard }) {
+    const canManage = canManageBoard(board)
+
+    return (
+      <div
+        key={board.id}
+        className={`group relative bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-primary-300 dark:hover:border-primary-700 hover:shadow-md transition-all cursor-pointer ${board.is_archived ? 'opacity-60' : ''}`}
+        onClick={() => navigate(`/kanban/${board.id}`)}
+      >
+        {/* Color strip */}
+        <div
+          className="h-2 rounded-t-xl"
+          style={{ backgroundColor: board.color }}
+        />
+        <div className="p-5">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white truncate">
+                  {board.name}
+                </h3>
+                {board.is_personal && (
+                  <span className="flex-shrink-0 inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 font-medium">
+                    <Lock className="h-3 w-3" />
+                    {t('kanban.personal')}
+                  </span>
+                )}
+              </div>
+              {board.description && (
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
+                  {board.description}
+                </p>
+              )}
+            </div>
+            {board.is_archived && (
+              <span className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
+                {t('kanban.archived')}
+              </span>
+            )}
+          </div>
+
+          <div className="mt-4 flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+            <span className="flex items-center gap-1">
+              <Columns className="h-3.5 w-3.5" />
+              {board.column_count} {t('kanban.columns_count')}
+            </span>
+            <span className="flex items-center gap-1">
+              <CheckSquare className="h-3.5 w-3.5" />
+              {board.task_count} {t('kanban.tasks_count')}
+            </span>
+          </div>
+        </div>
+
+        {/* Action buttons — only for board managers, hidden for personal boards that aren't ours */}
+        {canManage && (
+          <div
+            className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* No edit on personal boards (name/desc are fixed) — only color allowed */}
+            <button
+              onClick={() => setEditBoard(board)}
+              title={t('common.edit')}
+              className="p-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            {/* Archive not available for personal boards */}
+            {!board.is_personal && (
+              <button
+                onClick={() => handleArchive(board)}
+                title={board.is_archived ? t('kanban.unarchive') : t('kanban.archive')}
+                className="p-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
+              >
+                {board.is_archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
+              </button>
+            )}
+            {/* Delete not available for personal boards */}
+            {!board.is_personal && (
+              <button
+                onClick={() => setConfirmDelete(board)}
+                title={t('common.delete')}
+                className="p-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-500 dark:text-gray-400 hover:text-red-500"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Kanban className="h-5 w-5 text-gray-600 dark:text-gray-400" />
@@ -173,91 +283,55 @@ export default function KanbanBoardsPage() {
 
       {isLoading ? (
         <div className="text-center py-12 text-gray-400">{t('common.loading')}</div>
-      ) : boards.length === 0 ? (
-        <div className="text-center py-16">
-          <Kanban className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500 dark:text-gray-400">{t('kanban.no_boards')}</p>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="mt-4 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm font-medium"
-          >
-            {t('kanban.create_first_board')}
-          </button>
-        </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {boards.map((board) => (
-            <div
-              key={board.id}
-              className={`group relative bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-primary-300 dark:hover:border-primary-700 hover:shadow-md transition-all cursor-pointer ${board.is_archived ? 'opacity-60' : ''}`}
-              onClick={() => navigate(`/kanban/${board.id}`)}
-            >
-              {/* Color strip */}
-              <div
-                className="h-2 rounded-t-xl"
-                style={{ backgroundColor: board.color }}
-              />
-              <div className="p-5">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-white truncate">
-                      {board.name}
-                    </h3>
-                    {board.description && (
-                      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
-                        {board.description}
-                      </p>
-                    )}
-                  </div>
-                  {board.is_archived && (
-                    <span className="flex-shrink-0 text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400">
-                      {t('kanban.archived')}
-                    </span>
-                  )}
-                </div>
-
-                <div className="mt-4 flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
-                  <span className="flex items-center gap-1">
-                    <Columns className="h-3.5 w-3.5" />
-                    {board.column_count} {t('kanban.columns_count')}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <CheckSquare className="h-3.5 w-3.5" />
-                    {board.task_count} {t('kanban.tasks_count')}
-                  </span>
-                </div>
+        <>
+          {/* Personal board section */}
+          {personalBoards.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Lock className="h-4 w-4 text-violet-500" />
+                <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                  {t('kanban.personal_boards')}
+                </h2>
               </div>
-
-              {/* Action buttons */}
-              <div
-                className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  onClick={() => setEditBoard(board)}
-                  title={t('common.edit')}
-                  className="p-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  onClick={() => handleArchive(board)}
-                  title={board.is_archived ? t('kanban.unarchive') : t('kanban.archive')}
-                  className="p-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400"
-                >
-                  {board.is_archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
-                </button>
-                <button
-                  onClick={() => setConfirmDelete(board)}
-                  title={t('common.delete')}
-                  className="p-1.5 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-red-50 dark:hover:bg-red-900/20 text-gray-500 dark:text-gray-400 hover:text-red-500"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {personalBoards.map((board) => (
+                  <BoardCard key={board.id} board={board} />
+                ))}
               </div>
             </div>
-          ))}
-        </div>
+          )}
+
+          {/* Shared boards section */}
+          {sharedBoards.length > 0 ? (
+            <div className="space-y-3">
+              {personalBoards.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Kanban className="h-4 w-4 text-primary-500" />
+                  <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">
+                    {t('kanban.shared_boards')}
+                  </h2>
+                </div>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {sharedBoards.map((board) => (
+                  <BoardCard key={board.id} board={board} />
+                ))}
+              </div>
+            </div>
+          ) : personalBoards.length === 0 ? (
+            <div className="text-center py-16">
+              <Kanban className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500 dark:text-gray-400">{t('kanban.no_boards')}</p>
+              <button
+                onClick={() => setShowCreate(true)}
+                className="mt-4 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm font-medium"
+              >
+                {t('kanban.create_first_board')}
+              </button>
+            </div>
+          ) : null}
+        </>
       )}
 
       {/* Create modal */}

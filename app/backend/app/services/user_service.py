@@ -165,6 +165,18 @@ class UserService:
         )
         self.db.add(user)
         await self.db.flush()
+
+        # Auto-create personal kanban board for the new user
+        from app.services.kanban_service import KanbanService
+        kanban_svc = KanbanService(self.db)
+        await kanban_svc.create_board(
+            name="Kişisel Pano",
+            description="Yalnızca size özel kanban panonuz.",
+            color="#8b5cf6",
+            created_by=user.id,
+            is_personal=True,
+        )
+
         return user, temp_password
 
     async def update_user(

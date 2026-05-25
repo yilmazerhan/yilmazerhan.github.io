@@ -19,6 +19,7 @@ class KanbanBoard(Base):
     created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    is_personal: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_archived: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -50,7 +51,7 @@ class KanbanColumn(Base):
     )
 
     board: Mapped["KanbanBoard"] = relationship("KanbanBoard", back_populates="columns")
-    tasks: Mapped[list["Task"]] = relationship("Task", back_populates="column")
+    tasks: Mapped[list["Task"]] = relationship("Task", back_populates="column", cascade="all, delete-orphan")
 
 
 class Task(Base):
@@ -66,7 +67,7 @@ class Task(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )
     column_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("kanban_columns.id", ondelete="RESTRICT"), nullable=False, index=True
+        UUID(as_uuid=True), ForeignKey("kanban_columns.id", ondelete="CASCADE"), nullable=False, index=True
     )
     priority: Mapped[str] = mapped_column(
         SAEnum("low", "medium", "high", "critical", name="task_priority"),

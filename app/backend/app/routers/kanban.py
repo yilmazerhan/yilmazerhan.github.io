@@ -30,34 +30,34 @@ router = APIRouter(prefix="/kanban", tags=["kanban"])
 
 @router.get("/boards", response_model=list[BoardResponse])
 async def list_boards(
-    _: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     include_archived: bool = Query(False),
 ):
     svc = KanbanService(db)
-    return await svc.list_boards(include_archived=include_archived)
+    return await svc.list_boards(requester=current_user, include_archived=include_archived)
 
 
 @router.post("/boards", response_model=BoardResponse, status_code=201)
 async def create_board(
     body: BoardCreate,
-    current_user: Annotated[User, Depends(require_manager_or_above)],
+    current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = KanbanService(db)
     board = await svc.create_board(body.name, body.description, body.color, current_user.id)
-    boards = await svc.list_boards()
+    boards = await svc.list_boards(requester=current_user)
     return next(b for b in boards if b["id"] == board.id)
 
 
 @router.get("/boards/{board_id}", response_model=BoardResponse)
 async def get_board(
     board_id: uuid.UUID,
-    _: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = KanbanService(db)
-    boards = await svc.list_boards(include_archived=True)
+    boards = await svc.list_boards(requester=current_user, include_archived=True)
     board = next((b for b in boards if b["id"] == board_id), None)
     if not board:
         from fastapi import HTTPException
@@ -69,19 +69,19 @@ async def get_board(
 async def update_board(
     board_id: uuid.UUID,
     body: BoardUpdate,
-    _: Annotated[User, Depends(require_manager_or_above)],
+    current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = KanbanService(db)
-    await svc.update_board(board_id, body.name, body.description, body.color, body.is_archived)
-    boards = await svc.list_boards(include_archived=True)
+    await svc.update_board(board_id, current_user, body.name, body.description, body.color, body.is_archived)
+    boards = await svc.list_boards(requester=current_user, include_archived=True)
     return next(b for b in boards if b["id"] == board_id)
 
 
 @router.delete("/boards/{board_id}", response_model=dict)
 async def delete_board(
     board_id: uuid.UUID,
-    current_user: Annotated[User, Depends(require_superadmin)],
+    current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = KanbanService(db)

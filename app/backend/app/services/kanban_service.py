@@ -2,8 +2,9 @@ import uuid
 from typing import Optional
 from datetime import date
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, update as sa_update, or_
+from sqlalchemy import select, func, update as sa_update, or_, exists
 from sqlalchemy.orm import selectinload
+from app.models.user_team import user_teams
 
 from app.models.kanban import KanbanBoard, KanbanColumn, Task
 from app.models.task_comment import TaskComment
@@ -37,17 +38,59 @@ class KanbanService:
         self.db.add(entry)
 
     # ─── Boards ──────────────────────────────────────────────────────────────
-    async def list_boards(self, include_archived: bool = False) -> list[dict]:
+
+    async def _requester_manages_user(self, requester_id: uuid.UUID, target_user_id: uuid.UUID) -> bool:
+        """Return True if requester is a team_manager of any team the target user belongs to."""
+        result = await self.db.execute(
+            select(func.count()).where(
+                exists(
+                    select(1)
+                    .where(
+                        user_teams.c.user_id == requester_id,
+                        user_teams.c.team_id.in_(
+                            select(user_teams.c.team_id).where(user_teams.c.user_id == target_user_id)
+                        ),
+                    )
+                )
+            )
+        )
+        return result.scalar_one() > 0
+
+    async def _can_see_board(self, board: KanbanBoard, requester: User) -> bool:
+        """Check if requester can see the given board."""
+        if not board.is_personal:
+            return True  # All regular boards are visible to everyone
+        # Personal board: only owner, their team managers, and superadmin
+        if requester.role == "superadmin":
+            return True
+        if board.created_by == requester.id:
+            return True
+        if requester.role == "team_manager" and board.created_by:
+            return await self._requester_manages_user(requester.id, board.created_by)
+        return False
+
+    async def _can_manage_board(self, board: KanbanBoard, requester: User) -> bool:
+        """Check if requester can edit/delete the given board."""
+        if requester.role == "superadmin":
+            return True
+        if board.created_by == requester.id:
+            return True
+        if requester.role == "team_manager" and board.created_by:
+            return await self._requester_manages_user(requester.id, board.created_by)
+        return False
+
+    async def list_boards(self, requester: User, include_archived: bool = False) -> list[dict]:
         q = select(KanbanBoard)
         if not include_archived:
             q = q.where(KanbanBoard.is_archived == False)
-        q = q.order_by(KanbanBoard.created_at)
+        q = q.order_by(KanbanBoard.is_personal.desc(), KanbanBoard.created_at)
         result = await self.db.execute(q)
         boards = list(result.scalars().all())
 
         board_list = []
         for board in boards:
-            # Count columns and tasks per board
+            if not await self._can_see_board(board, requester):
+                continue
             col_count = (
                 await self.db.execute(
                     select(func.count()).where(KanbanColumn.board_id == board.id)
@@ -67,6 +110,7 @@ class KanbanService:
                 "description": board.description,
                 "color": board.color,
                 "is_archived": board.is_archived,
+                "is_personal": board.is_personal,
                 "created_by": board.created_by,
                 "created_at": board.created_at,
                 "updated_at": board.updated_at,
@@ -84,12 +128,29 @@ class KanbanService:
             raise NotFoundError("Pano")
         return board
 
-    async def create_board(self, name: str, description: Optional[str], color: str, created_by: uuid.UUID) -> KanbanBoard:
-        board = KanbanBoard(name=name, description=description, color=color, created_by=created_by)
+    async def create_board(
+        self,
+        name: str,
+        description: Optional[str],
+        color: str,
+        created_by: uuid.UUID,
+        is_personal: bool = False,
+    ) -> KanbanBoard:
+        if is_personal:
+            # Enforce one personal board per user
+            existing = (await self.db.execute(
+                select(func.count()).where(
+                    KanbanBoard.is_personal == True,
+                    KanbanBoard.created_by == created_by,
+                )
+            )).scalar_one()
+            if existing > 0:
+                raise ValidationError("Zaten bir kişisel panonuz var.")
+
+        board = KanbanBoard(name=name, description=description, color=color, created_by=created_by, is_personal=is_personal)
         self.db.add(board)
         await self.db.flush()
 
-        # Create default columns for new board
         default_cols = [
             KanbanColumn(board_id=board.id, name="Bekleyen", name_key="kanban.col_pending", color="#e2e8f0", sort_order=0),
             KanbanColumn(board_id=board.id, name="Devam Eden", name_key="kanban.col_in_progress", color="#fef3c7", sort_order=1),
@@ -101,8 +162,12 @@ class KanbanService:
         await self.db.flush()
         return board
 
-    async def update_board(self, board_id: uuid.UUID, name: Optional[str], description: Optional[str], color: Optional[str], is_archived: Optional[bool]) -> KanbanBoard:
+    async def update_board(self, board_id: uuid.UUID, requester: User, name: Optional[str], description: Optional[str], color: Optional[str], is_archived: Optional[bool]) -> KanbanBoard:
         board = await self.get_board(board_id)
+        if not await self._can_manage_board(board, requester):
+            raise ForbiddenError("Bu panoyu düzenleme yetkiniz yok.")
+        if board.is_personal and is_archived:
+            raise ValidationError("Kişisel pano arşivlenemez.")
         if name is not None:
             board.name = name
         if description is not None:
@@ -115,15 +180,16 @@ class KanbanService:
         return board
 
     async def delete_board(self, board_id: uuid.UUID, requester: User) -> None:
-        if requester.role != "superadmin":
-            raise ForbiddenError("Pano silme yalnızca superadmin tarafından yapılabilir.")
         board = await self.get_board(board_id)
-        # Check if it's the last board
-        count = (await self.db.execute(
-            select(func.count()).where(KanbanBoard.is_archived == False)
-        )).scalar_one()
-        if count <= 1:
-            raise ValidationError("Son pano silinemez. En az bir pano olmalıdır.")
+
+        # Personal boards cannot be deleted
+        if board.is_personal:
+            raise ValidationError("Kişisel pano silinemez.")
+
+        # Permission: creator, team_manager of creator, or superadmin
+        if not await self._can_manage_board(board, requester):
+            raise ForbiddenError("Bu panoyu silme yetkiniz yok. Yalnızca pano oluşturan, takım yöneticisi veya süper admin silebilir.")
+
         await self.db.delete(board)
         await self.db.flush()
 
