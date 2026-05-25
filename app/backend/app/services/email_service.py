@@ -79,6 +79,61 @@ class EmailService:
         await self.db.flush()
         return cfg
 
+    async def test_smtp_config(self, config_id: uuid.UUID, to_email: str) -> dict:
+        """Send a test email via the given SMTP config and return success/error info."""
+        import smtplib
+        import ssl as ssl_lib
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+
+        result = await self.db.execute(select(SmtpConfig).where(SmtpConfig.id == config_id))
+        cfg = result.scalar_one_or_none()
+        if not cfg:
+            raise NotFoundError("SMTP yapılandırması")
+
+        password = decrypt_field(cfg.password_encrypted, settings.SMTP_ENCRYPTION_KEY)
+
+        subject = "Test E-postası — TeamApp"
+        html_body = (
+            "<h2>SMTP Test</h2>"
+            "<p>Bu e-posta, SMTP yapılandırmanızın doğruluğunu test etmek için gönderilmiştir.</p>"
+            f"<p><strong>Host:</strong> {cfg.host}:{cfg.port}</p>"
+            f"<p><strong>Gönderen:</strong> {cfg.from_name} &lt;{cfg.from_email}&gt;</p>"
+        )
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"{cfg.from_name} <{cfg.from_email}>"
+        msg["To"] = to_email
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+        def _send_sync():
+            if cfg.use_tls:
+                context = ssl_lib.create_default_context()
+                with smtplib.SMTP(cfg.host, cfg.port, timeout=10) as server:
+                    server.ehlo()
+                    server.starttls(context=context)
+                    server.login(cfg.username, password)
+                    server.sendmail(cfg.from_email, [to_email], msg.as_bytes())
+            else:
+                with smtplib.SMTP(cfg.host, cfg.port, timeout=10) as server:
+                    server.login(cfg.username, password)
+                    server.sendmail(cfg.from_email, [to_email], msg.as_bytes())
+
+        import asyncio
+        loop = asyncio.get_event_loop()
+        try:
+            await loop.run_in_executor(None, _send_sync)
+            return {"success": True, "message": f"Test e-postası {to_email} adresine başarıyla gönderildi."}
+        except smtplib.SMTPAuthenticationError as e:
+            return {"success": False, "message": f"Kimlik doğrulama hatası: {e.smtp_error.decode() if isinstance(e.smtp_error, bytes) else str(e)}"}
+        except smtplib.SMTPConnectError as e:
+            return {"success": False, "message": f"Bağlantı hatası: {e}"}
+        except smtplib.SMTPException as e:
+            return {"success": False, "message": f"SMTP hatası: {e}"}
+        except OSError as e:
+            return {"success": False, "message": f"Ağ hatası: {e}"}
+
     # ─── Email Templates ──────────────────────────────────────────────────────
 
     async def list_templates(self) -> list[EmailTemplate]:

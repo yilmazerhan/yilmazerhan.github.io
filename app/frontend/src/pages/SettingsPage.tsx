@@ -49,6 +49,7 @@ import {
   useSmtpConfigs,
   useCreateSmtpConfig,
   useUpdateSmtpConfig,
+  useTestSmtpConfig,
   type SmtpConfig,
 } from '@/api/email'
 
@@ -60,6 +61,7 @@ export default function SettingsPage() {
   const { data: smtpConfigs = [] } = useSmtpConfigs()
   const createSmtp = useCreateSmtpConfig()
   const updateSmtp = useUpdateSmtpConfig()
+  const testSmtp = useTestSmtpConfig()
   const [smtpShowForm, setSmtpShowForm] = useState(false)
   const [smtpEditing, setSmtpEditing] = useState<SmtpConfig | null>(null)
   const [smtpHost, setSmtpHost] = useState('')
@@ -70,6 +72,17 @@ export default function SettingsPage() {
   const [smtpFromName, setSmtpFromName] = useState('')
   const [smtpUseTls, setSmtpUseTls] = useState(true)
   const [smtpError, setSmtpError] = useState('')
+  const [smtpTestResult, setSmtpTestResult] = useState<Record<string, { success: boolean; msg: string }>>({})
+
+  async function handleSmtpTest(cfg: SmtpConfig) {
+    setSmtpTestResult((prev) => ({ ...prev, [cfg.id]: { success: false, msg: '...' } }))
+    try {
+      const result = await testSmtp.mutateAsync(cfg.id)
+      setSmtpTestResult((prev) => ({ ...prev, [cfg.id]: { success: result.success, msg: result.message } }))
+    } catch (err: any) {
+      setSmtpTestResult((prev) => ({ ...prev, [cfg.id]: { success: false, msg: err.response?.data?.detail || t('common.error') } }))
+    }
+  }
 
   function smtpOpenCreate() {
     setSmtpEditing(null)
@@ -373,10 +386,41 @@ export default function SettingsPage() {
                       <span>{t('settings.smtp_from_label')}: {cfg.from_name} &lt;{cfg.from_email}&gt;</span>
                       <span>{t('settings.smtp_username_label')}: {cfg.username}</span>
                     </div>
+                    {/* Test result */}
+                    {smtpTestResult[cfg.id] && (
+                      <div className={`mt-2 flex items-center gap-1.5 text-xs ${
+                        smtpTestResult[cfg.id].msg === '...' ? 'text-gray-400' :
+                        smtpTestResult[cfg.id].success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                      }`}>
+                        {smtpTestResult[cfg.id].msg === '...' ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : smtpTestResult[cfg.id].success ? (
+                          <CheckCircle className="h-3 w-3" />
+                        ) : (
+                          <XCircle className="h-3 w-3" />
+                        )}
+                        {smtpTestResult[cfg.id].msg}
+                      </div>
+                    )}
                   </div>
-                  <button onClick={() => smtpOpenEdit(cfg)} className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
-                    <Pencil className="h-4 w-4" />
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => handleSmtpTest(cfg)}
+                      disabled={testSmtp.isPending && smtpTestResult[cfg.id]?.msg === '...'}
+                      className="px-2.5 py-1.5 rounded text-xs font-medium text-amber-700 dark:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-900/20 border border-amber-300 dark:border-amber-700 flex items-center gap-1"
+                      title={t('settings.smtp_test')}
+                    >
+                      {smtpTestResult[cfg.id]?.msg === '...' ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Mail className="h-3 w-3" />
+                      )}
+                      {t('settings.smtp_test')}
+                    </button>
+                    <button onClick={() => smtpOpenEdit(cfg)} className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

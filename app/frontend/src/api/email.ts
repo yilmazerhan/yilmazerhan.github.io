@@ -104,6 +104,13 @@ export function useUpdateSmtpConfig() {
   })
 }
 
+export function useTestSmtpConfig() {
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiClient.post<{ success: boolean; message: string }>(`/email/smtp/${id}/test`).then((r) => r.data),
+  })
+}
+
 // ─── Templates ────────────────────────────────────────────────────────────────
 
 export function useEmailTemplates() {

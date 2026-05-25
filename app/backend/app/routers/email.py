@@ -61,6 +61,18 @@ async def update_smtp(
     )
 
 
+@router.post("/smtp/{config_id}/test", response_model=dict)
+async def test_smtp(
+    config_id: uuid.UUID,
+    current_user: Annotated[User, Depends(require_superadmin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Send a test email via the given SMTP configuration."""
+    svc = EmailService(db)
+    result = await svc.test_smtp_config(config_id, to_email=current_user.email)
+    return result
+
+
 # ─── Templates ────────────────────────────────────────────────────────────────
 
 @router.get("/templates", response_model=list[EmailTemplateResponse])
