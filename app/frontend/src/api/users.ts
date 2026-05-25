@@ -34,6 +34,7 @@ export interface CreateUserPayload {
 }
 
 export interface UpdateUserPayload {
+  email?: string
   full_name?: string
   role?: string
   team_id?: string | null

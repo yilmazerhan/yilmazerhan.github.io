@@ -131,6 +131,7 @@ async def update_user(
     return await svc.update_user(
         user_id=user_id,
         requester=current_user,
+        email=body.email,
         full_name=body.full_name,
         role=body.role,
         team_id=body.team_id,

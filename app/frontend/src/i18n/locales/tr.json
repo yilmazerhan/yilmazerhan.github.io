@@ -252,7 +252,8 @@
     "confirm_hard_delete": "Bu kullanıcıyı kalıcı olarak silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
     "confirm_restore": "Bu kullanıcıyı geri yüklemek istiyor musunuz?",
     "restored": "Kullanıcı başarıyla geri yüklendi.",
-    "deleted_permanently": "Kullanıcı kalıcı olarak silindi."
+    "deleted_permanently": "Kullanıcı kalıcı olarak silindi.",
+    "email_change_note": "Email değişikliği yalnızca süper admin tarafından yapılabilir."
   },
   "permissions": {
     "edit_title": "Yetki Düzenle",

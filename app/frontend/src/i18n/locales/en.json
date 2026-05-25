@@ -252,7 +252,8 @@
     "confirm_hard_delete": "Are you sure you want to permanently delete this user? This action cannot be undone.",
     "confirm_restore": "Do you want to restore this user?",
     "restored": "User restored successfully.",
-    "deleted_permanently": "User permanently deleted."
+    "deleted_permanently": "User permanently deleted.",
+    "email_change_note": "Email address can only be changed by a super admin."
   },
   "permissions": {
     "edit_title": "Edit Permissions",

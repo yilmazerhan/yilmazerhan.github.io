@@ -171,6 +171,7 @@ class UserService:
         self,
         user_id: uuid.UUID,
         requester: User,
+        email: Optional[str] = None,
         full_name: Optional[str] = None,
         role: Optional[str] = None,
         team_id: Optional[uuid.UUID] = None,
@@ -186,6 +187,25 @@ class UserService:
                 raise ForbiddenError("Yalnızca kendi takımınızdaki kullanıcıları düzenleyebilirsiniz.")
             if role and role in ("superadmin", "team_manager"):
                 raise ForbiddenError("Takım yöneticisi kullanıcı rolünü yükseltemez.")
+            if email is not None:
+                raise ForbiddenError("Takım yöneticisi kullanıcı email adresini değiştiremez.")
+
+        if email is not None:
+            new_email = email.lower().strip()
+            if new_email != user.email:
+                # Check uniqueness — including soft-deleted users
+                conflict = await self.db.execute(
+                    select(User).where(User.email == new_email, User.id != user_id)
+                )
+                conflict_user = conflict.scalar_one_or_none()
+                if conflict_user:
+                    if conflict_user.is_deleted:
+                        raise ConflictError(
+                            "Bu email adresi daha önce silinmiş bir kullanıcıya ait. "
+                            "Kullanıcıyı 'Silinen Kullanıcılar' listesinden geri yükleyebilirsiniz."
+                        )
+                    raise ConflictError("Bu email adresi başka bir kullanıcı tarafından kullanılıyor.")
+                user.email = new_email
 
         if full_name is not None:
             user.full_name = full_name
