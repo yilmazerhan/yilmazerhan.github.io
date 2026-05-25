@@ -156,7 +156,7 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
   const [title, setTitle] = useState(task?.title ?? '')
   const [description, setDescription] = useState(task?.description ?? '')
   const [columnId, setColumnId] = useState(task?.column_id ?? defaultColumnId ?? columns[0]?.id ?? '')
-  const [assigneeId, setAssigneeId] = useState(task?.assignee_id ?? '')
+  const [assigneeId, setAssigneeId] = useState(task?.assignee_id ?? (isEdit ? '' : (user?.id ?? '')))
   const [priority, setPriority] = useState<typeof PRIORITIES[number]>(task?.priority ?? 'medium')
   const [dueDate, setDueDate] = useState(task?.due_date ?? '')
   const [startDate, setStartDate] = useState(task?.start_date ?? '')

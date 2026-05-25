@@ -25,3 +25,9 @@ class Team(Base):
 
     members: Mapped[list["User"]] = relationship("User", back_populates="team", foreign_keys="User.team_id")
     manager: Mapped[Optional["User"]] = relationship("User", foreign_keys=[manager_id])
+    # Many-to-many: all members across all teams (via user_teams junction)
+    all_members: Mapped[list["User"]] = relationship(
+        "User",
+        secondary="user_teams",
+        back_populates="all_teams",
+    )

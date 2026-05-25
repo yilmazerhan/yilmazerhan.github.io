@@ -3,9 +3,11 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from app.database import get_db
 from app.models.user import User
+from app.models.user_team import user_teams
 from app.schemas.team import (
     TeamCreate, TeamUpdate, TeamResponse, TeamDetailResponse,
     TeamListResponse, AddMemberRequest
@@ -14,6 +16,7 @@ from app.schemas.user import UserResponse
 from app.schemas.auth import MessageResponse
 from app.services.team_service import TeamService
 from app.core.dependencies import get_current_user, require_superadmin, require_manager_or_above
+from app.core.exceptions import ForbiddenError
 
 router = APIRouter(prefix="/teams", tags=["teams"])
 
@@ -97,10 +100,16 @@ async def add_member(
     current_user: Annotated[User, Depends(require_manager_or_above)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    # Managers can only add to their own team
-    if current_user.role == "team_manager" and current_user.team_id != team_id:
-        from app.core.exceptions import ForbiddenError
-        raise ForbiddenError("Yalnızca kendi takımınıza üye ekleyebilirsiniz.")
+    # Managers can only add to teams they belong to (via junction table)
+    if current_user.role == "team_manager":
+        in_team = (await db.execute(
+            select(user_teams.c.team_id).where(
+                user_teams.c.user_id == current_user.id,
+                user_teams.c.team_id == team_id,
+            )
+        )).scalar_one_or_none()
+        if not in_team:
+            raise ForbiddenError("Yalnızca kendi takımınıza üye ekleyebilirsiniz.")
     svc = TeamService(db)
     return await svc.add_member(team_id, body.user_id)
 
@@ -112,9 +121,16 @@ async def remove_member(
     current_user: Annotated[User, Depends(require_manager_or_above)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    if current_user.role == "team_manager" and current_user.team_id != team_id:
-        from app.core.exceptions import ForbiddenError
-        raise ForbiddenError("Yalnızca kendi takımınızdan üye çıkarabilirsiniz.")
+    # Managers can only remove from teams they belong to (via junction table)
+    if current_user.role == "team_manager":
+        in_team = (await db.execute(
+            select(user_teams.c.team_id).where(
+                user_teams.c.user_id == current_user.id,
+                user_teams.c.team_id == team_id,
+            )
+        )).scalar_one_or_none()
+        if not in_team:
+            raise ForbiddenError("Yalnızca kendi takımınızdan üye çıkarabilirsiniz.")
     svc = TeamService(db)
     await svc.remove_member(team_id, user_id, current_user)
     return {"message": "Üye takımdan çıkarıldı."}

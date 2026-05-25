@@ -72,11 +72,12 @@ export function useUsers(params?: {
   search?: string
   skip?: number
   limit?: number
-}) {
+}, enabled = true) {
   return useQuery({
     queryKey: userKeys.list(params),
     queryFn: () =>
       apiClient.get<UserListResponse>('/users', { params }).then((r) => r.data),
+    enabled,
   })
 }
 

@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.models.user import User
 from app.models.team import Team
+from app.models.user_team import user_teams
 from app.core.security import hash_password
 from app.core.exceptions import ConflictError, NotFoundError, ForbiddenError, ValidationError
 
@@ -52,11 +53,21 @@ class UserService:
             .where(User.is_deleted == False)
         )
 
-        # Managers can only see their own team
+        # Managers can only see users in any of their teams (via junction table)
         if requester.role == "team_manager":
-            query = query.where(User.team_id == requester.team_id)
+            my_team_ids = (
+                select(user_teams.c.team_id)
+                .where(user_teams.c.user_id == requester.id)
+                .scalar_subquery()
+            )
+            query = query.join(user_teams, User.id == user_teams.c.user_id).where(
+                user_teams.c.team_id.in_(my_team_ids)
+            )
         elif team_id:
-            query = query.where(User.team_id == team_id)
+            # Superadmin filtering by team_id: use junction table
+            query = query.join(user_teams, User.id == user_teams.c.user_id).where(
+                user_teams.c.team_id == team_id
+            )
 
         if role:
             query = query.where(User.role == role)

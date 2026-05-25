@@ -241,8 +241,7 @@ class KanbanService:
         skip: int = 0,
         limit: int = 200,
     ) -> tuple[list[Task], int]:
-        # Alias for joining users table on assignee
-        Assignee = User.__table__.alias("assignee_user")
+        from app.models.user_team import user_teams
 
         q = (
             select(Task)
@@ -259,36 +258,37 @@ class KanbanService:
 
         # ── Role-based scoping ────────────────────────────────────────────────
         if requester.role == "superadmin":
-            # Superadmin sees everything; optional team filter
+            # Superadmin sees everything; optional filters
             if team_id:
-                q = (
-                    q.join(Assignee, Task.assignee_id == Assignee.c.id)
-                    .where(Assignee.c.team_id == team_id)
+                # Filter tasks whose assignee belongs to a given team (via junction)
+                team_member_ids = (
+                    select(user_teams.c.user_id)
+                    .where(user_teams.c.team_id == team_id)
+                    .scalar_subquery()
                 )
-            elif assignee_id:
-                q = q.where(Task.assignee_id == assignee_id)
-        elif requester.team_id is not None:
-            # Team member / manager: scope to own team's tasks
-            q = q.outerjoin(Assignee, Task.assignee_id == Assignee.c.id).where(
-                or_(
-                    Assignee.c.team_id == requester.team_id,
-                    Task.assignee_id.is_(None),
-                )
-            )
+                q = q.where(Task.assignee_id.in_(team_member_ids))
             if assignee_id:
                 q = q.where(Task.assignee_id == assignee_id)
-        else:
-            # User without a team: on a board view show all tasks;
-            # otherwise show tasks they created or are assigned to.
-            if not board_id:
-                q = q.where(
-                    or_(
-                        Task.assignee_id == requester.id,
-                        Task.created_by == requester.id,
+
+        elif requester.role == "team_manager":
+            # Team manager sees tasks assigned to anyone in any of their teams
+            my_team_member_ids = (
+                select(user_teams.c.user_id)
+                .where(
+                    user_teams.c.team_id.in_(
+                        select(user_teams.c.team_id).where(user_teams.c.user_id == requester.id)
                     )
                 )
+                .scalar_subquery()
+            )
+            q = q.where(Task.assignee_id.in_(my_team_member_ids))
+            # Optional extra filters
             if assignee_id:
                 q = q.where(Task.assignee_id == assignee_id)
+
+        else:
+            # Regular user: only sees tasks assigned to themselves
+            q = q.where(Task.assignee_id == requester.id)
 
         # ── Extra filters ─────────────────────────────────────────────────────
         if board_id:
@@ -346,6 +346,10 @@ class KanbanService:
         start_date: Optional[date] = None,
         label_ids: Optional[list[uuid.UUID]] = None,
     ) -> Task:
+        # Auto-assign to creator if no assignee specified
+        if assignee_id is None:
+            assignee_id = created_by
+
         col = await self.db.execute(select(KanbanColumn).where(KanbanColumn.id == column_id))
         if not col.scalar_one_or_none():
             raise NotFoundError("Sütun")

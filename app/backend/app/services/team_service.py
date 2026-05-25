@@ -1,11 +1,13 @@
 import uuid
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete as sa_delete
 from sqlalchemy.orm import selectinload
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.models.team import Team
 from app.models.user import User
+from app.models.user_team import user_teams
 from app.core.exceptions import ConflictError, NotFoundError, ForbiddenError, ValidationError
 
 
@@ -34,7 +36,10 @@ class TeamService:
         query = select(Team).options(selectinload(Team.manager))
 
         if requester.role == "team_manager":
-            query = query.where(Team.id == requester.team_id)
+            # Show all teams the manager belongs to (via junction table)
+            query = query.join(user_teams, Team.id == user_teams.c.team_id).where(
+                user_teams.c.user_id == requester.id
+            )
 
         if is_active is not None:
             query = query.where(Team.is_active == is_active)
@@ -94,6 +99,12 @@ class TeamService:
                 manager.team_id = team_id
                 if manager.role == "user":
                     manager.role = "team_manager"
+                # Also ensure they are in junction table
+                await self.db.execute(
+                    pg_insert(user_teams)
+                    .values(user_id=manager_id, team_id=team_id)
+                    .on_conflict_do_nothing()
+                )
         if is_active is not None:
             team.is_active = is_active
 
@@ -102,9 +113,9 @@ class TeamService:
 
     async def delete_team(self, team_id: uuid.UUID) -> None:
         team = await self.get_by_id(team_id)
-        # Check for members
+        # Check for members in the junction table
         count_result = await self.db.execute(
-            select(func.count()).where(User.team_id == team_id, User.is_deleted == False)
+            select(func.count()).where(user_teams.c.team_id == team_id)
         )
         if count_result.scalar_one() > 0:
             raise ValidationError("Takımda üyeler var. Önce üyeleri başka bir takıma taşıyın.")
@@ -112,27 +123,78 @@ class TeamService:
         await self.db.flush()
 
     async def add_member(self, team_id: uuid.UUID, user_id: uuid.UUID) -> User:
-        team = await self.get_by_id(team_id)
+        # Verify team exists
+        team_check = await self.db.execute(select(Team).where(Team.id == team_id))
+        if not team_check.scalar_one_or_none():
+            raise NotFoundError("Takım")
+
         result = await self.db.execute(
             select(User).where(User.id == user_id, User.is_deleted == False)
         )
         user = result.scalar_one_or_none()
         if not user:
             raise NotFoundError("Kullanıcı")
-        user.team_id = team_id
+
+        # Insert into junction table (idempotent)
+        await self.db.execute(
+            pg_insert(user_teams)
+            .values(user_id=user_id, team_id=team_id)
+            .on_conflict_do_nothing()
+        )
+
+        # Set primary team_id if not yet assigned
+        if user.team_id is None:
+            user.team_id = team_id
+
         await self.db.flush()
-        return user
+
+        # Re-query with eager-loaded relationships for serialization
+        result = await self.db.execute(
+            select(User)
+            .options(selectinload(User.team))
+            .where(User.id == user_id)
+        )
+        return result.scalar_one()
 
     async def remove_member(self, team_id: uuid.UUID, user_id: uuid.UUID, requester: User) -> None:
+        # Check user is in this team via junction table
+        in_team = await self.db.execute(
+            select(user_teams.c.user_id).where(
+                user_teams.c.user_id == user_id,
+                user_teams.c.team_id == team_id,
+            )
+        )
+        if not in_team.scalar_one_or_none():
+            raise NotFoundError("Takım üyesi")
+
         result = await self.db.execute(
-            select(User).where(User.id == user_id, User.team_id == team_id, User.is_deleted == False)
+            select(User).where(User.id == user_id, User.is_deleted == False)
         )
         user = result.scalar_one_or_none()
         if not user:
-            raise NotFoundError("Takım üyesi")
+            raise NotFoundError("Kullanıcı")
+
         if user.id == requester.id:
             raise ForbiddenError("Kendinizi takımdan çıkaramazsınız.")
-        user.team_id = None
+
+        # Remove from junction table
+        await self.db.execute(
+            sa_delete(user_teams).where(
+                user_teams.c.user_id == user_id,
+                user_teams.c.team_id == team_id,
+            )
+        )
+
+        # Update primary team_id if it was this team
+        if user.team_id == team_id:
+            # Try to find another team membership
+            next_team_row = await self.db.execute(
+                select(user_teams.c.team_id)
+                .where(user_teams.c.user_id == user_id)
+                .limit(1)
+            )
+            user.team_id = next_team_row.scalar_one_or_none()
+
         await self.db.flush()
 
     async def _validate_manager(self, manager_id: uuid.UUID) -> None:

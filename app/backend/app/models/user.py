@@ -37,6 +37,13 @@ class User(Base):
     )
 
     team: Mapped[Optional["Team"]] = relationship("Team", back_populates="members", foreign_keys=[team_id])
+    # Many-to-many: all teams this user belongs to (via user_teams junction)
+    all_teams: Mapped[list["Team"]] = relationship(
+        "Team",
+        secondary="user_teams",
+        back_populates="all_members",
+        lazy="selectin",
+    )
     permission_overrides: Mapped[list["PermissionOverride"]] = relationship(
         "PermissionOverride", back_populates="user", foreign_keys="PermissionOverride.user_id"
     )

@@ -35,14 +35,19 @@ export default function KanbanPage() {
   const bulkUpdate = useBulkUpdateTasks()
 
   const isSuperAdmin = user?.role === 'superadmin'
-  const isTeamMember = !isSuperAdmin && !!user?.team_id
+  const isTeamManager = user?.role === 'team_manager'
+  const canFilterUsers = isSuperAdmin || isTeamManager
 
+  // Only superadmin needs the team dropdown
   const { data: teamsData } = useTeams({ is_active: true }, isSuperAdmin)
   const teams = teamsData?.items ?? []
 
-  const filterTeamId = isSuperAdmin ? selectedTeamId : (user?.team_id ?? '')
+  // Superadmin: filter users by selected team; team_manager: backend scopes automatically
   const { data: usersData } = useUsers(
-    filterTeamId ? { team_id: filterTeamId, is_active: true } : undefined
+    canFilterUsers
+      ? (isSuperAdmin && selectedTeamId ? { team_id: selectedTeamId, is_active: true } : { is_active: true })
+      : undefined,
+    canFilterUsers,
   )
   const teamUsers = usersData?.items ?? []
 
@@ -52,7 +57,7 @@ export default function KanbanPage() {
   if (isSuperAdmin) {
     if (selectedUserId) taskParams.assignee_id = selectedUserId
     else if (selectedTeamId) taskParams.team_id = selectedTeamId
-  } else if (isTeamMember && selectedUserId) {
+  } else if (isTeamManager && selectedUserId) {
     taskParams.assignee_id = selectedUserId
   }
   if (selectedPriority) taskParams.priority = selectedPriority
@@ -162,7 +167,7 @@ export default function KanbanPage() {
           </select>
         )}
 
-        {(isSuperAdmin || isTeamMember) && teamUsers.length > 0 && (
+        {canFilterUsers && teamUsers.length > 0 && (
           <select
             value={selectedUserId}
             onChange={(e) => setSelectedUserId(e.target.value)}
