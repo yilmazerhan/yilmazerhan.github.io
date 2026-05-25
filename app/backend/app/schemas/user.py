@@ -103,6 +103,7 @@ class UserResponse(BaseModel):
     preferred_language: str
     preferred_theme: str
     is_active: bool
+    is_deleted: bool = False
     last_login_at: Optional[datetime]
     created_at: datetime
 

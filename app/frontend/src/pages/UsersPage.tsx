@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Plus, Search, Pencil, Trash2, ShieldCheck, KeyRound, BarChart3 } from 'lucide-react'
-import { useUsers, useDeleteUser, type User } from '@/api/users'
+import { Plus, Search, Pencil, Trash2, ShieldCheck, KeyRound, BarChart3, RotateCcw, Skull, UserX } from 'lucide-react'
+import { useUsers, useDeleteUser, useRestoreUser, useHardDeleteUser, type User } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
 import UserFormModal from '@/components/users/UserFormModal'
 import PermissionMatrixModal from '@/components/users/PermissionMatrixModal'
@@ -13,13 +13,22 @@ export default function UsersPage() {
   const currentUser = useAuthStore((s) => s.user)
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
+  const [showDeleted, setShowDeleted] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [editUser, setEditUser] = useState<User | null>(null)
   const [permUser, setPermUser] = useState<User | null>(null)
   const [setPwUser, setSetPwUser] = useState<User | null>(null)
 
-  const { data, isLoading } = useUsers({ search: search || undefined, role: roleFilter || undefined })
+  const isSuperAdmin = currentUser?.role === 'superadmin'
+
+  const { data, isLoading } = useUsers({
+    search: search || undefined,
+    role: roleFilter || undefined,
+    include_deleted: isSuperAdmin && showDeleted ? true : undefined,
+  })
   const deleteUser = useDeleteUser()
+  const restoreUser = useRestoreUser()
+  const hardDeleteUser = useHardDeleteUser()
 
   function canSetPassword(target: User): boolean {
     if (!currentUser) return false
@@ -37,6 +46,16 @@ export default function UsersPage() {
   async function handleDelete(user: User) {
     if (!confirm(t('common.confirm_delete'))) return
     await deleteUser.mutateAsync(user.id)
+  }
+
+  async function handleRestore(user: User) {
+    if (!confirm(t('users.confirm_restore'))) return
+    await restoreUser.mutateAsync(user.id)
+  }
+
+  async function handleHardDelete(user: User) {
+    if (!confirm(t('users.confirm_hard_delete'))) return
+    await hardDeleteUser.mutateAsync(user.id)
   }
 
   const roleLabel = (role: string) => {
@@ -63,7 +82,7 @@ export default function UsersPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3">
+      <div className="flex gap-3 flex-wrap items-center">
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
@@ -84,7 +103,37 @@ export default function UsersPage() {
           <option value="team_manager">{t('users.role_team_manager')}</option>
           <option value="user">{t('users.role_user')}</option>
         </select>
+
+        {/* Show deleted toggle — superadmin only */}
+        {isSuperAdmin && (
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <div
+              onClick={() => setShowDeleted(!showDeleted)}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                showDeleted ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-600'
+              }`}
+            >
+              <span
+                className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                  showDeleted ? 'translate-x-4' : 'translate-x-1'
+                }`}
+              />
+            </div>
+            <span className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1">
+              <UserX className="h-3.5 w-3.5" />
+              {t('users.show_deleted')}
+            </span>
+          </label>
+        )}
       </div>
+
+      {/* Deleted users notice */}
+      {showDeleted && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-700 dark:text-red-400">
+          <UserX className="h-4 w-4 shrink-0" />
+          <span>Silinen kullanıcılar kırmızı satırlarla gösterilmektedir. Geri yükleyebilir veya kalıcı olarak silebilirsiniz.</span>
+        </div>
+      )}
 
       {/* Table */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
@@ -107,8 +156,19 @@ export default function UsersPage() {
             ) : data?.items.length === 0 ? (
               <tr><td colSpan={7} className="text-center py-8 text-gray-400">{t('users.not_found')}</td></tr>
             ) : data?.items.map((user) => (
-              <tr key={user.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30">
-                <td className="px-4 py-3 font-medium text-gray-900 dark:text-white max-w-[160px] truncate" title={user.full_name}>{user.full_name}</td>
+              <tr
+                key={user.id}
+                className={`border-b border-gray-100 dark:border-gray-800 ${
+                  user.is_deleted
+                    ? 'bg-red-50/50 dark:bg-red-900/10 opacity-75'
+                    : 'hover:bg-gray-50 dark:hover:bg-gray-800/30'
+                }`}
+              >
+                <td className="px-4 py-3 font-medium max-w-[160px] truncate" title={user.full_name}>
+                  <span className={user.is_deleted ? 'line-through text-gray-400 dark:text-gray-600' : 'text-gray-900 dark:text-white'}>
+                    {user.full_name}
+                  </span>
+                </td>
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-400 font-mono text-xs">{user.username}</td>
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-400 max-w-[200px] truncate" title={user.email}>{user.email}</td>
                 <td className="px-4 py-3">
@@ -122,55 +182,86 @@ export default function UsersPage() {
                 </td>
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{user.team?.name || '—'}</td>
                 <td className="px-4 py-3">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                    user.is_active
-                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                      : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                  }`}>
-                    {user.is_active ? t('users.active') : t('users.inactive')}
-                  </span>
+                  {user.is_deleted ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                      {t('users.deleted')}
+                    </span>
+                  ) : (
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                      user.is_active
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                        : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                    }`}>
+                      {user.is_active ? t('users.active') : t('users.inactive')}
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-1">
-                    {(currentUser?.role === 'superadmin' || currentUser?.role === 'team_manager') && (
-                      <Link
-                        to={`/reports/user/${user.id}`}
-                        className="p-1.5 rounded text-gray-400 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/20"
-                        title={t('activity.title')}
-                      >
-                        <BarChart3 className="h-4 w-4" />
-                      </Link>
+                    {user.is_deleted ? (
+                      /* Actions for DELETED users */
+                      <>
+                        <button
+                          onClick={() => handleRestore(user)}
+                          disabled={restoreUser.isPending}
+                          className="p-1.5 rounded text-gray-400 hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
+                          title={t('users.restore')}
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleHardDelete(user)}
+                          disabled={hardDeleteUser.isPending}
+                          className="p-1.5 rounded text-gray-400 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          title={t('users.hard_delete')}
+                        >
+                          <Skull className="h-4 w-4" />
+                        </button>
+                      </>
+                    ) : (
+                      /* Actions for ACTIVE users */
+                      <>
+                        {(currentUser?.role === 'superadmin' || currentUser?.role === 'team_manager') && (
+                          <Link
+                            to={`/reports/user/${user.id}`}
+                            className="p-1.5 rounded text-gray-400 hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-900/20"
+                            title={t('activity.title')}
+                          >
+                            <BarChart3 className="h-4 w-4" />
+                          </Link>
+                        )}
+                        <button
+                          onClick={() => setPermUser(user)}
+                          className="p-1.5 rounded text-gray-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                          title={t('users.permissions')}
+                        >
+                          <ShieldCheck className="h-4 w-4" />
+                        </button>
+                        {canSetPassword(user) && (
+                          <button
+                            onClick={() => setSetPwUser(user)}
+                            className="p-1.5 rounded text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
+                            title={t('users.set_password')}
+                          >
+                            <KeyRound className="h-4 w-4" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setEditUser(user)}
+                          className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                          title={t('common.edit')}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(user)}
+                          className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          title={t('common.delete')}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </>
                     )}
-                    <button
-                      onClick={() => setPermUser(user)}
-                      className="p-1.5 rounded text-gray-400 hover:text-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20"
-                      title={t('users.permissions')}
-                    >
-                      <ShieldCheck className="h-4 w-4" />
-                    </button>
-                    {canSetPassword(user) && (
-                      <button
-                        onClick={() => setSetPwUser(user)}
-                        className="p-1.5 rounded text-gray-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
-                        title={t('users.set_password')}
-                      >
-                        <KeyRound className="h-4 w-4" />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setEditUser(user)}
-                      className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                      title={t('common.edit')}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(user)}
-                      className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                      title={t('common.delete')}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
                   </div>
                 </td>
               </tr>

@@ -12,6 +12,7 @@ export interface User {
   preferred_language: string
   preferred_theme: string
   is_active: boolean
+  is_deleted: boolean
   last_login_at: string | null
   created_at: string
 }
@@ -70,6 +71,7 @@ export function useUsers(params?: {
   role?: string
   is_active?: boolean
   search?: string
+  include_deleted?: boolean
   skip?: number
   limit?: number
 }, enabled = true) {
@@ -113,6 +115,22 @@ export function useDeleteUser() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => apiClient.delete(`/users/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: userKeys.all }),
+  })
+}
+
+export function useRestoreUser() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => apiClient.post<User>(`/users/${id}/restore`).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: userKeys.all }),
+  })
+}
+
+export function useHardDeleteUser() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => apiClient.delete(`/users/${id}/hard`),
     onSuccess: () => qc.invalidateQueries({ queryKey: userKeys.all }),
   })
 }

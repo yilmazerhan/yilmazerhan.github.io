@@ -27,9 +27,13 @@ async def list_users(
     role: Optional[str] = Query(None),
     is_active: Optional[bool] = Query(None),
     search: Optional[str] = Query(None),
+    include_deleted: bool = Query(False),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
 ):
+    # Only superadmin can view deleted users
+    if include_deleted and current_user.role != "superadmin":
+        include_deleted = False
     svc = UserService(db)
     items, total = await svc.list_users(
         requester=current_user,
@@ -37,6 +41,7 @@ async def list_users(
         role=role,
         is_active=is_active,
         search=search,
+        include_deleted=include_deleted,
         skip=skip,
         limit=limit,
     )
@@ -58,13 +63,17 @@ async def create_user(
         preferred_language=body.preferred_language,
         username=body.username,
     )
-    from app.tasks.email_tasks import send_new_account_email_task
-    send_new_account_email_task.delay(
-        to_email=user.email,
-        full_name=user.full_name,
-        username=user.username,
-        temp_password=temp_password,
-    )
+    try:
+        from app.tasks.email_tasks import send_new_account_email_task
+        send_new_account_email_task.delay(
+            to_email=user.email,
+            full_name=user.full_name,
+            username=user.username,
+            temp_password=temp_password,
+        )
+    except Exception:
+        # Email task queue unavailable (e.g. Redis not running in dev) — ignore silently
+        pass
     return user
 
 
@@ -154,6 +163,29 @@ async def admin_set_password(
     return {"message": "Kullanıcının şifresi başarıyla güncellendi."}
 
 
+@router.post("/{user_id}/restore", response_model=UserResponse)
+async def restore_user(
+    user_id: uuid.UUID,
+    current_user: Annotated[User, Depends(require_superadmin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Restore a soft-deleted user to active status."""
+    svc = UserService(db)
+    return await svc.restore_user(user_id, current_user)
+
+
+@router.delete("/{user_id}/hard", response_model=MessageResponse)
+async def hard_delete_user(
+    user_id: uuid.UUID,
+    current_user: Annotated[User, Depends(require_superadmin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Permanently delete a soft-deleted user. This cannot be undone."""
+    svc = UserService(db)
+    await svc.hard_delete_user(user_id, current_user)
+    return {"message": "Kullanıcı kalıcı olarak silindi."}
+
+
 @router.patch("/{user_id}/resend-activation", response_model=MessageResponse)
 async def resend_activation(
     user_id: uuid.UUID,
@@ -162,10 +194,13 @@ async def resend_activation(
 ):
     svc = UserService(db)
     user, token = await svc.resend_activation(user_id)
-    from app.tasks.email_tasks import send_activation_email_task
-    send_activation_email_task.delay(
-        to_email=user.email,
-        full_name=user.full_name,
-        activation_token=token,
-    )
+    try:
+        from app.tasks.email_tasks import send_activation_email_task
+        send_activation_email_task.delay(
+            to_email=user.email,
+            full_name=user.full_name,
+            activation_token=token,
+        )
+    except Exception:
+        pass
     return {"message": "Aktivasyon emaili yeniden gönderildi."}

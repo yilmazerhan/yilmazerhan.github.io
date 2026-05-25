@@ -244,7 +244,15 @@
     "role_all": "All",
     "role_superadmin": "Super Admin",
     "role_team_manager": "Team Manager",
-    "role_user": "User"
+    "role_user": "User",
+    "deleted": "Deleted",
+    "show_deleted": "Show Deleted",
+    "restore": "Restore",
+    "hard_delete": "Permanently Delete",
+    "confirm_hard_delete": "Are you sure you want to permanently delete this user? This action cannot be undone.",
+    "confirm_restore": "Do you want to restore this user?",
+    "restored": "User restored successfully.",
+    "deleted_permanently": "User permanently deleted."
   },
   "permissions": {
     "edit_title": "Edit Permissions",

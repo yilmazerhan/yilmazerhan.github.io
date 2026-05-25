@@ -44,14 +44,16 @@ class UserService:
         role: Optional[str] = None,
         is_active: Optional[bool] = None,
         search: Optional[str] = None,
+        include_deleted: bool = False,
         skip: int = 0,
         limit: int = 50,
     ) -> tuple[list[User], int]:
         query = (
             select(User)
             .options(selectinload(User.team))
-            .where(User.is_deleted == False)
         )
+        if not include_deleted:
+            query = query.where(User.is_deleted == False)
 
         # Managers can only see users in any of their teams (via junction table)
         if requester.role == "team_manager":
@@ -127,7 +129,13 @@ class UserService:
         result = await self.db.execute(
             select(User).where(User.email == email.lower())
         )
-        if result.scalar_one_or_none():
+        existing = result.scalar_one_or_none()
+        if existing:
+            if existing.is_deleted:
+                raise ConflictError(
+                    "Bu email adresi daha önce silinmiş bir kullanıcıya ait. "
+                    "Kullanıcıyı 'Silinen Kullanıcılar' listesinden geri yükleyebilirsiniz."
+                )
             raise ConflictError("Bu email adresi zaten kayıtlı.")
 
         if team_id:
@@ -266,3 +274,53 @@ class UserService:
         self.db.add(record)
         await self.db.flush()
         return user, raw_token
+
+    async def get_deleted_by_id(self, user_id: uuid.UUID) -> User:
+        """Fetch a soft-deleted user (for restore/hard-delete operations)."""
+        result = await self.db.execute(
+            select(User)
+            .options(selectinload(User.team))
+            .where(User.id == user_id, User.is_deleted == True)
+        )
+        user = result.scalar_one_or_none()
+        if not user:
+            raise NotFoundError("Silinmiş kullanıcı")
+        return user
+
+    async def restore_user(self, user_id: uuid.UUID, requester: User) -> User:
+        """Restore a soft-deleted user back to active state."""
+        if requester.role != "superadmin":
+            raise ForbiddenError("Kullanıcı geri yükleme yalnızca superadmin tarafından yapılabilir.")
+        user = await self.get_deleted_by_id(user_id)
+        user.is_deleted = False
+        user.is_active = True
+        await self.db.flush()
+        # Re-query with relationships loaded
+        result = await self.db.execute(
+            select(User).options(selectinload(User.team)).where(User.id == user_id)
+        )
+        return result.scalar_one()
+
+    async def hard_delete_user(self, user_id: uuid.UUID, requester: User) -> None:
+        """Permanently (hard) delete a user record. Only for already soft-deleted users."""
+        if requester.role != "superadmin":
+            raise ForbiddenError("Kalıcı silme yalnızca superadmin tarafından yapılabilir.")
+        result = await self.db.execute(
+            select(User).where(User.id == user_id, User.is_deleted == True)
+        )
+        user = result.scalar_one_or_none()
+        if not user:
+            raise NotFoundError("Silinmiş kullanıcı")
+        # Revoke all tokens first
+        from sqlalchemy import update as sa_update
+        from app.models.user import RefreshToken
+        await self.db.execute(
+            sa_update(RefreshToken).where(RefreshToken.user_id == user_id).values(revoked=True)
+        )
+        # Remove from junction table
+        from sqlalchemy import delete as sa_delete
+        await self.db.execute(
+            sa_delete(user_teams).where(user_teams.c.user_id == user_id)
+        )
+        await self.db.delete(user)
+        await self.db.flush()
