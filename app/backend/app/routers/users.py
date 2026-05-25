@@ -21,7 +21,7 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 @router.get("", response_model=UserListResponse)
 async def list_users(
-    current_user: Annotated[User, Depends(require_manager_or_above)],
+    current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     team_id: Optional[uuid.UUID] = Query(None),
     role: Optional[str] = Query(None),

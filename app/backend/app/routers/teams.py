@@ -20,7 +20,7 @@ router = APIRouter(prefix="/teams", tags=["teams"])
 
 @router.get("", response_model=TeamListResponse)
 async def list_teams(
-    current_user: Annotated[User, Depends(require_manager_or_above)],
+    current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     is_active: Optional[bool] = Query(None),
     skip: int = Query(0, ge=0),

@@ -278,8 +278,17 @@ class KanbanService:
             if assignee_id:
                 q = q.where(Task.assignee_id == assignee_id)
         else:
-            # User without a team: only their own assigned tasks
-            q = q.where(Task.assignee_id == requester.id)
+            # User without a team: on a board view show all tasks;
+            # otherwise show tasks they created or are assigned to.
+            if not board_id:
+                q = q.where(
+                    or_(
+                        Task.assignee_id == requester.id,
+                        Task.created_by == requester.id,
+                    )
+                )
+            if assignee_id:
+                q = q.where(Task.assignee_id == assignee_id)
 
         # ── Extra filters ─────────────────────────────────────────────────────
         if board_id:

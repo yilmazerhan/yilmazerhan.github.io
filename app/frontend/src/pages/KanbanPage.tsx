@@ -37,7 +37,7 @@ export default function KanbanPage() {
   const isSuperAdmin = user?.role === 'superadmin'
   const isTeamMember = !isSuperAdmin && !!user?.team_id
 
-  const { data: teamsData } = useTeams({ is_active: true })
+  const { data: teamsData } = useTeams({ is_active: true }, isSuperAdmin)
   const teams = teamsData?.items ?? []
 
   const filterTeamId = isSuperAdmin ? selectedTeamId : (user?.team_id ?? '')

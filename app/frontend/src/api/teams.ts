@@ -22,10 +22,11 @@ export const teamKeys = {
   detail: (id: string) => [...teamKeys.all, 'detail', id] as const,
 }
 
-export function useTeams(params?: { is_active?: boolean }) {
+export function useTeams(params?: { is_active?: boolean }, enabled = true) {
   return useQuery({
     queryKey: teamKeys.list(params),
     queryFn: () => apiClient.get<{ items: Team[]; total: number }>('/teams', { params }).then((r) => r.data),
+    enabled,
   })
 }
 
