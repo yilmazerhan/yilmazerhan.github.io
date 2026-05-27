@@ -11,6 +11,7 @@ from app.routers import auth, users, teams, permissions, worklog, kanban, jira, 
 from app.routers.leave import router as leave_router
 from app.routers.backup import router as backup_router
 from app.routers.export import router as export_router
+from app.routers.inventory import router as inventory_router
 
 logger = logging.getLogger(__name__)
 
@@ -67,8 +68,19 @@ def _start_scheduler():
             except Exception as exc:
                 logger.error("Scheduled backup failed: %s", exc, exc_info=True)
 
+        async def _run_inventory_email_check():
+            """Check for due inventory email schedules and send them."""
+            try:
+                from app.database import AsyncSessionLocal
+                from app.services.inventory_service import run_due_inventory_schedules
+                async with AsyncSessionLocal() as db:
+                    await run_due_inventory_schedules(db)
+            except Exception as exc:
+                logger.error("Inventory email schedule check failed: %s", exc, exc_info=True)
+
         # Check every hour on the hour
         scheduler.add_job(_run_scheduled_backup, CronTrigger(minute=0), id="hourly_backup_check")
+        scheduler.add_job(_run_inventory_email_check, CronTrigger(minute=0), id="hourly_inventory_email_check")
         scheduler.start()
         logger.info("APScheduler started (hourly backup check job).")
         return scheduler
@@ -146,6 +158,7 @@ app.include_router(notifications.router, prefix="/api/v1")
 app.include_router(leave_router, prefix="/api/v1")
 app.include_router(backup_router, prefix="/api/v1")
 app.include_router(export_router, prefix="/api/v1")
+app.include_router(inventory_router, prefix="/api/v1")
 
 
 # ─── Health check ─────────────────────────────────────────────────────────

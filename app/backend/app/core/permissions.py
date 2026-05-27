@@ -18,6 +18,7 @@ ROLE_DEFAULTS: dict[str, dict[str, set[str]]] = {
         "jira_config": {"create", "edit", "delete", "view"},
         "ssl_management": {"create", "edit", "delete", "view"},
         "branding": {"create", "edit", "delete", "view"},
+        "inventory": {"create", "edit", "delete", "view"},
     },
     "team_manager": {
         "worklog": {"create", "edit", "delete", "view"},
@@ -27,6 +28,7 @@ ROLE_DEFAULTS: dict[str, dict[str, set[str]]] = {
         "jira_config": set(),
         "ssl_management": set(),
         "branding": set(),
+        "inventory": {"create", "edit", "delete", "view"},
     },
     "user": {
         "worklog": {"create", "view"},
@@ -36,6 +38,7 @@ ROLE_DEFAULTS: dict[str, dict[str, set[str]]] = {
         "jira_config": set(),
         "ssl_management": set(),
         "branding": set(),
+        "inventory": {"view"},
     },
 }
 

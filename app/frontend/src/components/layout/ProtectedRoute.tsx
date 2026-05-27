@@ -31,7 +31,7 @@ export default function ProtectedRoute() {
           setToken(res.data.access_token)
           setChecking(false)
         })
-        .catch((err) => {
+        .catch((_err) => {
           // AbortError means this effect was superseded by StrictMode remount.
           // The remounted effect will issue a fresh request — do nothing here.
           if (controller.signal.aborted) return

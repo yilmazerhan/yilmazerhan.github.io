@@ -25,6 +25,7 @@ class PermissionOverride(Base):
             "jira_config",
             "ssl_management",
             "branding",
+            "inventory",
             name="permission_module",
         ),
         nullable=False,

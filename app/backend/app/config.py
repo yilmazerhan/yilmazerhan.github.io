@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     JIRA_ENCRYPTION_KEY: str = ""
     SMTP_ENCRYPTION_KEY: str = ""
     SSL_ENCRYPTION_KEY: str = ""
+    INVENTORY_ENCRYPTION_KEY: str = ""
 
     # JWT
     JWT_ALGORITHM: str = "HS256"
