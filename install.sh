@@ -139,15 +139,40 @@ else
   success "PostgreSQL kullanıcısı güncellendi"
 fi
 
-# pg_hba.conf — localhost bağlantısına md5 izni ver
+# postgresql.conf — Docker bridge ağından erişim için tüm arayüzlerde dinle
+PG_CONF=$(sudo -u postgres psql -tc "SHOW config_file" | tr -d ' ')
 PG_HBA=$(sudo -u postgres psql -tc "SHOW hba_file" | tr -d ' ')
+
+if grep -q "listen_addresses = 'localhost'" "$PG_CONF" 2>/dev/null; then
+  sed -i "s/listen_addresses = 'localhost'/listen_addresses = '*'/" "$PG_CONF"
+  info "PostgreSQL: listen_addresses='*' olarak güncellendi"
+elif grep -q "#listen_addresses = 'localhost'" "$PG_CONF" 2>/dev/null; then
+  sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" "$PG_CONF"
+  info "PostgreSQL: listen_addresses='*' olarak etkinleştirildi"
+elif ! grep -qE "^listen_addresses\s*=" "$PG_CONF" 2>/dev/null; then
+  echo "listen_addresses = '*'" >> "$PG_CONF"
+  info "PostgreSQL: listen_addresses='*' eklendi"
+fi
+
+# pg_hba.conf — localhost + Docker bridge ağına md5 izni ver
 if ! grep -q "^host.*${DB_NAME}.*${DB_USER}.*127.0.0.1" "$PG_HBA" 2>/dev/null; then
   echo "host    ${DB_NAME}    ${DB_USER}    127.0.0.1/32    md5" >> "$PG_HBA"
   echo "host    ${DB_NAME}    ${DB_USER}    ::1/128         md5" >> "$PG_HBA"
-  systemctl reload postgresql
+fi
+# Docker bridge ağı (172.x ve 192.168.x) — container→host bağlantısı için
+if ! grep -q "^host.*${DB_NAME}.*${DB_USER}.*172\.0\.0\.0" "$PG_HBA" 2>/dev/null; then
+  echo "host    ${DB_NAME}    ${DB_USER}    172.0.0.0/8    md5" >> "$PG_HBA"
+fi
+if ! grep -q "^host.*${DB_NAME}.*${DB_USER}.*192\.168\.0\.0" "$PG_HBA" 2>/dev/null; then
+  echo "host    ${DB_NAME}    ${DB_USER}    192.168.0.0/16 md5" >> "$PG_HBA"
 fi
 
-success "PostgreSQL yapılandırıldı"
+# listen_addresses değişikliği için restart gerekli (reload yetmez)
+systemctl restart postgresql
+sleep 5
+systemctl is-active postgresql >/dev/null 2>&1 || error "PostgreSQL yeniden başlatılamadı!"
+
+success "PostgreSQL yapılandırıldı (Docker bridge erişimi aktif)"
 
 # ═════════════════════════════════════════════════════════════════════════════
 step "5/9 — Uygulama kaynak kodunu indirme"
