@@ -56,7 +56,7 @@ async def _seed_superadmin(db: AsyncSession) -> None:
 
     admin = User(
         email=settings.SUPERADMIN_EMAIL.lower(),
-        username=settings.SUPERADMIN_EMAIL.lower().split('@')[0],
+        username="superuser",  # Default superadmin username is always "superuser"
         hashed_password=hash_password(settings.SUPERADMIN_PASSWORD),
         full_name=settings.SUPERADMIN_FULL_NAME,
         role="superadmin",
