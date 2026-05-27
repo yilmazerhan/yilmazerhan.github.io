@@ -11,7 +11,7 @@ from app.schemas.permission import (
 )
 from app.schemas.auth import MessageResponse
 from app.services.permission_service import PermissionService
-from app.core.dependencies import require_superadmin
+from app.core.dependencies import require_superadmin, get_current_user
 
 router = APIRouter(prefix="/permissions", tags=["permissions"])
 
@@ -53,6 +53,17 @@ async def delete_override(
     svc = PermissionService(db)
     await svc.delete_override(user_id, module, action)
     return {"message": "Yetki override'ı silindi."}
+
+
+@router.get("/effective/me", response_model=EffectivePermissions)
+async def get_my_effective_permissions(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    """Return the effective permissions for the currently authenticated user."""
+    svc = PermissionService(db)
+    perms = await svc.get_effective_permissions(current_user.id)
+    return {"user_id": current_user.id, "role": current_user.role, "permissions": perms}
 
 
 @router.get("/effective/{user_id}", response_model=EffectivePermissions)

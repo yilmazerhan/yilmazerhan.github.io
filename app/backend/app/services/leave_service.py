@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 from typing import Optional
 
 from fastapi import HTTPException
@@ -10,7 +10,8 @@ from sqlalchemy.orm import selectinload
 from app.models.leave_request import LeaveRequest
 from app.models.user import User
 
-ALLOWED_STATUSES = {"cancelled"}
+MANAGER_STATUSES = {"approved", "rejected", "cancelled"}
+USER_STATUSES = {"cancelled"}
 
 
 class LeaveService:
@@ -35,7 +36,7 @@ class LeaveService:
             start_date=start_date,
             end_date=end_date,
             reason=reason,
-            status="pending",  # Requires manager/superadmin approval via PATCH /leave/{id}/review
+            status="pending",  # Requires manager/superadmin approval via PATCH /leaves/{id}
         )
         self.db.add(leave)
         await self.db.flush()
@@ -106,30 +107,45 @@ class LeaveService:
         if not leave:
             raise HTTPException(status_code=404, detail="İzin talebi bulunamadı.")
 
-        if status is not None and status != "cancelled":
-            raise HTTPException(status_code=422, detail="Yalnızca iptal (cancelled) işlemi yapılabilir.")
-
         if self._is_manager_or_admin(requester):
-            # Managers/admins can cancel any non-cancelled leave and add a note
-            if status == "cancelled":
-                if leave.status == "cancelled":
-                    raise HTTPException(status_code=422, detail="Bu izin talebi zaten iptal edilmiş.")
-                leave.status = "cancelled"
+            # Managers / admins: can approve, reject, or cancel any leave
+            if status is not None:
+                if status not in MANAGER_STATUSES:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"Geçersiz durum. Kabul edilenler: {', '.join(sorted(MANAGER_STATUSES))}"
+                    )
+                if leave.status == status:
+                    raise HTTPException(status_code=422, detail=f"İzin talebi zaten '{status}' durumunda.")
+                # Once approved/rejected, only cancellation is allowed (can't re-approve a rejected leave)
+                if leave.status in ("approved", "rejected") and status not in ("cancelled",):
+                    raise HTTPException(
+                        status_code=422, detail="Onaylanmış/reddedilmiş izin yalnızca iptal edilebilir."
+                    )
+                leave.status = status
+                leave.reviewed_by = requester.id
+                leave.reviewed_at = datetime.now(timezone.utc)
             if review_note is not None:
                 leave.review_note = review_note
         else:
-            # Regular users can only cancel their own non-cancelled leaves
+            # Regular users: can only cancel their own pending leave
             if leave.user_id != requester.id:
                 raise HTTPException(status_code=403, detail="Bu izin talebini güncelleme yetkiniz yok.")
-            if status == "cancelled":
-                if leave.status == "cancelled":
-                    raise HTTPException(status_code=422, detail="Bu izin talebi zaten iptal edilmiş.")
+            if status is not None:
+                if status not in USER_STATUSES:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Kullanıcılar yalnızca kendi izinlerini iptal edebilir."
+                    )
+                if leave.status != "pending":
+                    raise HTTPException(
+                        status_code=422,
+                        detail="Yalnızca beklemedeki (pending) izin talepleri iptal edilebilir."
+                    )
                 leave.status = "cancelled"
 
         await self.db.flush()
 
-        # Re-fetch with populate_existing=True so SQLAlchemy overwrites the cached instance
-        # (needed because we set reviewed_by FK directly; the relationship won't auto-refresh)
         result = await self.db.execute(
             select(LeaveRequest)
             .where(LeaveRequest.id == leave_id)

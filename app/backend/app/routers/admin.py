@@ -1,9 +1,12 @@
+import csv
+import io
 import uuid
 import base64
 from datetime import date, timedelta
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -443,6 +446,72 @@ async def user_activity_report(
             for l in logs[:20]
         ],
     }
+
+
+# ─── Report CSV Export ───────────────────────────────────────────────────────
+
+@router.get("/reports/user/{user_id}/export")
+async def export_user_report_csv(
+    user_id: uuid.UUID,
+    current_user: Annotated[User, Depends(require_manager_or_above)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+):
+    """Download a user's work-log entries as a CSV file."""
+    from app.models.worklog import WorkLog
+
+    # Team managers: check team membership (same check as activity report)
+    if current_user.role == "team_manager":
+        from app.models.user_team import user_teams as ut
+        from app.core.exceptions import ForbiddenError as _ForbiddenError
+        shared = await db.execute(
+            select(ut.c.team_id).where(
+                ut.c.user_id == current_user.id,
+                ut.c.team_id.in_(
+                    select(ut.c.team_id).where(ut.c.user_id == user_id)
+                ),
+            ).limit(1)
+        )
+        if not shared.scalar_one_or_none():
+            raise _ForbiddenError("Yalnızca kendi takımınızdaki kullanıcıların raporlarına erişebilirsiniz.")
+
+    # Resolve subject user
+    from app.core.exceptions import NotFoundError as _NotFoundError
+    u_res = await db.execute(select(User).where(User.id == user_id, User.is_deleted == False))
+    subject = u_res.scalar_one_or_none()
+    if not subject:
+        raise _NotFoundError("Kullanıcı")
+
+    end = date_to or date.today()
+    start = date_from or (end - timedelta(days=30))
+
+    wl_q = (
+        select(WorkLog)
+        .options(selectinload(WorkLog.work_type))
+        .where(WorkLog.user_id == user_id, WorkLog.log_date >= start, WorkLog.log_date <= end)
+        .order_by(WorkLog.log_date.desc())
+    )
+    logs = (await db.execute(wl_q)).scalars().all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Date", "Work Type", "Duration (h)", "Description"])
+    for log in logs:
+        writer.writerow([
+            log.log_date.isoformat(),
+            log.work_type.name if log.work_type else "",
+            float(log.duration_hours),
+            log.description or "",
+        ])
+
+    output.seek(0)
+    filename = f"worklogs_{subject.username}_{start}_{end}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 # ─── Report Schedules ────────────────────────────────────────────────────────

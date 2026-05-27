@@ -14,6 +14,7 @@ from app.core.dependencies import get_current_user
 from app.core.rate_limit import limiter
 from app.config import settings
 from app.models.user import User
+from app.core.task_utils import fire_and_forget
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -22,11 +23,15 @@ COOKIE_MAX_AGE = settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400
 
 
 def _set_refresh_cookie(response: Response, token: str) -> None:
+    # `secure=True` requires HTTPS — only enforce in production.
+    # In development the cookie must still be stored over HTTP so the
+    # ProtectedRoute silent-refresh flow works correctly.
+    is_prod = settings.ENVIRONMENT == "production"
     response.set_cookie(
         key=REFRESH_COOKIE,
         value=token,
         httponly=True,
-        secure=True,
+        secure=is_prod,
         samesite="strict",
         max_age=COOKIE_MAX_AGE,
         path="/api/v1/auth",
@@ -34,12 +39,12 @@ def _set_refresh_cookie(response: Response, token: str) -> None:
 
 
 def _clear_refresh_cookie(response: Response) -> None:
-    # Must match the original cookie attributes so the browser removes it correctly
+    is_prod = settings.ENVIRONMENT == "production"
     response.delete_cookie(
         key=REFRESH_COOKIE,
         path="/api/v1/auth",
         httponly=True,
-        secure=True,
+        secure=is_prod,
         samesite="strict",
     )
 
@@ -53,20 +58,11 @@ async def register(
 ):
     svc = AuthService(db)
     user, activation_token = await svc.register(body.email, body.password, body.full_name, body.preferred_language)
-    try:
-        from app.tasks.email_tasks import send_activation_email_task
-        send_activation_email_task.delay(
-            to_email=user.email,
-            full_name=user.full_name,
-            activation_token=activation_token,
-        )
-    except Exception:
-        # Email queue unavailable (e.g. Redis/Celery not running in dev) — log and continue.
-        # The activation token is stored in DB; the admin can resend manually.
-        import logging
-        logging.getLogger(__name__).warning(
-            "Activation email queuing failed for %s (Celery unavailable?)", user.email
-        )
+    from app.tasks.email_tasks import send_activation_email_task
+    fire_and_forget(send_activation_email_task,
+                    to_email=user.email,
+                    full_name=user.full_name,
+                    activation_token=activation_token)
     return {"message": "Kayıt başarılı. Email adresinize aktivasyon bağlantısı gönderildi."}
 
 
@@ -98,7 +94,7 @@ async def login(
 
 
 @router.post("/refresh", response_model=TokenResponse)
-@limiter.limit("30/minute")
+@limiter.limit(settings.AUTH_REFRESH_RATE_LIMIT)
 async def refresh(
     request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -146,11 +142,10 @@ async def forgot_password(
     if result:
         user, raw_token = result
         from app.tasks.email_tasks import send_password_reset_email_task
-        send_password_reset_email_task.delay(
-            to_email=user.email,
-            full_name=user.full_name,
-            reset_token=raw_token,
-        )
+        fire_and_forget(send_password_reset_email_task,
+                        to_email=user.email,
+                        full_name=user.full_name,
+                        reset_token=raw_token)
 
     # Always return success message to prevent user enumeration
     return {"message": "Şifre sıfırlama bağlantısı email adresinize gönderildi (eğer kayıtlıysa)."}

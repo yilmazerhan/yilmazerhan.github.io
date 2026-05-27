@@ -17,6 +17,15 @@ celery_app.conf.update(
     task_acks_late=True,
     task_reject_on_worker_lost=True,
     worker_prefetch_multiplier=1,
+    # Broker connection timeouts — fail fast when Redis is not available
+    # so the API doesn't block waiting for broker connection
+    broker_connection_timeout=2,           # seconds to wait for initial connect
+    broker_connection_retry_on_startup=False,
+    broker_transport_options={
+        "socket_connect_timeout": 2,
+        "socket_timeout": 2,
+        "retry_on_timeout": False,
+    },
 )
 
 celery_app.conf.beat_schedule = {

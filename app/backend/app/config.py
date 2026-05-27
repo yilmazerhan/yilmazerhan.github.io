@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     # Rate limiting
     AUTH_LOGIN_RATE_LIMIT: str = "5/minute"
     AUTH_FORGOT_PASSWORD_RATE_LIMIT: str = "3/hour"
+    AUTH_REFRESH_RATE_LIMIT: str = "60/minute"
 
     # SuperAdmin seed
     SUPERADMIN_EMAIL: str = "admin@example.com"

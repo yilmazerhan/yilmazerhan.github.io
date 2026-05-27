@@ -11,20 +11,39 @@ export default function ProtectedRoute() {
 
   useEffect(() => {
     if (!accessToken && user) {
-      // User is in localStorage but token is missing (e.g. after page reload with expired token).
+      // User profile is in localStorage but access token is missing (page reload).
       // Attempt a silent refresh using the httpOnly refresh cookie.
+      //
+      // AbortController: React 18 StrictMode double-invokes effects in development
+      // (mount → cleanup → remount). The cleanup aborts the first in-flight request
+      // before the browser sends it to the server, so only the second (real)
+      // invocation actually rotates the refresh token. Without this guard,
+      // two concurrent refresh calls would cause a token-rotation race that logs
+      // the user out.
+      const controller = new AbortController()
+
       axios
-        .post(`${BASE_URL}/api/v1/auth/refresh`, {}, { withCredentials: true })
+        .post(`${BASE_URL}/api/v1/auth/refresh`, {}, {
+          withCredentials: true,
+          signal: controller.signal,
+        })
         .then((res) => {
           setToken(res.data.access_token)
-        })
-        .catch(() => {
-          logout()
-        })
-        .finally(() => {
           setChecking(false)
         })
+        .catch((err) => {
+          // AbortError means this effect was superseded by StrictMode remount.
+          // The remounted effect will issue a fresh request — do nothing here.
+          if (controller.signal.aborted) return
+          logout()
+          setChecking(false)
+        })
+
+      // Return cleanup: abort the in-flight request on unmount (StrictMode remount).
+      return () => { controller.abort() }
     }
+    // If user is already authenticated (accessToken present) or fully logged out
+    // (no user), nothing to do — the render path below handles it.
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (checking) {

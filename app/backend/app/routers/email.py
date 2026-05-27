@@ -215,7 +215,8 @@ async def test_run_workflow(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     from app.tasks.email_tasks import evaluate_scheduled_workflows
-    evaluate_scheduled_workflows.delay()
+    from app.core.task_utils import fire_and_forget
+    fire_and_forget(evaluate_scheduled_workflows)
     return {"message": "İş akışı kuyruğa alındı."}
 
 

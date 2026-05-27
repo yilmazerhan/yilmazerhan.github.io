@@ -15,6 +15,7 @@ from app.services.user_service import UserService
 from app.core.dependencies import (
     get_current_user, require_superadmin, require_manager_or_above
 )
+from app.core.task_utils import fire_and_forget
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -63,17 +64,12 @@ async def create_user(
         preferred_language=body.preferred_language,
         username=body.username,
     )
-    try:
-        from app.tasks.email_tasks import send_new_account_email_task
-        send_new_account_email_task.delay(
-            to_email=user.email,
-            full_name=user.full_name,
-            username=user.username,
-            temp_password=temp_password,
-        )
-    except Exception:
-        # Email task queue unavailable (e.g. Redis not running in dev) — ignore silently
-        pass
+    from app.tasks.email_tasks import send_new_account_email_task
+    fire_and_forget(send_new_account_email_task,
+                    to_email=user.email,
+                    full_name=user.full_name,
+                    username=user.username,
+                    temp_password=temp_password)
     return user
 
 
@@ -212,13 +208,9 @@ async def resend_activation(
 ):
     svc = UserService(db)
     user, token = await svc.resend_activation(user_id)
-    try:
-        from app.tasks.email_tasks import send_activation_email_task
-        send_activation_email_task.delay(
-            to_email=user.email,
-            full_name=user.full_name,
-            activation_token=token,
-        )
-    except Exception:
-        pass
+    from app.tasks.email_tasks import send_activation_email_task
+    fire_and_forget(send_activation_email_task,
+                    to_email=user.email,
+                    full_name=user.full_name,
+                    activation_token=token)
     return {"message": "Aktivasyon emaili yeniden gönderildi."}
