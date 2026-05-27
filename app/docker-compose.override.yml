@@ -1,3 +1,13 @@
+# ⚠️  SADECE YEREL GELİŞTİRME İÇİN / FOR LOCAL DEVELOPMENT ONLY
+#
+# Bu dosya Docker Compose tarafından otomatik yüklenir ve docker-compose.yml
+# üzerine yazar. Üretim ortamında (production) KULLANILMAZ — install.sh ve
+# systemd servisi açıkça "-f docker-compose.yml" ile çalışır.
+#
+# Geliştirici kullanımı:
+#   docker compose up            → hem yml hem bu override devreye girer (HMR, --reload)
+#   docker compose -f docker-compose.yml up  → sadece production stage
+
 services:
   backend:
     build:
@@ -37,4 +47,4 @@ services:
       - ./frontend:/workspace
       - /workspace/node_modules
     environment:
-      VITE_API_BASE_URL: https://localhost:9443
+      VITE_API_BASE_URL: http://localhost:8000

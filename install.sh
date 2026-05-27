@@ -195,6 +195,11 @@ fi
 
 cd "${APP_DIR}/${APP_SUBDIR}"
 
+# Üretim ortamında docker-compose.override.yml otomatik yüklenmesin.
+# Override dosyası sadece yerel geliştirme içindir (dev stage, volume mount'lar).
+# docker-compose.yml'yi açıkça belirterek her zaman production stage'i kullanırız.
+COMPOSE_PROD="-f docker-compose.yml"
+
 # ═════════════════════════════════════════════════════════════════════════════
 step "6/9 — Ortam değişkenleri (.env) oluşturma"
 # ═════════════════════════════════════════════════════════════════════════════
@@ -285,12 +290,12 @@ step "8/9 — Docker imajlarını derleme ve servisleri başlatma"
 # ═════════════════════════════════════════════════════════════════════════════
 
 info "Docker imajları derleniyor (5-10 dakika sürebilir)..."
-docker compose build --no-cache --quiet 2>&1 | grep -E "^#|Step|error|ERROR" || true
+docker compose ${COMPOSE_PROD} build --no-cache --quiet 2>&1 | grep -E "^#|Step|error|ERROR" || true
 success "Docker imajları derlendi"
 
 info "Servisler başlatılıyor..."
 # Migration + ssl_init + tüm servisler
-docker compose up -d --remove-orphans
+docker compose ${COMPOSE_PROD} up -d --remove-orphans
 
 info "Servislerin hazır olması bekleniyor (60 saniye)..."
 sleep 10
@@ -300,7 +305,7 @@ TIMEOUT=90
 ELAPSED=0
 info "Migration bekleniyor..."
 while true; do
-  STATUS=$(docker compose ps migration --format json 2>/dev/null | python3 -c "
+  STATUS=$(docker compose ${COMPOSE_PROD} ps migration --format json 2>/dev/null | python3 -c "
 import sys, json
 try:
     data = json.load(sys.stdin)
@@ -310,7 +315,7 @@ except: print('unknown')
 " 2>/dev/null || echo "unknown")
 
   if echo "$STATUS" | grep -qi "exit\|exited\|complete\|finished"; then
-    EXIT_CODE=$(docker compose ps migration --format json 2>/dev/null | python3 -c "
+    EXIT_CODE=$(docker compose ${COMPOSE_PROD} ps migration --format json 2>/dev/null | python3 -c "
 import sys, json
 try:
     data = json.load(sys.stdin)
@@ -321,7 +326,7 @@ except: print('0')
     if [ "$EXIT_CODE" = "0" ] || [ "$EXIT_CODE" = "" ]; then
       success "Veritabanı migration tamamlandı"
     else
-      error "Migration başarısız! Loglar: docker compose logs migration"
+      error "Migration başarısız! Loglar: docker compose ${COMPOSE_PROD} logs migration"
     fi
     break
   fi
@@ -329,7 +334,7 @@ except: print('0')
   ELAPSED=$((ELAPSED+5))
   if [ $ELAPSED -ge $TIMEOUT ]; then
     warn "Migration zaman aşımına uğradı, log kontrol ediliyor..."
-    docker compose logs migration --tail=20 2>/dev/null || true
+    docker compose ${COMPOSE_PROD} logs migration --tail=20 2>/dev/null || true
     break
   fi
   sleep 5
@@ -363,8 +368,8 @@ step "9/9 — Kurulum doğrulama"
 
 echo ""
 info "Servis durumları:"
-docker compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || \
-  docker compose ps
+docker compose ${COMPOSE_PROD} ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || \
+  docker compose ${COMPOSE_PROD} ps
 
 echo ""
 info "Bağlantı testi yapılıyor..."
