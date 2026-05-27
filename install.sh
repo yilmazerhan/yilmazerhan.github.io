@@ -154,14 +154,18 @@ elif ! grep -qE "^listen_addresses\s*=" "$PG_CONF" 2>/dev/null; then
   info "PostgreSQL: listen_addresses='*' eklendi"
 fi
 
-# pg_hba.conf — localhost + Docker bridge ağına md5 izni ver
+# pg_hba.conf — localhost + sunucu IP'si + Docker bridge ağlarına md5 izni ver
 if ! grep -q "^host.*${DB_NAME}.*${DB_USER}.*127.0.0.1" "$PG_HBA" 2>/dev/null; then
   echo "host    ${DB_NAME}    ${DB_USER}    127.0.0.1/32    md5" >> "$PG_HBA"
   echo "host    ${DB_NAME}    ${DB_USER}    ::1/128         md5" >> "$PG_HBA"
 fi
-# Docker bridge ağı (172.x ve 192.168.x) — container→host bağlantısı için
-if ! grep -q "^host.*${DB_NAME}.*${DB_USER}.*172\.0\.0\.0" "$PG_HBA" 2>/dev/null; then
-  echo "host    ${DB_NAME}    ${DB_USER}    172.0.0.0/8    md5" >> "$PG_HBA"
+# Sunucunun kendi IP'si — Docker bridge NAT'ı sonucu bu IP görülüyor
+if ! grep -q "^host.*${DB_NAME}.*${DB_USER}.*10\.0\.0\.0" "$PG_HBA" 2>/dev/null; then
+  echo "host    ${DB_NAME}    ${DB_USER}    10.0.0.0/8     md5" >> "$PG_HBA"
+fi
+# Docker bridge ağı 172.16-31.x (Docker'ın varsayılan özel aralığı)
+if ! grep -q "^host.*${DB_NAME}.*${DB_USER}.*172\.16\.0\.0" "$PG_HBA" 2>/dev/null; then
+  echo "host    ${DB_NAME}    ${DB_USER}    172.16.0.0/12  md5" >> "$PG_HBA"
 fi
 if ! grep -q "^host.*${DB_NAME}.*${DB_USER}.*192\.168\.0\.0" "$PG_HBA" 2>/dev/null; then
   echo "host    ${DB_NAME}    ${DB_USER}    192.168.0.0/16 md5" >> "$PG_HBA"
@@ -224,6 +228,8 @@ POSTGRES_DB=${DB_NAME}
 POSTGRES_USER=${DB_USER}
 POSTGRES_PASSWORD=${DB_PASS}
 POSTGRES_PORT=5432
+# Docker containers use this IP to reach host PostgreSQL (bypasses host.docker.internal NAT issues)
+POSTGRES_HOST=${SERVER_IP}
 
 # ─── Redis ────────────────────────────────────────────────────────────────
 REDIS_PASSWORD=${REDIS_PASS}
@@ -264,8 +270,15 @@ ufw default allow outgoing >/dev/null 2>&1
 ufw allow ssh      >/dev/null 2>&1   # 22
 ufw allow 80/tcp   >/dev/null 2>&1   # HTTP → HTTPS yönlendirme
 ufw allow 443/tcp  >/dev/null 2>&1   # HTTPS
+
+# Docker bridge ağlarının host'taki PostgreSQL'e ulaşmasına izin ver.
+# UFW'nin DEFAULT DENY kuralı bu trafiği engelliyor; Docker ağı (172.16-31.x, 10.x)
+# için açık kural eklenmelidir.
+ufw allow from 172.16.0.0/12 to any port 5432 proto tcp >/dev/null 2>&1
+ufw allow from 10.0.0.0/8    to any port 5432 proto tcp >/dev/null 2>&1
+
 ufw --force enable >/dev/null 2>&1
-success "UFW güvenlik duvarı aktif: 22 (SSH), 80 (HTTP), 443 (HTTPS)"
+success "UFW güvenlik duvarı aktif: 22 (SSH), 80 (HTTP), 443 (HTTPS) + Docker→PostgreSQL (5432)"
 
 # ═════════════════════════════════════════════════════════════════════════════
 step "8/9 — Docker imajlarını derleme ve servisleri başlatma"
