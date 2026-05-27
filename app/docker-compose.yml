@@ -40,6 +40,8 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      - backup_data:/app/backups
     depends_on:
       redis:
         condition: service_healthy
@@ -129,6 +131,7 @@ services:
 volumes:
   redis_data:
   ssl_certs:
+  backup_data:
 
 networks:
   internal:
