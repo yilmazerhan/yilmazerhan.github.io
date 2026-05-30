@@ -10,6 +10,7 @@ class SmtpConfigCreate(BaseModel):
     username: str
     password: str
     use_tls: bool = True
+    use_ssl: bool = False
     from_email: str
     from_name: str = "Team App"
 
@@ -20,6 +21,7 @@ class SmtpConfigUpdate(BaseModel):
     username: Optional[str] = None
     password: Optional[str] = None
     use_tls: Optional[bool] = None
+    use_ssl: Optional[bool] = None
     from_email: Optional[str] = None
     from_name: Optional[str] = None
     is_active: Optional[bool] = None
@@ -31,6 +33,7 @@ class SmtpConfigResponse(BaseModel):
     port: int
     username: str
     use_tls: bool
+    use_ssl: bool = False
     from_email: str
     from_name: str
     is_active: bool

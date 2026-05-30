@@ -71,6 +71,7 @@ export default function SettingsPage() {
   const [smtpFromEmail, setSmtpFromEmail] = useState('')
   const [smtpFromName, setSmtpFromName] = useState('')
   const [smtpUseTls, setSmtpUseTls] = useState(true)
+  const [smtpUseSsl, setSmtpUseSsl] = useState(false)
   const [smtpError, setSmtpError] = useState('')
   const [smtpTestResult, setSmtpTestResult] = useState<Record<string, { success: boolean; msg: string }>>({})
 
@@ -87,7 +88,7 @@ export default function SettingsPage() {
   function smtpOpenCreate() {
     setSmtpEditing(null)
     setSmtpHost(''); setSmtpPort(587); setSmtpUsername(''); setSmtpPassword('')
-    setSmtpFromEmail(''); setSmtpFromName(''); setSmtpUseTls(true); setSmtpError('')
+    setSmtpFromEmail(''); setSmtpFromName(''); setSmtpUseTls(true); setSmtpUseSsl(false); setSmtpError('')
     setSmtpShowForm(true)
   }
 
@@ -95,7 +96,7 @@ export default function SettingsPage() {
     setSmtpEditing(cfg)
     setSmtpHost(cfg.host); setSmtpPort(cfg.port); setSmtpUsername(cfg.username)
     setSmtpPassword(''); setSmtpFromEmail(cfg.from_email); setSmtpFromName(cfg.from_name)
-    setSmtpUseTls(cfg.use_tls); setSmtpError('')
+    setSmtpUseTls(cfg.use_tls); setSmtpUseSsl(cfg.use_ssl ?? false); setSmtpError('')
     setSmtpShowForm(true)
   }
 
@@ -103,11 +104,11 @@ export default function SettingsPage() {
     e.preventDefault(); setSmtpError('')
     try {
       if (smtpEditing) {
-        const data: any = { id: smtpEditing.id, host: smtpHost, port: smtpPort, username: smtpUsername, from_email: smtpFromEmail, from_name: smtpFromName, use_tls: smtpUseTls }
+        const data: any = { id: smtpEditing.id, host: smtpHost, port: smtpPort, username: smtpUsername, from_email: smtpFromEmail, from_name: smtpFromName, use_tls: smtpUseTls, use_ssl: smtpUseSsl }
         if (smtpPassword) data.password = smtpPassword
         await updateSmtp.mutateAsync(data)
       } else {
-        await createSmtp.mutateAsync({ host: smtpHost, port: smtpPort, username: smtpUsername, password: smtpPassword, from_email: smtpFromEmail, from_name: smtpFromName, use_tls: smtpUseTls })
+        await createSmtp.mutateAsync({ host: smtpHost, port: smtpPort, username: smtpUsername, password: smtpPassword, from_email: smtpFromEmail, from_name: smtpFromName, use_tls: smtpUseTls, use_ssl: smtpUseSsl })
       }
       setSmtpShowForm(false)
     } catch (err: any) {
@@ -774,8 +775,26 @@ export default function SettingsPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <input type="checkbox" id="smtp_tls" checked={smtpUseTls} onChange={(e) => setSmtpUseTls(e.target.checked)} className="rounded" />
-                <label htmlFor="smtp_tls" className="text-sm text-gray-700 dark:text-gray-300">{t('settings.smtp_use_tls')}</label>
+                <input
+                  type="checkbox"
+                  id="smtp_tls"
+                  checked={smtpUseTls}
+                  disabled={smtpUseSsl}
+                  onChange={(e) => { setSmtpUseTls(e.target.checked); if (e.target.checked) setSmtpUseSsl(false) }}
+                  className="rounded"
+                />
+                <label htmlFor="smtp_tls" className={`text-sm ${smtpUseSsl ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'}`}>{t('settings.smtp_use_tls')}</label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="smtp_ssl"
+                  checked={smtpUseSsl}
+                  disabled={smtpUseTls}
+                  onChange={(e) => { setSmtpUseSsl(e.target.checked); if (e.target.checked) setSmtpUseTls(false) }}
+                  className="rounded"
+                />
+                <label htmlFor="smtp_ssl" className={`text-sm ${smtpUseTls ? 'text-gray-400 dark:text-gray-500' : 'text-gray-700 dark:text-gray-300'}`}>SSL (port 465)</label>
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setSmtpShowForm(false)} className="flex-1 py-2 px-4 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium">{t('common.cancel')}</button>

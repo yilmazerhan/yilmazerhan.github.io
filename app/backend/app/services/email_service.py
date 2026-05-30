@@ -39,6 +39,7 @@ class EmailService:
         use_tls: bool,
         from_email: str,
         from_name: str,
+        use_ssl: bool = False,
     ) -> SmtpConfig:
         cfg = SmtpConfig(
             host=host,
@@ -46,6 +47,7 @@ class EmailService:
             username=username,
             password_encrypted=encrypt_field(password, settings.SMTP_ENCRYPTION_KEY),
             use_tls=use_tls,
+            use_ssl=use_ssl,
             from_email=from_email,
             from_name=from_name,
         )
@@ -61,6 +63,7 @@ class EmailService:
         username: Optional[str] = None,
         password: Optional[str] = None,
         use_tls: Optional[bool] = None,
+        use_ssl: Optional[bool] = None,
         from_email: Optional[str] = None,
         from_name: Optional[str] = None,
         is_active: Optional[bool] = None,
@@ -74,6 +77,7 @@ class EmailService:
         if username is not None: cfg.username = username
         if password is not None: cfg.password_encrypted = encrypt_field(password, settings.SMTP_ENCRYPTION_KEY)
         if use_tls is not None: cfg.use_tls = use_tls
+        if use_ssl is not None: cfg.use_ssl = use_ssl
         if from_email is not None: cfg.from_email = from_email
         if from_name is not None: cfg.from_name = from_name
         if is_active is not None: cfg.is_active = is_active
@@ -109,15 +113,21 @@ class EmailService:
         msg.attach(MIMEText(html_body, "html", "utf-8"))
 
         def _send_sync():
-            if cfg.use_tls:
-                context = ssl_lib.create_default_context()
+            context = ssl_lib.create_default_context()
+            if getattr(cfg, 'use_ssl', False):
+                with smtplib.SMTP_SSL(cfg.host, cfg.port, context=context, timeout=10) as server:
+                    server.login(cfg.username, password)
+                    server.sendmail(cfg.from_email, [to_email], msg.as_bytes())
+            elif cfg.use_tls:
                 with smtplib.SMTP(cfg.host, cfg.port, timeout=10) as server:
                     server.ehlo()
                     server.starttls(context=context)
+                    server.ehlo()
                     server.login(cfg.username, password)
                     server.sendmail(cfg.from_email, [to_email], msg.as_bytes())
             else:
                 with smtplib.SMTP(cfg.host, cfg.port, timeout=10) as server:
+                    server.ehlo()
                     server.login(cfg.username, password)
                     server.sendmail(cfg.from_email, [to_email], msg.as_bytes())
 

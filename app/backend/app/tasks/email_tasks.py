@@ -57,24 +57,35 @@ async def _send_email_async(to_email: str, subject: str, html_body: str, log_id:
         msg.attach(MIMEText(html_body, "html", "utf-8"))
 
         try:
-            if smtp_cfg.use_tls:
-                context = ssl_lib.create_default_context()
-                with smtplib.SMTP(smtp_cfg.host, smtp_cfg.port) as server:
+            context = ssl_lib.create_default_context()
+            if getattr(smtp_cfg, 'use_ssl', False):
+                with smtplib.SMTP_SSL(smtp_cfg.host, smtp_cfg.port, context=context, timeout=15) as server:
+                    server.login(smtp_cfg.username, password)
+                    server.sendmail(smtp_cfg.from_email, [to_email], msg.as_string())
+            elif smtp_cfg.use_tls:
+                with smtplib.SMTP(smtp_cfg.host, smtp_cfg.port, timeout=15) as server:
+                    server.ehlo()
                     server.starttls(context=context)
+                    server.ehlo()
                     server.login(smtp_cfg.username, password)
                     server.sendmail(smtp_cfg.from_email, [to_email], msg.as_string())
             else:
-                with smtplib.SMTP(smtp_cfg.host, smtp_cfg.port) as server:
+                with smtplib.SMTP(smtp_cfg.host, smtp_cfg.port, timeout=15) as server:
+                    server.ehlo()
                     server.login(smtp_cfg.username, password)
                     server.sendmail(smtp_cfg.from_email, [to_email], msg.as_string())
 
             if log_id:
                 await _mark_log_sent(db, log_id)
+            await db.commit()
         except Exception as e:
             if log_id:
                 await _mark_log_failed(db, log_id, str(e))
+                try:
+                    await db.commit()
+                except Exception:
+                    pass
             raise
-        await db.commit()
 
 
 async def _mark_log_sent(db, log_id: str):

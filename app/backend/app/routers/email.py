@@ -41,7 +41,7 @@ async def create_smtp(
     svc = EmailService(db)
     return await svc.create_smtp_config(
         host=body.host, port=body.port, username=body.username,
-        password=body.password, use_tls=body.use_tls,
+        password=body.password, use_tls=body.use_tls, use_ssl=body.use_ssl,
         from_email=body.from_email, from_name=body.from_name,
     )
 
@@ -56,7 +56,7 @@ async def update_smtp(
     svc = EmailService(db)
     return await svc.update_smtp_config(
         config_id, host=body.host, port=body.port, username=body.username,
-        password=body.password, use_tls=body.use_tls,
+        password=body.password, use_tls=body.use_tls, use_ssl=body.use_ssl,
         from_email=body.from_email, from_name=body.from_name, is_active=body.is_active,
     )
 

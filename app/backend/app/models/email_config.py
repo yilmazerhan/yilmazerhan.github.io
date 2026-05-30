@@ -16,6 +16,7 @@ class SmtpConfig(Base):
     username: Mapped[str] = mapped_column(String(255), nullable=False)
     password_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
     use_tls: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    use_ssl: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     from_email: Mapped[str] = mapped_column(String(255), nullable=False)
     from_name: Mapped[str] = mapped_column(String(100), nullable=False, default="Team App")
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
