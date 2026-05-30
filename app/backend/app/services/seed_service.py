@@ -50,7 +50,7 @@ async def _seed_superadmin(db: AsyncSession) -> None:
     if not settings.SUPERADMIN_PASSWORD:
         return
 
-    result = await db.execute(select(User).where(User.role == "superadmin"))
+    result = await db.execute(select(User).where(User.role == "superadmin").limit(1))
     if result.scalar_one_or_none():
         return
 
