@@ -175,7 +175,7 @@ function TeamForm({
   const [error, setError] = useState('')
   const { data: usersData } = useUsers({ is_active: true, limit: 200 })
 
-  const managers = (usersData?.items ?? []).filter((u) => u.role !== 'superadmin')
+  const managers = (usersData?.items ?? []).filter((u) => u.role === 'team_manager' || u.role === 'superadmin')
 
   function set(field: keyof TeamFormData, value: string | boolean) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -231,7 +231,7 @@ function TeamForm({
             <option value="">{t('teams.manager_placeholder')}</option>
             {managers.map((u) => (
               <option key={u.id} value={u.id}>
-                {u.full_name} ({u.role === 'team_manager' ? t('users.role_team_manager') : t('users.role_user')})
+                {u.full_name} ({u.role === 'superadmin' ? t('users.role_superadmin') : t('users.role_team_manager')})
               </option>
             ))}
           </select>
