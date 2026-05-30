@@ -7,6 +7,7 @@ export interface SmtpConfig {
   port: number
   username: string
   use_tls: boolean
+  use_ssl: boolean
   from_email: string
   from_name: string
   is_active: boolean
