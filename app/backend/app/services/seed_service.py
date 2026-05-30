@@ -102,16 +102,27 @@ SYSTEM_EMAIL_TEMPLATES = [
     {
         "name": "Yeni Hesap Bilgileri",
         "slug": "new_account",
-        "subject": "Hesabınız Oluşturuldu",
-        "html_body": """<h2>Merhaba {{ full_name }},</h2>
+        "subject": "{% if app_name %}{{ app_name }} — {% endif %}Hesabınız Oluşturuldu",
+        "html_body": """<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+{% if app_name %}<p style="font-size:1.1em;font-weight:bold;color:#1d4ed8;">{{ app_name }}</p>{% endif %}
+<h2 style="color:#111827;">Merhaba {{ full_name }},</h2>
 <p>Hesabınız oluşturuldu. Aşağıdaki bilgilerle giriş yapabilirsiniz:</p>
 <table style="border-collapse:collapse;margin:16px 0;">
   <tr><td style="padding:4px 12px 4px 0;font-weight:bold;">Kullanıcı Adı:</td><td style="padding:4px 0;font-family:monospace;font-size:1.1em;">{{ username }}</td></tr>
   <tr><td style="padding:4px 12px 4px 0;font-weight:bold;">Geçici Şifre:</td><td style="padding:4px 0;font-family:monospace;font-size:1.1em;">{{ temp_password }}</td></tr>
 </table>
-<p><a href="{{ login_url }}" style="background:#3b82f6;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;">Giriş Yap</a></p>
-<p style="color:#6b7280;font-size:0.9em;">Güvenliğiniz için ilk girişinizde şifrenizi değiştirmenizi öneririz.</p>""",
-        "available_vars": {"full_name": "Kullanıcı adı", "username": "Kullanıcı adı", "temp_password": "Geçici şifre", "login_url": "Giriş URL"},
+<p><a href="{{ login_url }}" style="background:#3b82f6;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;">Giriş Yap</a></p>
+{% if app_url %}<p style="color:#6b7280;font-size:0.9em;">Uygulama adresi: <a href="{{ app_url }}" style="color:#3b82f6;">{{ app_url }}</a></p>{% endif %}
+<p style="color:#6b7280;font-size:0.9em;">Güvenliğiniz için ilk girişinizde şifrenizi değiştirmenizi öneririz.</p>
+</div>""",
+        "available_vars": {
+            "full_name": "Kullanıcı adı",
+            "username": "Kullanıcı adı",
+            "temp_password": "Geçici şifre",
+            "login_url": "Giriş URL",
+            "app_name": "Uygulama adı (otomatik)",
+            "app_url": "Uygulama URL (otomatik)",
+        },
         "is_system": True,
     },
     {
@@ -181,5 +192,13 @@ SYSTEM_EMAIL_TEMPLATES = [
 async def _seed_email_templates(db: AsyncSession) -> None:
     for tmpl_data in SYSTEM_EMAIL_TEMPLATES:
         result = await db.execute(select(EmailTemplate).where(EmailTemplate.slug == tmpl_data["slug"]))
-        if not result.scalar_one_or_none():
+        existing = result.scalar_one_or_none()
+        if existing:
+            # Keep system templates in sync with code — update subject/body/vars
+            if existing.is_system:
+                existing.name = tmpl_data["name"]
+                existing.subject = tmpl_data["subject"]
+                existing.html_body = tmpl_data["html_body"]
+                existing.available_vars = tmpl_data["available_vars"]
+        else:
             db.add(EmailTemplate(**tmpl_data))

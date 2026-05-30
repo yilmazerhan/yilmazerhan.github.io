@@ -172,13 +172,27 @@ def _get_setting(attr: str, default):
 async def _send_auth_email_async(to_email: str, template_slug: str, variables: dict):
     from app.database import AsyncSessionLocal
     from app.services.email_service import EmailService
+    from app.models.app_setting import AppSetting
+    from app.config import settings
+    from sqlalchemy import select
 
     async with AsyncSessionLocal() as db:
         svc = EmailService(db)
         template = await svc.get_template_by_slug(template_slug)
         if not template:
             return
-        subject, html_body = svc.render_template(template, variables)
+
+        # Inject app branding so any template can use {{ app_name }} / {{ app_url }}
+        setting_result = await db.execute(
+            select(AppSetting).where(AppSetting.key == "company_name")
+        )
+        name_row = setting_result.scalar_one_or_none()
+        app_name = name_row.value if name_row and name_row.value else ""
+        app_url = settings.FRONTEND_URL.rstrip("/")
+
+        merged_vars = {"app_name": app_name, "app_url": app_url, **variables}
+
+        subject, html_body = svc.render_template(template, merged_vars)
         log = await svc.create_log_entry(
             to_email=to_email,
             subject=subject,
