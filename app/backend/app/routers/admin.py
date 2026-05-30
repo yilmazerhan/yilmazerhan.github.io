@@ -7,7 +7,7 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select, func
+from sqlalchemy import select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -268,6 +268,69 @@ async def dashboard_stats(
         emails_sent_today=emails_sent_today,
         emails_failed_today=emails_failed_today,
     )
+
+
+# ─── System Health ────────────────────────────────────────────────────────────
+
+@router.get("/system-health")
+async def system_health(
+    _: Annotated[User, Depends(require_superadmin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    import asyncio
+    import redis.asyncio as aioredis
+    from app.config import settings
+    from app.tasks.celery_app import celery_app
+
+    # Database check
+    db_status = "ok"
+    db_error = None
+    try:
+        await db.execute(text("SELECT 1"))
+    except Exception as exc:
+        db_status = "error"
+        db_error = str(exc)
+
+    # Redis check
+    redis_status = "ok"
+    redis_error = None
+    try:
+        r = aioredis.from_url(settings.REDIS_URL)
+        await r.ping()
+        await r.aclose()
+    except Exception as exc:
+        redis_status = "error"
+        redis_error = str(exc)
+
+    # Celery worker check (run blocking call in thread executor)
+    celery_status = "degraded"
+    loop = asyncio.get_event_loop()
+    try:
+        stats = await loop.run_in_executor(
+            None,
+            lambda: celery_app.control.inspect(timeout=2.0).stats(),
+        )
+        if stats and isinstance(stats, dict) and len(stats) > 0:
+            celery_status = "ok"
+    except Exception:
+        celery_status = "degraded"
+
+    # Uptime
+    try:
+        from app.main import _APP_START_TIME
+        import time
+        uptime_seconds = int(time.time() - _APP_START_TIME)
+    except Exception:
+        uptime_seconds = 0
+
+    return {
+        "database": db_status,
+        "redis": redis_status,
+        "celery_worker": celery_status,
+        "uptime_seconds": uptime_seconds,
+        "db_error": db_error,
+        "redis_error": redis_error,
+    }
 
 
 # ─── Backup ───────────────────────────────────────────────────────────────────

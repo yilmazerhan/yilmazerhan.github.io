@@ -85,7 +85,13 @@
     "hours_by_person": "Hours Per Person This Week",
     "no_hours": "No records this week",
     "edit_widgets": "Customize Widgets",
-    "done_editing": "Done"
+    "done_editing": "Done",
+    "health_title": "System Health",
+    "health_db": "Database",
+    "health_redis": "Redis",
+    "health_worker": "Celery Worker",
+    "health_uptime": "Uptime",
+    "widget_health_check": "System Health"
   },
   "worklog": {
     "title": "Work Log",
@@ -464,7 +470,15 @@
     "recipient_assignee": "Assignee",
     "recipient_team_manager": "Team Manager",
     "recipient_all_managers": "All Managers",
-    "recipient_creator": "Creator"
+    "recipient_creator": "Creator",
+    "trigger_dashboard_report": "Dashboard Report",
+    "recipient_specific_emails": "Specific Email Addresses",
+    "recipient_emails_label": "Email Addresses (comma separated)",
+    "send_hour": "Send Hour (0-23)",
+    "frequency": "Frequency",
+    "frequency_daily": "Daily",
+    "frequency_weekly": "Weekly",
+    "day_of_week": "Day of Week"
   },
   "reports": {
     "title": "Reports",

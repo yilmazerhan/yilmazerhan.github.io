@@ -23,6 +23,7 @@ export default function EmailWorkflowsPage() {
     { value: 'task_assigned', label: t('email.trigger_task_assigned') },
     { value: 'account_activation', label: t('email.trigger_account_activation') },
     { value: 'password_reset', label: t('email.trigger_password_reset') },
+    { value: 'dashboard_report', label: t('email.trigger_dashboard_report') },
   ]
 
   const RECIPIENT_TYPES = [
@@ -30,6 +31,7 @@ export default function EmailWorkflowsPage() {
     { value: 'team_manager', label: t('email.recipient_team_manager') },
     { value: 'all_managers', label: t('email.recipient_all_managers') },
     { value: 'creator', label: t('email.recipient_creator') },
+    { value: 'specific_emails', label: t('email.recipient_specific_emails') },
   ]
 
   const { data: workflows = [], isLoading } = useEmailWorkflows()
@@ -50,29 +52,59 @@ export default function EmailWorkflowsPage() {
   const [sendTeams, setSendTeams] = useState(false)
   const [teamsWebhookId, setTeamsWebhookId] = useState('')
   const [daysBefore, setDaysBefore] = useState(3)
+  const [recipientEmailsInput, setRecipientEmailsInput] = useState('')
+  const [sendHour, setSendHour] = useState(8)
+  const [frequency, setFrequency] = useState('daily')
+  const [dayOfWeek, setDayOfWeek] = useState(0)
   const [error, setError] = useState('')
 
   function openCreate() {
     setEditing(null); setName(''); setTriggerType('task_due_soon'); setTemplateId(templates[0]?.id || '')
-    setRecipientType('assignee'); setSendTeams(false); setTeamsWebhookId(''); setDaysBefore(3); setError('')
+    setRecipientType('assignee'); setSendTeams(false); setTeamsWebhookId(''); setDaysBefore(3)
+    setRecipientEmailsInput(''); setSendHour(8); setFrequency('daily'); setDayOfWeek(0); setError('')
     setShowForm(true)
   }
 
   function openEdit(wf: EmailWorkflow) {
     setEditing(wf); setName(wf.name); setTriggerType(wf.trigger_type); setTemplateId(wf.template_id)
     setRecipientType(wf.recipient_type); setSendTeams(wf.send_teams); setTeamsWebhookId(wf.teams_webhook_id || '')
-    setDaysBefore((wf.trigger_config as any)?.days_before ?? 3); setError('')
+    setDaysBefore((wf.trigger_config as any)?.days_before ?? 3)
+    setSendHour((wf.trigger_config as any)?.send_hour ?? 8)
+    setFrequency((wf.trigger_config as any)?.frequency ?? 'daily')
+    setDayOfWeek((wf.trigger_config as any)?.day_of_week ?? 0)
+    if (wf.recipient_type === 'specific_emails' && Array.isArray(wf.recipient_users)) {
+      setRecipientEmailsInput((wf.recipient_users as string[]).join(', '))
+    } else {
+      setRecipientEmailsInput('')
+    }
+    setError('')
     setShowForm(true)
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setError('')
-    const triggerConfig = triggerType === 'task_due_soon' ? { days_before: daysBefore } : null
-    const data = {
+
+    let triggerConfig: Record<string, unknown> | null = null
+    if (triggerType === 'task_due_soon') {
+      triggerConfig = { days_before: daysBefore }
+    } else if (triggerType === 'dashboard_report') {
+      triggerConfig = { send_hour: sendHour, frequency, day_of_week: dayOfWeek }
+    }
+
+    let recipientUsers: string[] | undefined
+    if (recipientType === 'specific_emails') {
+      recipientUsers = recipientEmailsInput.split(',').map((e) => e.trim()).filter((e) => e.includes('@'))
+    }
+
+    const data: Record<string, unknown> = {
       name, trigger_type: triggerType, template_id: templateId, recipient_type: recipientType,
       trigger_config: triggerConfig, send_teams: sendTeams,
       teams_webhook_id: sendTeams && teamsWebhookId ? teamsWebhookId : null,
     }
+    if (recipientUsers !== undefined) {
+      data.recipient_users = recipientUsers
+    }
+
     try {
       if (editing) await updateWorkflow.mutateAsync({ id: editing.id, ...data })
       else await createWorkflow.mutateAsync(data)
@@ -177,6 +209,36 @@ export default function EmailWorkflowsPage() {
                 </div>
               )}
 
+              {triggerType === 'dashboard_report' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('email.send_hour')}</label>
+                    <input type="number" value={sendHour} min={0} max={23} onChange={(e) => setSendHour(parseInt(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('email.frequency')}</label>
+                    <select value={frequency} onChange={(e) => setFrequency(e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500">
+                      <option value="daily">{t('email.frequency_daily')}</option>
+                      <option value="weekly">{t('email.frequency_weekly')}</option>
+                    </select>
+                  </div>
+                  {frequency === 'weekly' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('email.day_of_week')}</label>
+                      <select value={dayOfWeek} onChange={(e) => setDayOfWeek(parseInt(e.target.value))} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500">
+                        <option value={0}>{t('backup.monday')}</option>
+                        <option value={1}>{t('backup.tuesday')}</option>
+                        <option value={2}>{t('backup.wednesday')}</option>
+                        <option value={3}>{t('backup.thursday')}</option>
+                        <option value={4}>{t('backup.friday')}</option>
+                        <option value={5}>{t('backup.saturday')}</option>
+                        <option value={6}>{t('backup.sunday')}</option>
+                      </select>
+                    </div>
+                  )}
+                </>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('email.template_label_form')} *</label>
                 <select value={templateId} onChange={(e) => setTemplateId(e.target.value)} required className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500">
@@ -191,6 +253,19 @@ export default function EmailWorkflowsPage() {
                   {RECIPIENT_TYPES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
                 </select>
               </div>
+
+              {recipientType === 'specific_emails' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('email.recipient_emails_label')}</label>
+                  <input
+                    type="text"
+                    value={recipientEmailsInput}
+                    onChange={(e) => setRecipientEmailsInput(e.target.value)}
+                    placeholder="email1@domain.com, email2@domain.com"
+                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+              )}
 
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="sendTeams" checked={sendTeams} onChange={(e) => setSendTeams(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-primary-600" />

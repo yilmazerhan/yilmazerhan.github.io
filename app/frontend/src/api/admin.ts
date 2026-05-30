@@ -46,11 +46,21 @@ export interface DashboardStats {
   emails_failed_today: number
 }
 
+export interface SystemHealth {
+  database: 'ok' | 'error'
+  redis: 'ok' | 'error'
+  celery_worker: 'ok' | 'degraded'
+  uptime_seconds: number
+  db_error: string | null
+  redis_error: string | null
+}
+
 const adminKeys = {
   ssl: ['admin', 'ssl'] as const,
   branding: ['admin', 'branding'] as const,
   auditLogs: (p: Record<string, unknown>) => ['admin', 'audit-logs', p] as const,
   dashboardStats: ['admin', 'stats', 'dashboard'] as const,
+  systemHealth: ['admin', 'system-health'] as const,
 }
 
 export function useSslCertificates() {
@@ -168,6 +178,16 @@ export function useDashboardStats(opts?: { enabled?: boolean }) {
     queryFn: () =>
       apiClient.get<DashboardStats>('/admin/stats/dashboard').then((r) => r.data),
     staleTime: 60_000,
+    enabled: opts?.enabled ?? true,
+  })
+}
+
+export function useSystemHealth(opts?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: adminKeys.systemHealth,
+    queryFn: () =>
+      apiClient.get<SystemHealth>('/admin/system-health').then((r) => r.data),
+    refetchInterval: 30000,
     enabled: opts?.enabled ?? true,
   })
 }

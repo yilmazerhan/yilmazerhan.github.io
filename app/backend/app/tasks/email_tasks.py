@@ -263,6 +263,14 @@ async def _evaluate_workflows_async():
                 if now.hour == hour:
                     await _handle_worklog_reminder(db, wf, today)
 
+            elif wf.trigger_type == "dashboard_report":
+                hour = (wf.trigger_config or {}).get("send_hour", 8)
+                frequency = (wf.trigger_config or {}).get("frequency", "daily")
+                day_of_week = (wf.trigger_config or {}).get("day_of_week", 0)  # 0=Mon
+                if now.hour == hour:
+                    if frequency == "daily" or (frequency == "weekly" and today.weekday() == day_of_week):
+                        await _handle_dashboard_report(db, wf, today)
+
             wf.last_run_at = now
 
         await db.commit()
@@ -421,6 +429,84 @@ async def _handle_worklog_reminder(db, workflow, today: date):
 
         send_email_task.delay(
             to_email=user.email,
+            subject=subject,
+            html_body=html,
+            log_id=str(log.id),
+        )
+
+
+async def _handle_dashboard_report(db, workflow, today: date):
+    from sqlalchemy import select, func as sqlfunc
+    from app.models.user import User
+    from app.models.kanban import Task, KanbanColumn
+    from app.models.worklog import WorkLog
+    from app.models.email_log import EmailLog
+    from app.services.email_service import EmailService
+    from datetime import datetime, timezone, timedelta
+
+    svc = EmailService(db)
+
+    # Get recipient emails from recipient_users list (stored as email strings for dashboard_report)
+    recipient_emails = []
+    if workflow.recipient_type == "specific_emails" and workflow.recipient_users:
+        recipient_emails = [e for e in workflow.recipient_users if isinstance(e, str) and "@" in e]
+
+    if not recipient_emails:
+        return
+
+    # Check already sent today (use workflow last_run_at as proxy)
+    if workflow.last_run_at:
+        last_run_date = workflow.last_run_at.astimezone(timezone.utc).date()
+        if last_run_date == today:
+            return
+
+    # Collect dashboard stats
+    now_utc = datetime.now(timezone.utc)
+    week_ago = now_utc - timedelta(days=7)
+    today_start = datetime.combine(today, datetime.min.time()).replace(tzinfo=timezone.utc)
+
+    total_users = (await db.execute(select(sqlfunc.count()).where(User.is_deleted == False))).scalar_one()
+    active_users = (await db.execute(select(sqlfunc.count()).where(User.is_active == True, User.is_deleted == False))).scalar_one()
+    total_tasks = (await db.execute(select(sqlfunc.count(Task.id)))).scalar_one()
+    active_tasks = (await db.execute(select(sqlfunc.count(Task.id)).where(Task.is_archived == False))).scalar_one()
+    overdue_tasks = (await db.execute(
+        select(sqlfunc.count(Task.id))
+        .join(KanbanColumn, Task.column_id == KanbanColumn.id)
+        .where(Task.is_archived == False, Task.due_date < today, KanbanColumn.is_terminal == False)
+    )).scalar_one()
+    worklogs_week = (await db.execute(
+        select(sqlfunc.count(WorkLog.id)).where(WorkLog.log_date >= week_ago.date())
+    )).scalar_one()
+    emails_sent = (await db.execute(
+        select(sqlfunc.count(EmailLog.id)).where(EmailLog.status == "sent", EmailLog.sent_at >= today_start)
+    )).scalar_one()
+
+    template = await svc.get_template_by_slug("dashboard_report")
+    if not template:
+        return
+
+    variables = {
+        "report_date": str(today),
+        "total_users": total_users,
+        "active_users": active_users,
+        "total_tasks": total_tasks,
+        "active_tasks": active_tasks,
+        "overdue_tasks": overdue_tasks,
+        "worklogs_this_week": worklogs_week,
+        "emails_sent_today": emails_sent,
+    }
+
+    for email in recipient_emails:
+        subject, html = svc.render_template(template, variables)
+        log = await svc.create_log_entry(
+            to_email=email,
+            subject=subject,
+            workflow_id=workflow.id,
+            template_id=workflow.template_id,
+        )
+        await db.flush()
+        send_email_task.delay(
+            to_email=email,
             subject=subject,
             html_body=html,
             log_id=str(log.id),

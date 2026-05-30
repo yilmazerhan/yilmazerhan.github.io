@@ -1,10 +1,13 @@
 import logging
+import time as _time_module
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 
 from app.config import settings
+
+_APP_START_TIME = _time_module.time()
 from app.core.middleware import SecurityHeadersMiddleware, AuditLogMiddleware
 from app.core.rate_limit import limiter, rate_limit_exceeded_handler
 from app.routers import auth, users, teams, permissions, worklog, kanban, jira, email, admin, notifications

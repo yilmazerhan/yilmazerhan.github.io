@@ -85,7 +85,13 @@
     "hours_by_person": "Bu Hafta Kişi Başı Saat",
     "no_hours": "Bu hafta kayıt yok",
     "edit_widgets": "Widget'ları Düzenle",
-    "done_editing": "Tamam"
+    "done_editing": "Tamam",
+    "health_title": "Sistem Sağlığı",
+    "health_db": "Veritabanı",
+    "health_redis": "Redis",
+    "health_worker": "Celery Worker",
+    "health_uptime": "Çalışma Süresi",
+    "widget_health_check": "Sistem Sağlığı"
   },
   "worklog": {
     "title": "İş Günlüğü",
@@ -464,7 +470,15 @@
     "recipient_assignee": "Atanan Kişi",
     "recipient_team_manager": "Takım Yöneticisi",
     "recipient_all_managers": "Tüm Yöneticiler",
-    "recipient_creator": "Oluşturan"
+    "recipient_creator": "Oluşturan",
+    "trigger_dashboard_report": "Dashboard Raporu",
+    "recipient_specific_emails": "Belirli E-posta Adresleri",
+    "recipient_emails_label": "E-posta Adresleri (virgülle ayırın)",
+    "send_hour": "Gönderim Saati (0-23)",
+    "frequency": "Sıklık",
+    "frequency_daily": "Günlük",
+    "frequency_weekly": "Haftalık",
+    "day_of_week": "Haftanın Günü"
   },
   "reports": {
     "title": "Raporlar",

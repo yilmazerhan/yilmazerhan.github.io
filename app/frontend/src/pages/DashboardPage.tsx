@@ -2,15 +2,22 @@ import { useMemo, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format, subDays, isToday, isPast, parseISO } from 'date-fns'
 import { tr, enUS } from 'date-fns/locale'
-import { Clock, AlertTriangle, CheckCircle2, ListTodo, TrendingUp, Users, Database, Mail, Settings2, Eye, EyeOff, Check } from 'lucide-react'
+import { Clock, AlertTriangle, CheckCircle2, ListTodo, TrendingUp, Users, Database, Mail, Settings2, Eye, EyeOff, Check, CheckCircle, XCircle, AlertCircle, Activity } from 'lucide-react'
 import { useTasks } from '@/api/kanban'
 import { useWorkLogs } from '@/api/worklog'
 import { useAuthStore } from '@/store/authStore'
-import { useDashboardStats } from '@/api/admin'
+import { useDashboardStats, useSystemHealth } from '@/api/admin'
 import { resolveName } from '@/utils/i18nName'
 
-const WIDGET_KEYS = ['db_stats', 'charts', 'overdue', 'recent_logs'] as const
+const WIDGET_KEYS = ['db_stats', 'charts', 'overdue', 'recent_logs', 'health_check'] as const
 type WidgetKey = typeof WIDGET_KEYS[number]
+
+function formatUptime(seconds: number): string {
+  const d = Math.floor(seconds / 86400)
+  const h = Math.floor((seconds % 86400) / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  return d > 0 ? `${d}g ${h}s ${m}d` : h > 0 ? `${h}s ${m}d` : `${m}d`
+}
 
 function loadHiddenWidgets(): Set<WidgetKey> {
   try {
@@ -380,6 +387,90 @@ export default function DashboardPage() {
         </div>
         )}
       </div>
+
+      {/* System Health Widget — superadmin only */}
+      {isSuperAdmin && (!isHidden('health_check') || editMode) && (
+        <HealthCheckWidget
+          editMode={editMode}
+          isHidden={isHidden('health_check')}
+          onToggle={() => toggleWidget('health_check')}
+          t={t}
+        />
+      )}
+    </div>
+  )
+}
+
+function HealthCheckWidget({
+  editMode,
+  isHidden,
+  onToggle,
+  t,
+}: {
+  editMode: boolean
+  isHidden: boolean
+  onToggle: () => void
+  t: (key: string) => string
+}) {
+  const { data: health } = useSystemHealth({ enabled: true })
+
+  const statusIcon = (status: string | undefined) => {
+    if (status === 'ok') return <CheckCircle className="h-4 w-4 text-green-500" />
+    if (status === 'degraded') return <AlertCircle className="h-4 w-4 text-amber-500" />
+    return <XCircle className="h-4 w-4 text-red-500" />
+  }
+
+  const statusColor = (status: string | undefined) => {
+    if (status === 'ok') return 'text-green-600 dark:text-green-400'
+    if (status === 'degraded') return 'text-amber-600 dark:text-amber-400'
+    return 'text-red-600 dark:text-red-400'
+  }
+
+  return (
+    <div className={`bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 ${isHidden ? 'opacity-40' : ''}`}>
+      <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
+        <Activity className="h-4 w-4 text-gray-400" />
+        {t('dashboard.health_title')}
+        {editMode && (
+          <button onClick={onToggle} className="ml-auto p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+            {isHidden ? <Eye className="h-4 w-4 text-gray-400" /> : <EyeOff className="h-4 w-4 text-gray-400" />}
+          </button>
+        )}
+      </h2>
+      {!health ? (
+        <p className="text-sm text-gray-400">{t('common.loading')}</p>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="flex items-center gap-2">
+            {statusIcon(health.database)}
+            <div>
+              <p className={`text-sm font-medium ${statusColor(health.database)}`}>{health.database}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{t('dashboard.health_db')}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {statusIcon(health.redis)}
+            <div>
+              <p className={`text-sm font-medium ${statusColor(health.redis)}`}>{health.redis}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{t('dashboard.health_redis')}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {statusIcon(health.celery_worker)}
+            <div>
+              <p className={`text-sm font-medium ${statusColor(health.celery_worker)}`}>{health.celery_worker}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{t('dashboard.health_worker')}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-indigo-500" />
+            <div>
+              <p className="text-sm font-medium text-gray-900 dark:text-white">{formatUptime(health.uptime_seconds)}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{t('dashboard.health_uptime')}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

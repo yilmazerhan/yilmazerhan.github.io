@@ -186,6 +186,60 @@ SYSTEM_EMAIL_TEMPLATES = [
         "available_vars": {"task_title": "Görev başlığı", "assignee_name": "Atanan adı", "due_date": "Bitiş tarihi (isteğe bağlı)", "priority": "Öncelik"},
         "is_system": False,
     },
+    {
+        "name": "Dashboard Raporu",
+        "slug": "dashboard_report",
+        "subject": "{% if app_name %}{{ app_name }} — {% endif %}Dashboard Raporu: {{ report_date }}",
+        "html_body": """<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+{% if app_name %}<p style="font-size:1.1em;font-weight:bold;color:#1d4ed8;">{{ app_name }}</p>{% endif %}
+<h2 style="color:#111827;">Dashboard Raporu</h2>
+<p style="color:#6b7280;">{{ report_date }} tarihli özet</p>
+<table style="width:100%;border-collapse:collapse;margin:16px 0;">
+  <tr style="background:#f3f4f6;">
+    <td style="padding:8px 12px;font-weight:bold;border:1px solid #e5e7eb;">Toplam Kullanıcı</td>
+    <td style="padding:8px 12px;border:1px solid #e5e7eb;text-align:right;">{{ total_users }}</td>
+  </tr>
+  <tr>
+    <td style="padding:8px 12px;font-weight:bold;border:1px solid #e5e7eb;">Aktif Kullanıcı</td>
+    <td style="padding:8px 12px;border:1px solid #e5e7eb;text-align:right;">{{ active_users }}</td>
+  </tr>
+  <tr style="background:#f3f4f6;">
+    <td style="padding:8px 12px;font-weight:bold;border:1px solid #e5e7eb;">Toplam Görev</td>
+    <td style="padding:8px 12px;border:1px solid #e5e7eb;text-align:right;">{{ total_tasks }}</td>
+  </tr>
+  <tr>
+    <td style="padding:8px 12px;font-weight:bold;border:1px solid #e5e7eb;">Aktif Görev</td>
+    <td style="padding:8px 12px;border:1px solid #e5e7eb;text-align:right;">{{ active_tasks }}</td>
+  </tr>
+  <tr style="background:#f3f4f6;">
+    <td style="padding:8px 12px;font-weight:bold;color:#dc2626;border:1px solid #e5e7eb;">Gecikmiş Görev</td>
+    <td style="padding:8px 12px;border:1px solid #e5e7eb;text-align:right;color:#dc2626;font-weight:bold;">{{ overdue_tasks }}</td>
+  </tr>
+  <tr>
+    <td style="padding:8px 12px;font-weight:bold;border:1px solid #e5e7eb;">Bu Hafta İş Günlüğü</td>
+    <td style="padding:8px 12px;border:1px solid #e5e7eb;text-align:right;">{{ worklogs_this_week }}</td>
+  </tr>
+  <tr style="background:#f3f4f6;">
+    <td style="padding:8px 12px;font-weight:bold;border:1px solid #e5e7eb;">Bugün Gönderilen E-posta</td>
+    <td style="padding:8px 12px;border:1px solid #e5e7eb;text-align:right;">{{ emails_sent_today }}</td>
+  </tr>
+</table>
+{% if app_url %}<p style="color:#6b7280;font-size:0.9em;">Detaylar için: <a href="{{ app_url }}" style="color:#3b82f6;">{{ app_url }}</a></p>{% endif %}
+</div>""",
+        "available_vars": {
+            "report_date": "Rapor tarihi",
+            "total_users": "Toplam kullanıcı",
+            "active_users": "Aktif kullanıcı",
+            "total_tasks": "Toplam görev",
+            "active_tasks": "Aktif görev",
+            "overdue_tasks": "Gecikmiş görev",
+            "worklogs_this_week": "Bu hafta iş günlüğü",
+            "emails_sent_today": "Bugün gönderilen e-posta",
+            "app_name": "Uygulama adı (otomatik)",
+            "app_url": "Uygulama URL (otomatik)",
+        },
+        "is_system": True,
+    },
 ]
 
 
