@@ -70,7 +70,15 @@ class TeamService:
         team = Team(name=name, description=description, manager_id=manager_id)
         self.db.add(team)
         await self.db.flush()
-        return team
+
+        # Eager-load manager so TeamResponse serialization doesn't trigger
+        # lazy loading in an async context (MissingGreenlet → 500).
+        result = await self.db.execute(
+            select(Team)
+            .options(selectinload(Team.manager), selectinload(Team.members))
+            .where(Team.id == team.id)
+        )
+        return result.scalar_one()
 
     async def update_team(
         self,
@@ -109,7 +117,14 @@ class TeamService:
             team.is_active = is_active
 
         await self.db.flush()
-        return team
+
+        # Re-query with eager-loaded relationships to avoid lazy loading in async context.
+        result = await self.db.execute(
+            select(Team)
+            .options(selectinload(Team.manager), selectinload(Team.members))
+            .where(Team.id == team.id)
+        )
+        return result.scalar_one()
 
     async def delete_team(self, team_id: uuid.UUID) -> None:
         team = await self.get_by_id(team_id)
