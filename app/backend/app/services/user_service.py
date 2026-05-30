@@ -272,6 +272,50 @@ class UserService:
         await self.db.flush()
         return user
 
+    async def _get_fallback_superadmin(self, exclude_user_id: uuid.UUID) -> Optional[User]:
+        """Return the superuser account (or any active superadmin) to inherit manager duties."""
+        # Prefer the seeded 'superuser' account
+        result = await self.db.execute(
+            select(User).where(
+                User.username == "superuser",
+                User.is_deleted == False,
+                User.is_active == True,
+                User.id != exclude_user_id,
+            ).limit(1)
+        )
+        fallback = result.scalar_one_or_none()
+        if fallback:
+            return fallback
+        # Any other active superadmin
+        result = await self.db.execute(
+            select(User).where(
+                User.role == "superadmin",
+                User.is_deleted == False,
+                User.is_active == True,
+                User.id != exclude_user_id,
+            ).limit(1)
+        )
+        return result.scalar_one_or_none()
+
+    async def _reassign_managed_teams(self, user: User, fallback: Optional[User]) -> None:
+        """Reassign all teams managed by user to fallback superadmin (or NULL if none)."""
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+        teams_result = await self.db.execute(
+            select(Team).where(Team.manager_id == user.id)
+        )
+        managed_teams = teams_result.scalars().all()
+        for team in managed_teams:
+            if fallback:
+                team.manager_id = fallback.id
+                # Ensure fallback is in the junction table for this team
+                await self.db.execute(
+                    pg_insert(user_teams)
+                    .values(user_id=fallback.id, team_id=team.id)
+                    .on_conflict_do_nothing()
+                )
+            else:
+                team.manager_id = None
+
     async def soft_delete_user(self, user_id: uuid.UUID, requester: User) -> None:
         user = await self.get_by_id(user_id)
         if user.id == requester.id:
@@ -283,6 +327,12 @@ class UserService:
             )
             if count_result.scalar_one() <= 1:
                 raise ForbiddenError("Son superadmin hesabı silinemez.")
+
+        # Reassign managed teams before marking deleted
+        if user.role in ("superadmin", "team_manager"):
+            fallback = await self._get_fallback_superadmin(user.id)
+            await self._reassign_managed_teams(user, fallback)
+
         user.is_deleted = True
         user.is_active = False
         await self.db.flush()
@@ -373,6 +423,13 @@ class UserService:
         user = result.scalar_one_or_none()
         if not user:
             raise NotFoundError("Silinmiş kullanıcı")
+
+        # Clear any remaining team manager FK references to avoid constraint violation.
+        # (soft_delete should have already reassigned these, but guard here too.)
+        await self.db.execute(
+            update(Team).where(Team.manager_id == user_id).values(manager_id=None)
+        )
+
         # Revoke all tokens first
         from sqlalchemy import update as sa_update
         from app.models.user import RefreshToken
