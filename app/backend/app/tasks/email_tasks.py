@@ -454,16 +454,20 @@ async def _handle_dashboard_report(db, workflow, today: date):
     if not recipient_emails:
         return
 
-    # Check already sent today (use workflow last_run_at as proxy)
-    if workflow.last_run_at:
-        last_run_date = workflow.last_run_at.astimezone(timezone.utc).date()
-        if last_run_date == today:
-            return
-
     # Collect dashboard stats
     now_utc = datetime.now(timezone.utc)
     week_ago = now_utc - timedelta(days=7)
     today_start = datetime.combine(today, datetime.min.time()).replace(tzinfo=timezone.utc)
+
+    # Deduplicate: check email_logs for any entry sent today via this workflow
+    already_sent = (await db.execute(
+        select(sqlfunc.count(EmailLog.id)).where(
+            EmailLog.workflow_id == workflow.id,
+            EmailLog.created_at >= today_start,
+        )
+    )).scalar_one()
+    if already_sent > 0:
+        return
 
     total_users = (await db.execute(select(sqlfunc.count()).where(User.is_deleted == False))).scalar_one()
     active_users = (await db.execute(select(sqlfunc.count()).where(User.is_active == True, User.is_deleted == False))).scalar_one()

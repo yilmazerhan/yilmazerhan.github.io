@@ -86,7 +86,7 @@ class EmailWorkflowCreate(BaseModel):
     @field_validator("trigger_type")
     @classmethod
     def validate_trigger(cls, v: str) -> str:
-        allowed = {"task_due_soon", "task_overdue", "task_status_changed", "worklog_reminder", "task_assigned", "account_activation", "password_reset"}
+        allowed = {"task_due_soon", "task_overdue", "task_status_changed", "worklog_reminder", "task_assigned", "account_activation", "password_reset", "dashboard_report"}
         if v not in allowed:
             raise ValueError(f"Geçersiz trigger tipi. İzin verilenler: {', '.join(sorted(allowed))}")
         return v
@@ -94,7 +94,7 @@ class EmailWorkflowCreate(BaseModel):
     @field_validator("recipient_type")
     @classmethod
     def validate_recipient(cls, v: str) -> str:
-        allowed = {"assignee", "team_manager", "all_managers", "specific_users", "creator"}
+        allowed = {"assignee", "team_manager", "all_managers", "specific_users", "creator", "specific_emails"}
         if v not in allowed:
             raise ValueError(f"Geçersiz alıcı tipi.")
         return v
