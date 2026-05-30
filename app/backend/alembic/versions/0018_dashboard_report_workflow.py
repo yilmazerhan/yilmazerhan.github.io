@@ -16,8 +16,9 @@ depends_on = None
 
 def upgrade() -> None:
     # PostgreSQL: add new values to existing enums (cannot be done in a transaction)
-    op.execute("ALTER TYPE email_workflow_trigger_type ADD VALUE IF NOT EXISTS 'dashboard_report'")
-    op.execute("ALTER TYPE email_workflow_recipient_type ADD VALUE IF NOT EXISTS 'specific_emails'")
+    # Actual type names from initial migration: email_trigger_type, recipient_type
+    op.execute("ALTER TYPE email_trigger_type ADD VALUE IF NOT EXISTS 'dashboard_report'")
+    op.execute("ALTER TYPE recipient_type ADD VALUE IF NOT EXISTS 'specific_emails'")
 
 
 def downgrade() -> None:
