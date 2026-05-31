@@ -4,7 +4,9 @@ import apiClient from './client'
 export interface Announcement {
   id: string
   title: string
+  title_en: string | null
   message: string
+  message_en: string | null
   type: 'info' | 'warning' | 'error' | 'success'
   target_type: 'all' | 'specific_teams' | 'specific_users'
   target_ids: string[] | null
@@ -18,7 +20,9 @@ export interface Announcement {
 
 export interface AnnouncementCreate {
   title: string
+  title_en?: string | null
   message: string
+  message_en?: string | null
   type: string
   target_type: string
   target_ids?: string[] | null

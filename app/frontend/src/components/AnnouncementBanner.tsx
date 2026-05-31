@@ -3,6 +3,11 @@ import { X, Info, AlertTriangle, AlertCircle, CheckCircle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useActiveAnnouncements, type Announcement } from '@/api/announcements'
 
+function localizedText(tr: string, en: string | null, lang: string): string {
+  if (lang === 'en') return en?.trim() || tr
+  return tr
+}
+
 const STORAGE_KEY = 'dismissed_announcements'
 
 function getDismissed(): Set<string> {
@@ -56,9 +61,11 @@ function AnnouncementItem({
   ann: Announcement
   onDismiss: (id: string) => void
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const cfg = typeConfig[ann.type] ?? typeConfig.info
   const Icon = cfg.icon
+  const displayTitle = localizedText(ann.title, ann.title_en, i18n.language)
+  const displayMessage = localizedText(ann.message, ann.message_en, i18n.language)
 
   return (
     <div
@@ -66,10 +73,10 @@ function AnnouncementItem({
     >
       <Icon className={`h-4 w-4 mt-0.5 flex-shrink-0 ${cfg.iconClass}`} />
       <div className="flex-1 min-w-0">
-        {ann.title && (
-          <span className="font-semibold mr-2">{ann.title}:</span>
+        {displayTitle && (
+          <span className="font-semibold mr-2">{displayTitle}:</span>
         )}
-        <span className="text-sm">{ann.message}</span>
+        <span className="text-sm">{displayMessage}</span>
       </div>
       <button
         onClick={() => onDismiss(ann.id)}

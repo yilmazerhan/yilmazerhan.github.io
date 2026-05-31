@@ -68,7 +68,9 @@ async def create_announcement(
 ):
     ann = Announcement(
         title=body.title,
+        title_en=body.title_en or None,
         message=body.message,
+        message_en=body.message_en or None,
         type=body.type,
         target_type=body.target_type,
         target_ids=body.target_ids,
@@ -96,7 +98,9 @@ async def update_announcement(
         raise NotFoundError("Duyuru")
 
     if body.title is not None: ann.title = body.title
+    if body.title_en is not None: ann.title_en = body.title_en or None
     if body.message is not None: ann.message = body.message
+    if body.message_en is not None: ann.message_en = body.message_en or None
     if body.type is not None: ann.type = body.type
     if body.target_type is not None: ann.target_type = body.target_type
     if body.target_ids is not None: ann.target_ids = body.target_ids

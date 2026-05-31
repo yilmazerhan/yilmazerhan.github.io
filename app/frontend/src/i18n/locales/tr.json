@@ -443,7 +443,12 @@
     "type_success": "Başarı",
     "target_all": "Tüm Kullanıcılar",
     "target_specific_teams": "Belirli Takımlar",
-    "target_specific_users": "Belirli Kullanıcılar"
+    "target_specific_users": "Belirli Kullanıcılar",
+    "lang_required": "zorunlu",
+    "lang_optional": "isteğe bağlı",
+    "tr_required": "Türkçe başlık ve mesaj zorunludur.",
+    "en_placeholder_title": "İngilizce başlık (İngilizce arayüz kullananlar görecek)",
+    "en_placeholder_message": "İngilizce mesaj (İngilizce arayüz kullananlar görecek)"
   },
   "email": {
     "templates_title": "E-posta Şablonları",

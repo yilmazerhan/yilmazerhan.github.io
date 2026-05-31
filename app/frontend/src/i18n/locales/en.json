@@ -443,7 +443,12 @@
     "type_success": "Success",
     "target_all": "All Users",
     "target_specific_teams": "Specific Teams",
-    "target_specific_users": "Specific Users"
+    "target_specific_users": "Specific Users",
+    "lang_required": "required",
+    "lang_optional": "optional",
+    "tr_required": "Turkish title and message are required.",
+    "en_placeholder_title": "English title (shown to users with English interface)",
+    "en_placeholder_message": "English message (shown to users with English interface)"
   },
   "email": {
     "templates_title": "Email Templates",

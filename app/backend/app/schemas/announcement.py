@@ -6,7 +6,9 @@ from pydantic import BaseModel, field_validator
 
 class AnnouncementCreate(BaseModel):
     title: str
+    title_en: Optional[str] = None
     message: str
+    message_en: Optional[str] = None
     type: str = "info"
     target_type: str = "all"
     target_ids: Optional[list] = None
@@ -33,7 +35,9 @@ class AnnouncementCreate(BaseModel):
 
 class AnnouncementUpdate(BaseModel):
     title: Optional[str] = None
+    title_en: Optional[str] = None
     message: Optional[str] = None
+    message_en: Optional[str] = None
     type: Optional[str] = None
     target_type: Optional[str] = None
     target_ids: Optional[list] = None
@@ -45,7 +49,9 @@ class AnnouncementUpdate(BaseModel):
 class AnnouncementResponse(BaseModel):
     id: uuid.UUID
     title: str
+    title_en: Optional[str]
     message: str
+    message_en: Optional[str]
     type: str
     target_type: str
     target_ids: Optional[list]
