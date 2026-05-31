@@ -6,8 +6,6 @@ Create Date: 2026-05-31
 """
 
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 revision = "0019_announcements"
 down_revision = "0018_dashboard_report_workflow"
@@ -16,7 +14,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Create types only if they don't already exist (PG15 has no CREATE TYPE IF NOT EXISTS)
+    # Idempotent type creation — DO/EXCEPTION is the PG15-safe way to avoid
+    # "already exists" errors when a previous partial run left the types behind.
     op.execute("""
         DO $$ BEGIN
             CREATE TYPE announcement_type AS ENUM ('info', 'warning', 'error', 'success');
@@ -30,34 +29,27 @@ def upgrade() -> None:
         END $$
     """)
 
-    conn = op.get_bind()
-    inspector = sa.inspect(conn)
-    table_exists = "announcements" in inspector.get_table_names()
-
-    if not table_exists:
-        op.create_table(
-            "announcements",
-            sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-            sa.Column("title", sa.String(200), nullable=False),
-            sa.Column("message", sa.Text, nullable=False),
-            sa.Column("type", sa.Enum("info", "warning", "error", "success", name="announcement_type", create_type=False), nullable=False, server_default="info"),
-            sa.Column("target_type", sa.Enum("all", "specific_teams", "specific_users", name="announcement_target_type", create_type=False), nullable=False, server_default="all"),
-            sa.Column("target_ids", postgresql.JSONB, nullable=True),
-            sa.Column("starts_at", sa.DateTime(timezone=True), nullable=False),
-            sa.Column("ends_at", sa.DateTime(timezone=True), nullable=True),
-            sa.Column("is_active", sa.Boolean, nullable=False, server_default=sa.text("true")),
-            sa.Column("created_by", postgresql.UUID(as_uuid=True), sa.ForeignKey("users.id", ondelete="SET NULL"), nullable=True),
-            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-            sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
+    # Use raw SQL so SQLAlchemy never touches the enum types again.
+    # op.create_table with sa.Enum ignores create_type=False in some SA versions
+    # and tries to CREATE TYPE a second time, causing DuplicateObjectError.
+    op.execute("""
+        CREATE TABLE IF NOT EXISTS announcements (
+            id          UUID PRIMARY KEY,
+            title       VARCHAR(200) NOT NULL,
+            message     TEXT NOT NULL,
+            type        announcement_type NOT NULL DEFAULT 'info',
+            target_type announcement_target_type NOT NULL DEFAULT 'all',
+            target_ids  JSONB,
+            starts_at   TIMESTAMPTZ NOT NULL,
+            ends_at     TIMESTAMPTZ,
+            is_active   BOOLEAN NOT NULL DEFAULT TRUE,
+            created_by  UUID REFERENCES users(id) ON DELETE SET NULL,
+            created_at  TIMESTAMPTZ DEFAULT NOW(),
+            updated_at  TIMESTAMPTZ DEFAULT NOW()
         )
-        op.create_index("ix_announcements_is_active", "announcements", ["is_active"])
-        op.create_index("ix_announcements_starts_at", "announcements", ["starts_at"])
-    else:
-        existing_indexes = {i["name"] for i in inspector.get_indexes("announcements")}
-        if "ix_announcements_is_active" not in existing_indexes:
-            op.create_index("ix_announcements_is_active", "announcements", ["is_active"])
-        if "ix_announcements_starts_at" not in existing_indexes:
-            op.create_index("ix_announcements_starts_at", "announcements", ["starts_at"])
+    """)
+    op.execute("CREATE INDEX IF NOT EXISTS ix_announcements_is_active ON announcements (is_active)")
+    op.execute("CREATE INDEX IF NOT EXISTS ix_announcements_starts_at ON announcements (starts_at)")
 
 
 def downgrade() -> None:
