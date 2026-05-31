@@ -613,7 +613,7 @@ async def create_report_schedule(
         next_run_at=compute_next_run(body.frequency, body.day_of_week, body.day_of_month, body.hour),
     )
     db.add(schedule)
-    await db.commit()
+    await db.flush()
     await db.refresh(schedule)
     return schedule
 
@@ -634,7 +634,7 @@ async def update_report_schedule(
 
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(schedule, field, value)
-    await db.commit()
+    await db.flush()
     await db.refresh(schedule)
     return schedule
 
@@ -652,7 +652,7 @@ async def delete_report_schedule(
     if not schedule:
         raise HTTPException(status_code=404, detail="Zamanlama bulunamadı.")
     await db.delete(schedule)
-    await db.commit()
+    await db.flush()
 
 
 @router.post("/reports/schedules/{schedule_id}/run", response_model=dict)
@@ -674,5 +674,5 @@ async def run_report_schedule(
     count = await generate_and_send_report(db, schedule)
     schedule.last_run_at = datetime.utcnow()
     schedule.next_run_at = compute_next_run(schedule.frequency, schedule.day_of_week, schedule.day_of_month, schedule.hour)
-    await db.commit()
+    await db.flush()
     return {"sent": count, "message": f"{count} alıcıya rapor gönderildi."}

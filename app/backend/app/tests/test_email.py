@@ -34,12 +34,17 @@ async def create_system_template(db: AsyncSession) -> EmailTemplate:
 
 
 class TestEmailTemplates:
-    async def test_list_templates_authenticated(self, client: AsyncClient, regular_user: User, db: AsyncSession):
+    async def test_list_templates_superadmin(self, client: AsyncClient, superadmin_user: User, db: AsyncSession):
         await create_template(db)
-        headers = await get_auth_headers(client, regular_user.email, "User123!")
+        headers = await get_auth_headers(client, superadmin_user.email, "Admin123!")
         resp = await client.get("/api/v1/email/templates", headers=headers)
         assert resp.status_code == 200
         assert isinstance(resp.json(), list)
+
+    async def test_list_templates_forbidden_for_regular_user(self, client: AsyncClient, regular_user: User):
+        headers = await get_auth_headers(client, regular_user.email, "User123!")
+        resp = await client.get("/api/v1/email/templates", headers=headers)
+        assert resp.status_code == 403
 
     async def test_create_template_superadmin(self, client: AsyncClient, superadmin_user: User, db: AsyncSession):
         headers = await get_auth_headers(client, superadmin_user.email, "Admin123!")

@@ -51,7 +51,7 @@ def _generate_self_signed_pem() -> tuple[bytes, bytes]:
 
 def _generate_pkcs12(cert_pem: bytes, key_pem: bytes, password: str = "testpass") -> bytes:
     """Wrap a cert+key into PKCS12 (compatible with JKS upload endpoint)."""
-    from cryptography.hazmat.primitives.serialization import pkcs12, load_pem_private_key
+    from cryptography.hazmat.primitives.serialization import load_pem_private_key, BestAvailableEncryption
     from cryptography.hazmat.primitives.serialization.pkcs12 import serialize_key_and_certificates
     from cryptography import x509
     from cryptography.hazmat.backends import default_backend
@@ -63,7 +63,7 @@ def _generate_pkcs12(cert_pem: bytes, key_pem: bytes, password: str = "testpass"
         key=key,
         cert=cert,
         cas=None,
-        encryption_algorithm=pkcs12.BestAvailableEncryption(password.encode()),
+        encryption_algorithm=BestAvailableEncryption(password.encode()),
     )
 
 

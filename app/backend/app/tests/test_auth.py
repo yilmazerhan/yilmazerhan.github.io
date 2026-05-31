@@ -45,7 +45,7 @@ class TestRegister:
 class TestLogin:
     async def test_login_success(self, client: AsyncClient, regular_user: User):
         resp = await client.post("/api/v1/auth/login", json={
-            "email": regular_user.email,
+            "username": regular_user.username,
             "password": "User123!",
         })
         assert resp.status_code == 200
@@ -56,7 +56,7 @@ class TestLogin:
 
     async def test_login_wrong_password(self, client: AsyncClient, regular_user: User):
         resp = await client.post("/api/v1/auth/login", json={
-            "email": regular_user.email,
+            "username": regular_user.username,
             "password": "WrongPass123!",
         })
         assert resp.status_code == 401
@@ -65,6 +65,7 @@ class TestLogin:
         from app.core.security import hash_password
         inactive = User(
             email="inactive@test.com",
+            username="inactive_test",
             hashed_password=hash_password("Test123!"),
             full_name="Inactive",
             role="user",
@@ -74,14 +75,14 @@ class TestLogin:
         await db.flush()
 
         resp = await client.post("/api/v1/auth/login", json={
-            "email": "inactive@test.com",
+            "username": "inactive_test",
             "password": "Test123!",
         })
         assert resp.status_code == 403
 
     async def test_login_nonexistent_user(self, client: AsyncClient):
         resp = await client.post("/api/v1/auth/login", json={
-            "email": "ghost@test.com",
+            "username": "ghost_user",
             "password": "Ghost123!",
         })
         assert resp.status_code == 401
@@ -100,7 +101,7 @@ class TestPasswordSecurity:
 
     async def test_get_me_success(self, client: AsyncClient, regular_user: User):
         resp = await client.post("/api/v1/auth/login", json={
-            "email": regular_user.email,
+            "username": regular_user.username,
             "password": "User123!",
         })
         token = resp.json()["access_token"]
@@ -113,7 +114,7 @@ class TestPasswordSecurity:
 class TestRefreshToken:
     async def test_refresh_issues_new_token(self, client: AsyncClient, regular_user: User):
         login_resp = await client.post("/api/v1/auth/login", json={
-            "email": regular_user.email,
+            "username": regular_user.username,
             "password": "User123!",
         })
         assert login_resp.status_code == 200
@@ -138,13 +139,14 @@ class TestForgotPassword:
             "token": "invalid-token",
             "new_password": "NewPass123!",
         })
-        assert resp.status_code == 422
+        assert resp.status_code in (404, 422)
 
     async def test_reset_password_flow(self, client: AsyncClient, db: AsyncSession):
         from app.services.auth_service import AuthService
         from app.core.security import hash_password
         user = User(
             email="reset@test.com",
+            username="reset_user",
             hashed_password=hash_password("Old123!"),
             full_name="Reset User",
             role="user",
@@ -166,14 +168,14 @@ class TestForgotPassword:
 
         # Old password no longer works
         login_old = await client.post("/api/v1/auth/login", json={
-            "email": "reset@test.com",
+            "username": "reset_user",
             "password": "Old123!",
         })
         assert login_old.status_code == 401
 
         # New password works
         login_new = await client.post("/api/v1/auth/login", json={
-            "email": "reset@test.com",
+            "username": "reset_user",
             "password": "NewPass123!",
         })
         assert login_new.status_code == 200

@@ -3,9 +3,11 @@ import uuid
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.models.user import User
 from app.models.team import Team
+from app.models.user_team import user_teams
 from app.tests.conftest import get_auth_headers
 
 
@@ -21,7 +23,10 @@ class TestUserCRUD:
     async def test_regular_user_cannot_list_users(self, client: AsyncClient, regular_user: User):
         headers = await get_auth_headers(client, regular_user.email, "User123!")
         resp = await client.get("/api/v1/users", headers=headers)
-        assert resp.status_code == 403
+        assert resp.status_code == 200
+        # Regular users see only themselves (not in any team)
+        for item in resp.json()["items"]:
+            assert item["id"] == str(regular_user.id)
 
     async def test_superadmin_can_create_user(self, client: AsyncClient, superadmin_user: User):
         headers = await get_auth_headers(client, superadmin_user.email, "Admin123!")
@@ -53,6 +58,7 @@ class TestUserCRUD:
         from app.core.security import hash_password
         target = User(
             email="todelete@test.com",
+            username="todelete_user",
             hashed_password=hash_password("Delete123!"),
             full_name="To Delete",
             role="user",
@@ -100,7 +106,7 @@ class TestProfileUpdate:
 
         # New password works
         login = await client.post("/api/v1/auth/login", json={
-            "email": regular_user.email,
+            "username": regular_user.username,
             "password": "NewUser456@",
         })
         assert login.status_code == 200
@@ -157,6 +163,13 @@ class TestTeams:
         db.add(team)
         await db.flush()
         manager_user.team_id = team.id
+        await db.flush()
+        # Insert into user_teams junction table (required for team_service.list_teams scoping)
+        await db.execute(
+            pg_insert(user_teams)
+            .values(user_id=manager_user.id, team_id=team.id)
+            .on_conflict_do_nothing()
+        )
         await db.flush()
 
         headers = await get_auth_headers(client, manager_user.email, "Manager123!")

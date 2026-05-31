@@ -3,10 +3,12 @@ from datetime import date, timedelta
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.models.user import User
 from app.models.team import Team
 from app.models.worklog import WorkType, WorkLog
+from app.models.user_team import user_teams
 from app.core.security import hash_password
 from app.tests.conftest import get_auth_headers
 
@@ -125,6 +127,18 @@ class TestWorkLogThreeDayRule:
         await db.flush()
         manager_user.team_id = team.id
         regular_user.team_id = team.id
+        await db.flush()
+        # Also insert into user_teams junction table (required for service-level scoping)
+        await db.execute(
+            pg_insert(user_teams)
+            .values(user_id=manager_user.id, team_id=team.id)
+            .on_conflict_do_nothing()
+        )
+        await db.execute(
+            pg_insert(user_teams)
+            .values(user_id=regular_user.id, team_id=team.id)
+            .on_conflict_do_nothing()
+        )
         await db.flush()
 
         wt = await create_work_type(db, "Manager Edit Test")

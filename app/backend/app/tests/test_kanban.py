@@ -1,15 +1,20 @@
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.models.user import User
 from app.models.team import Team
-from app.models.kanban import KanbanColumn, Task
+from app.models.kanban import KanbanBoard, KanbanColumn, Task
+from app.models.user_team import user_teams
 from app.tests.conftest import get_auth_headers
 
 
 async def create_column(db: AsyncSession, name: str = "Test Sütun", sort_order: int = 1) -> KanbanColumn:
-    col = KanbanColumn(name=name, color="#3b82f6", sort_order=sort_order, is_terminal=False)
+    board = KanbanBoard(name=f"Board for {name}")
+    db.add(board)
+    await db.flush()
+    col = KanbanColumn(name=name, color="#3b82f6", sort_order=sort_order, is_terminal=False, board_id=board.id)
     db.add(col)
     await db.flush()
     return col
@@ -45,6 +50,11 @@ class TestKanbanColumns:
         assert isinstance(resp.json(), list)
 
     async def test_create_column_superadmin(self, client: AsyncClient, superadmin_user: User, db: AsyncSession):
+        # Create a default board so the service can find one when board_id is omitted
+        board = KanbanBoard(name="Default Board")
+        db.add(board)
+        await db.flush()
+
         headers = await get_auth_headers(client, superadmin_user.email, "Admin123!")
         resp = await client.post("/api/v1/kanban/columns", headers=headers, json={
             "name": "Yeni Sütun",
@@ -113,8 +123,9 @@ class TestKanbanTasks:
 
     async def test_list_tasks(self, client: AsyncClient, regular_user: User, db: AsyncSession):
         col = await create_column(db, "InProgress", sort_order=2)
-        await create_task(db, "Görev 1", col.id, regular_user.id)
-        await create_task(db, "Görev 2", col.id, regular_user.id)
+        # Set assignee_id so regular user can see their assigned tasks
+        await create_task(db, "Görev 1", col.id, regular_user.id, assignee_id=regular_user.id)
+        await create_task(db, "Görev 2", col.id, regular_user.id, assignee_id=regular_user.id)
 
         headers = await get_auth_headers(client, regular_user.email, "User123!")
         resp = await client.get("/api/v1/kanban/tasks", headers=headers)
@@ -213,9 +224,22 @@ class TestKanbanTasks:
         manager_user.team_id = team.id
         regular_user.team_id = team.id
         await db.flush()
+        # Also insert into user_teams junction table (required for service-level scoping)
+        await db.execute(
+            pg_insert(user_teams)
+            .values(user_id=manager_user.id, team_id=team.id)
+            .on_conflict_do_nothing()
+        )
+        await db.execute(
+            pg_insert(user_teams)
+            .values(user_id=regular_user.id, team_id=team.id)
+            .on_conflict_do_nothing()
+        )
+        await db.flush()
 
         col = await create_column(db, "Takım Görevi", sort_order=10)
-        task = await create_task(db, "Üyenin Görevi", col.id, regular_user.id)
+        # Task must be assigned to the team member so manager can see/edit it
+        task = await create_task(db, "Üyenin Görevi", col.id, regular_user.id, assignee_id=regular_user.id)
 
         headers = await get_auth_headers(client, manager_user.email, "Manager123!")
         resp = await client.patch(f"/api/v1/kanban/tasks/{task.id}", headers=headers, json={

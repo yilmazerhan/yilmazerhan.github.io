@@ -43,7 +43,7 @@ async def seed_initial_data(db: AsyncSession) -> None:
     await _seed_kanban_columns(db)
     await _seed_app_settings(db)
     await _seed_email_templates(db)
-    await db.commit()
+    await db.flush()
 
 
 async def _seed_superadmin(db: AsyncSession) -> None:

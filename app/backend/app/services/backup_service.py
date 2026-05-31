@@ -181,7 +181,7 @@ async def restore_backup(db: AsyncSession, backup_id: uuid.UUID) -> dict:
     # The pg_dump backup contains ALTER TABLE / DROP CONSTRAINT statements that
     # require exclusive locks. If our session stays open in a transaction it
     # will deadlock with those lock requests.
-    await db.commit()
+    await db.flush()
     await db.close()
 
     cmd = [

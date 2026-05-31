@@ -103,7 +103,7 @@ class InventoryService:
                 setattr(item, enc_col, encrypt_field(plaintext, key))
 
         self.db.add(item)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(item)
         return item
 
@@ -125,14 +125,14 @@ class InventoryService:
                 setattr(item, field, value)
 
         item.updated_by = updated_by
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(item)
         return item
 
     async def delete_item(self, item_id: uuid.UUID) -> None:
         item = await self.get_item(item_id)
         await self.db.delete(item)
-        await self.db.commit()
+        await self.db.flush()
 
     async def reveal_field(self, item_id: uuid.UUID, field_name: str) -> str:
         """Decrypt and return a single sensitive field value."""
@@ -228,7 +228,7 @@ class InventoryService:
             ),
         )
         self.db.add(sch)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(sch)
         return sch
 
@@ -243,14 +243,14 @@ class InventoryService:
         sch.next_run_at = compute_next_run(
             sch.frequency, sch.day_of_week, sch.day_of_month, sch.hour
         )
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(sch)
         return sch
 
     async def delete_schedule(self, schedule_id: uuid.UUID) -> None:
         sch = await self.get_schedule(schedule_id)
         await self.db.delete(sch)
-        await self.db.commit()
+        await self.db.flush()
 
     async def send_now(self, schedule_id: uuid.UUID) -> int:
         """Manually trigger an inventory email schedule."""
@@ -260,7 +260,7 @@ class InventoryService:
         sch.next_run_at = compute_next_run(
             sch.frequency, sch.day_of_week, sch.day_of_month, sch.hour
         )
-        await self.db.commit()
+        await self.db.flush()
         return sent
 
 
@@ -386,4 +386,4 @@ async def run_due_inventory_schedules(db: AsyncSession) -> None:
             pass
 
     if schedules:
-        await db.commit()
+        await db.flush()

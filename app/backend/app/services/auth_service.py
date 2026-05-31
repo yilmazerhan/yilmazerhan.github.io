@@ -50,13 +50,27 @@ class AuthService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
+    async def _generate_unique_username(self, email: str) -> str:
+        import re
+        base = re.sub(r"[^a-z0-9]", "_", email.split("@")[0].lower())[:80]
+        candidate = base
+        suffix = 0
+        while True:
+            existing = await self.db.execute(select(User).where(User.username == candidate))
+            if existing.scalar_one_or_none() is None:
+                return candidate
+            suffix += 1
+            candidate = f"{base}{suffix}"
+
     async def register(self, email: str, password: str, full_name: str, preferred_language: str = "tr") -> tuple[User, str]:
         result = await self.db.execute(select(User).where(User.email == email.lower()))
         if result.scalar_one_or_none():
             raise ConflictError("Bu email adresi zaten kayıtlı.")
 
+        username = await self._generate_unique_username(email.lower())
         user = User(
             email=email.lower(),
+            username=username,
             hashed_password=hash_password(password),
             full_name=full_name,
             preferred_language=preferred_language,

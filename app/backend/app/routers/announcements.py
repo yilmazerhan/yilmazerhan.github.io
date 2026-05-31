@@ -80,7 +80,7 @@ async def create_announcement(
         created_by=current_user.id,
     )
     db.add(ann)
-    await db.commit()
+    await db.flush()
     await db.refresh(ann)
     return ann
 
@@ -108,7 +108,7 @@ async def update_announcement(
     if body.ends_at is not None: ann.ends_at = body.ends_at
     if body.is_active is not None: ann.is_active = body.is_active
 
-    await db.commit()
+    await db.flush()
     await db.refresh(ann)
     return ann
 
@@ -124,4 +124,4 @@ async def delete_announcement(
     if not ann:
         raise NotFoundError("Duyuru")
     await db.delete(ann)
-    await db.commit()
+    await db.flush()

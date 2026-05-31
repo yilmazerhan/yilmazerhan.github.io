@@ -293,6 +293,7 @@ class EmailService:
         wf = await self.get_workflow(workflow_id)
         wf.is_active = not wf.is_active
         await self.db.flush()
+        await self.db.refresh(wf)
         return wf
 
     # ─── Email Logs ───────────────────────────────────────────────────────────
