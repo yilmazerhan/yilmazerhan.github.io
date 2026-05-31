@@ -16,9 +16,19 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # IF NOT EXISTS guards against a partial previous run that created the types
-    op.execute("CREATE TYPE IF NOT EXISTS announcement_type AS ENUM ('info', 'warning', 'error', 'success')")
-    op.execute("CREATE TYPE IF NOT EXISTS announcement_target_type AS ENUM ('all', 'specific_teams', 'specific_users')")
+    # Create types only if they don't already exist (PG15 has no CREATE TYPE IF NOT EXISTS)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE announcement_type AS ENUM ('info', 'warning', 'error', 'success');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$
+    """)
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE announcement_target_type AS ENUM ('all', 'specific_teams', 'specific_users');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$
+    """)
 
     conn = op.get_bind()
     inspector = sa.inspect(conn)
