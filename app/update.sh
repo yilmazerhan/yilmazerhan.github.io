@@ -9,10 +9,7 @@ echo "==> Kod güncelleniyor..."
 git -C "$(dirname "$0")/.." pull
 
 echo "==> Production image'lar derleniyor (cache bypass)..."
-$COMPOSE build --no-cache migration backend frontend
-
-echo "==> Migration çalıştırılıyor..."
-$COMPOSE run --rm migration
+$COMPOSE build --no-cache backend frontend
 
 echo "==> Servisler yeniden başlatılıyor..."
 $COMPOSE up -d
