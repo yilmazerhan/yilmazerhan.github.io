@@ -13,22 +13,6 @@ services:
     networks:
       - internal
 
-  migration:
-    build:
-      context: ./backend
-      target: production
-    command: alembic upgrade head
-    env_file: .env
-    environment:
-      # POSTGRES_HOST is set by install.sh to the server's actual IP.
-      # Falls back to host.docker.internal for dev environments.
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST:-host.docker.internal}:${POSTGRES_PORT:-5432}/${POSTGRES_DB}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: "no"
-    networks:
-      - internal
-
   backend:
     build:
       context: ./backend
@@ -45,8 +29,6 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-      migration:
-        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s

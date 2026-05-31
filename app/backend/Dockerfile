@@ -30,9 +30,10 @@ RUN python -c "import alembic; print('alembic ok')"
 COPY app/ ./app/
 COPY alembic/ ./alembic/
 COPY alembic.ini .
+COPY entrypoint.sh ./entrypoint.sh
 
 # Yedek dizinini oluştur ve izinleri ayarla (volume mount edilse dahi)
-RUN mkdir -p /app/backups && chown -R appuser:appuser /app
+RUN mkdir -p /app/backups && chmod +x /app/entrypoint.sh && chown -R appuser:appuser /app
 USER appuser
 
 EXPOSE 8000
@@ -40,4 +41,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
+ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
