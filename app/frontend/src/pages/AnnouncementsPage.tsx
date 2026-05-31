@@ -24,7 +24,7 @@ export default function AnnouncementsPage() {
   const { data: announcements = [], isLoading } = useAllAnnouncements()
   const { data: teamsData } = useTeams()
   const { data: usersData } = useUsers({ limit: 200 })
-  const teams = teamsData ?? []
+  const teams = teamsData?.items ?? []
   const users = usersData?.items ?? []
 
   const createAnn = useCreateAnnouncement()
