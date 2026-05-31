@@ -61,7 +61,8 @@
     "reports": "Reports",
     "auditLogs": "Audit Logs",
     "backup": "Backup",
-    "inventory": "Inventory"
+    "inventory": "Inventory",
+    "announcements": "Announcements"
   },
   "dashboard": {
     "total_tasks": "Total Tasks",
@@ -412,7 +413,37 @@
     "deleting": "Deleting...",
     "export": "Export",
     "export_csv": "Export CSV",
-    "export_excel": "Export Excel"
+    "export_excel": "Export Excel",
+    "dismiss": "Dismiss",
+    "activate": "Activate",
+    "deactivate": "Deactivate",
+    "required_fields": "Please fill in all required fields."
+  },
+  "announcements": {
+    "title": "Announcements",
+    "add": "New Announcement",
+    "edit": "Edit Announcement",
+    "empty": "No announcements yet.",
+    "live": "Live",
+    "scheduled": "Scheduled",
+    "target": "Target",
+    "starts_at": "Start Date",
+    "ends_at": "End Date",
+    "starts_at_required": "Start date is required.",
+    "form_title": "Title",
+    "form_message": "Message",
+    "form_type": "Type",
+    "form_target": "Target Audience",
+    "form_active": "Active (publish now)",
+    "select_teams": "Select Teams",
+    "select_users": "Select Users",
+    "type_info": "Info",
+    "type_warning": "Warning",
+    "type_error": "Error",
+    "type_success": "Success",
+    "target_all": "All Users",
+    "target_specific_teams": "Specific Teams",
+    "target_specific_users": "Specific Users"
   },
   "email": {
     "templates_title": "Email Templates",

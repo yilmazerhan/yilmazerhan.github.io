@@ -5,6 +5,7 @@ import Topbar from './Topbar'
 import Toaster from '@/components/ui/Toast'
 import CommandPalette from '@/components/ui/CommandPalette'
 import ShortcutsHelp from '@/components/ui/ShortcutsHelp'
+import AnnouncementBanner from '@/components/AnnouncementBanner'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 
 export default function AppShell() {
@@ -25,6 +26,7 @@ export default function AppShell() {
           onMenuToggle={() => setSidebarOpen((o) => !o)}
           onSearchOpen={() => setPaletteOpen(true)}
         />
+        <AnnouncementBanner />
         <main className="flex-1 overflow-y-auto p-6">
           <Outlet />
         </main>

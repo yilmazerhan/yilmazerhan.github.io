@@ -15,6 +15,7 @@ from app.routers.leave import router as leave_router
 from app.routers.backup import router as backup_router
 from app.routers.export import router as export_router
 from app.routers.inventory import router as inventory_router
+from app.routers.announcements import router as announcements_router
 
 logger = logging.getLogger(__name__)
 
@@ -162,6 +163,7 @@ app.include_router(leave_router, prefix="/api/v1")
 app.include_router(backup_router, prefix="/api/v1")
 app.include_router(export_router, prefix="/api/v1")
 app.include_router(inventory_router, prefix="/api/v1")
+app.include_router(announcements_router, prefix="/api/v1")
 
 
 # ─── Health check ─────────────────────────────────────────────────────────

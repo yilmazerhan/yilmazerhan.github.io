@@ -30,6 +30,7 @@ import TimelinePage from '@/pages/TimelinePage'
 import LeavePage from '@/pages/LeavePage'
 import LeaveCalendarPage from '@/pages/LeaveCalendarPage'
 import InventoryPage from '@/pages/InventoryPage'
+import AnnouncementsPage from '@/pages/AnnouncementsPage'
 
 function BrandingInit() {
   const { data: branding } = useQuery({
@@ -95,6 +96,7 @@ export default function App() {
             <Route path="/admin/backup" element={<BackupPage />} />
             <Route path="/reports/user/:userId" element={<UserActivityPage />} />
             <Route path="/inventory" element={<InventoryPage />} />
+            <Route path="/admin/announcements" element={<AnnouncementsPage />} />
           </Route>
         </Route>
 

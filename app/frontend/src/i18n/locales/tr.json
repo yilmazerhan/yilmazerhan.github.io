@@ -61,7 +61,8 @@
     "reports": "Raporlar",
     "auditLogs": "Denetim Kayıtları",
     "backup": "Yedek",
-    "inventory": "Envanter"
+    "inventory": "Envanter",
+    "announcements": "Duyurular"
   },
   "dashboard": {
     "total_tasks": "Toplam Görev",
@@ -412,7 +413,37 @@
     "deleting": "Siliniyor...",
     "export": "Dışa Aktar",
     "export_csv": "CSV İndir",
-    "export_excel": "Excel İndir"
+    "export_excel": "Excel İndir",
+    "dismiss": "Kapat",
+    "activate": "Aktifleştir",
+    "deactivate": "Pasifleştir",
+    "required_fields": "Lütfen tüm zorunlu alanları doldurun."
+  },
+  "announcements": {
+    "title": "Duyurular",
+    "add": "Yeni Duyuru",
+    "edit": "Duyuruyu Düzenle",
+    "empty": "Henüz duyuru yok.",
+    "live": "Yayında",
+    "scheduled": "Planlandı",
+    "target": "Hedef",
+    "starts_at": "Başlangıç Tarihi",
+    "ends_at": "Bitiş Tarihi",
+    "starts_at_required": "Başlangıç tarihi zorunludur.",
+    "form_title": "Başlık",
+    "form_message": "Mesaj",
+    "form_type": "Tür",
+    "form_target": "Hedef Kitle",
+    "form_active": "Aktif (şimdi yayınla)",
+    "select_teams": "Takımları Seçin",
+    "select_users": "Kullanıcıları Seçin",
+    "type_info": "Bilgi",
+    "type_warning": "Uyarı",
+    "type_error": "Hata",
+    "type_success": "Başarı",
+    "target_all": "Tüm Kullanıcılar",
+    "target_specific_teams": "Belirli Takımlar",
+    "target_specific_users": "Belirli Kullanıcılar"
   },
   "email": {
     "templates_title": "E-posta Şablonları",
