@@ -132,10 +132,7 @@ export default function WorkLogPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('list')
 
   const canFilterByUser = user?.role === 'superadmin' || user?.role === 'team_manager'
-  const usersParams = user?.role === 'team_manager' && user.team_id
-    ? { team_id: user.team_id, limit: 200 }
-    : { limit: 200 }
-  const { data: usersData } = useUsers(canFilterByUser ? usersParams : undefined)
+  const { data: usersData } = useUsers(canFilterByUser ? { limit: 200 } : undefined)
 
   const { data, isLoading } = useWorkLogs({
     date_from: dateFrom,

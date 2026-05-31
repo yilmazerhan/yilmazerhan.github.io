@@ -92,11 +92,18 @@ class WorkLogService:
         if requester.role == "user":
             q = q.where(WorkLog.user_id == requester.id)
         elif requester.role == "team_manager":
-            # Can see own team's logs
-            from app.models.user import User as UserModel
-            q = q.join(UserModel, WorkLog.user_id == UserModel.id).where(
-                UserModel.team_id == requester.team_id
+            from app.models.user_team import user_teams
+            my_team_ids = (
+                select(user_teams.c.team_id)
+                .where(user_teams.c.user_id == requester.id)
+                .scalar_subquery()
             )
+            visible_user_ids = (
+                select(user_teams.c.user_id)
+                .where(user_teams.c.team_id.in_(my_team_ids))
+                .scalar_subquery()
+            )
+            q = q.where(WorkLog.user_id.in_(visible_user_ids))
             if user_id:
                 q = q.where(WorkLog.user_id == user_id)
         else:  # superadmin
@@ -159,8 +166,18 @@ class WorkLogService:
         log = await self._get_log_with_user(log_id)
         if requester.role == "user" and log.user_id != requester.id:
             raise ForbiddenError()
-        if requester.role == "team_manager" and log.user.team_id != requester.team_id:
-            raise ForbiddenError()
+        if requester.role == "team_manager":
+            from app.models.user_team import user_teams
+            shared = await self.db.execute(
+                select(user_teams.c.team_id).where(
+                    user_teams.c.user_id == requester.id,
+                    user_teams.c.team_id.in_(
+                        select(user_teams.c.team_id).where(user_teams.c.user_id == log.user_id)
+                    ),
+                ).limit(1)
+            )
+            if not shared.scalar_one_or_none():
+                raise ForbiddenError()
         return log
 
     async def update_log(
@@ -224,10 +241,18 @@ class WorkLogService:
         if requester.role == "user":
             q = q.where(WorkLog.user_id == requester.id)
         elif requester.role == "team_manager":
-            from app.models.user import User as UserModel
-            q = q.join(UserModel, WorkLog.user_id == UserModel.id).where(
-                UserModel.team_id == requester.team_id
+            from app.models.user_team import user_teams
+            my_team_ids = (
+                select(user_teams.c.team_id)
+                .where(user_teams.c.user_id == requester.id)
+                .scalar_subquery()
             )
+            visible_user_ids = (
+                select(user_teams.c.user_id)
+                .where(user_teams.c.team_id.in_(my_team_ids))
+                .scalar_subquery()
+            )
+            q = q.where(WorkLog.user_id.in_(visible_user_ids))
         if user_id and requester.role != "user":
             q = q.where(WorkLog.user_id == user_id)
         if date_from:

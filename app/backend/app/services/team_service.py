@@ -71,6 +71,20 @@ class TeamService:
         self.db.add(team)
         await self.db.flush()
 
+        if manager_id:
+            result = await self.db.execute(select(User).where(User.id == manager_id))
+            manager = result.scalar_one_or_none()
+            if manager:
+                manager.team_id = team.id
+                if manager.role == "user":
+                    manager.role = "team_manager"
+                await self.db.execute(
+                    pg_insert(user_teams)
+                    .values(user_id=manager_id, team_id=team.id)
+                    .on_conflict_do_nothing()
+                )
+            await self.db.flush()
+
         # Eager-load manager so TeamResponse serialization doesn't trigger
         # lazy loading in an async context (MissingGreenlet → 500).
         result = await self.db.execute(
