@@ -13,8 +13,6 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # ADD VALUE cannot run inside a transaction block
-    op.execute("COMMIT")
     op.execute("ALTER TYPE audit_action ADD VALUE IF NOT EXISTS 'login'")
     op.execute("ALTER TYPE audit_action ADD VALUE IF NOT EXISTS 'logout'")
 

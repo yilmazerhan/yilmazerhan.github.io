@@ -15,8 +15,13 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("announcements", sa.Column("title_en", sa.String(200), nullable=True))
-    op.add_column("announcements", sa.Column("message_en", sa.Text, nullable=True))
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    existing_cols = {c["name"] for c in inspector.get_columns("announcements")}
+    if "title_en" not in existing_cols:
+        op.add_column("announcements", sa.Column("title_en", sa.String(200), nullable=True))
+    if "message_en" not in existing_cols:
+        op.add_column("announcements", sa.Column("message_en", sa.Text, nullable=True))
 
 
 def downgrade() -> None:
