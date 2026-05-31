@@ -72,7 +72,13 @@ class AuthService:
         await self.db.flush()
         return user
 
-    async def login(self, username: str, password: str) -> tuple[User, str, str]:
+    async def login(
+        self,
+        username: str,
+        password: str,
+        ip: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> tuple[User, str, str]:
         """Returns (user, access_token, raw_refresh_token)."""
         result = await self.db.execute(
             select(User).where(User.username == username.lower(), User.is_deleted == False)
@@ -96,6 +102,17 @@ class AuthService:
             expires_at=refresh_token_expire(),
         )
         self.db.add(refresh_record)
+
+        from app.models.audit_log import AuditLog
+        self.db.add(AuditLog(
+            user_id=user.id,
+            action="login",
+            table_name="auth",
+            record_id=str(user.id),
+            ip_address=ip,
+            user_agent=user_agent,
+        ))
+
         await self.db.flush()
 
         access_token = create_access_token(user.id, user.role)
@@ -136,13 +153,34 @@ class AuthService:
 
         return create_access_token(user.id, user.role), raw_new
 
-    async def logout(self, raw_refresh_token: str) -> None:
+    async def logout(
+        self,
+        raw_refresh_token: str,
+        ip: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> None:
         token_hash = hash_token(raw_refresh_token)
+        record_result = await self.db.execute(
+            select(RefreshToken).where(RefreshToken.token_hash == token_hash)
+        )
+        record = record_result.scalar_one_or_none()
+        user_id = record.user_id if record else None
+
         await self.db.execute(
             update(RefreshToken)
             .where(RefreshToken.token_hash == token_hash)
             .values(revoked=True)
         )
+
+        from app.models.audit_log import AuditLog
+        self.db.add(AuditLog(
+            user_id=user_id,
+            action="logout",
+            table_name="auth",
+            record_id=str(user_id) if user_id else "",
+            ip_address=ip,
+            user_agent=user_agent,
+        ))
 
     async def forgot_password(self, email: str) -> Optional[tuple[User, str]]:
         """Returns (user, raw_token) or None if user not found (silently succeed for security)."""

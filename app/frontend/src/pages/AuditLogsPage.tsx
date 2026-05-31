@@ -9,6 +9,8 @@ const ACTION_COLORS: Record<string, string> = {
   create: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
   update: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
   delete: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+  login: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  logout: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
 }
 
 const LIMIT = 50
@@ -42,6 +44,8 @@ export default function AuditLogsPage() {
     create: t('audit.action_create'),
     update: t('audit.action_update'),
     delete: t('audit.action_delete'),
+    login: t('audit.action_login'),
+    logout: t('audit.action_logout'),
   }
 
   return (
@@ -70,6 +74,8 @@ export default function AuditLogsPage() {
               <option value="create">{t('audit.action_create')}</option>
               <option value="update">{t('audit.action_update')}</option>
               <option value="delete">{t('audit.action_delete')}</option>
+              <option value="login">{t('audit.action_login')}</option>
+              <option value="logout">{t('audit.action_logout')}</option>
             </select>
           </div>
           <div>

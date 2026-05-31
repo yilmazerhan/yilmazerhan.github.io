@@ -82,7 +82,11 @@ async def login(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = AuthService(db)
-    user, access_token, raw_refresh = await svc.login(body.username, body.password)
+    ip = request.client.host if request.client else None
+    ua = request.headers.get("user-agent")
+    user, access_token, raw_refresh = await svc.login(
+        body.username, body.password, ip=ip, user_agent=ua
+    )
 
     response = JSONResponse(content={
         "access_token": access_token,
@@ -118,12 +122,15 @@ async def refresh(
 
 @router.post("/logout", response_model=MessageResponse)
 async def logout(
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
     refresh_token: Annotated[Optional[str], Cookie(alias=REFRESH_COOKIE)] = None,
 ):
     if refresh_token:
         svc = AuthService(db)
-        await svc.logout(refresh_token)
+        ip = request.client.host if request.client else None
+        ua = request.headers.get("user-agent")
+        await svc.logout(refresh_token, ip=ip, user_agent=ua)
 
     response = JSONResponse(content={"message": "Başarıyla çıkış yapıldı."})
     _clear_refresh_cookie(response)

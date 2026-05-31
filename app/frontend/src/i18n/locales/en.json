@@ -631,6 +631,8 @@
     "action_create": "Create",
     "action_update": "Update",
     "action_delete": "Delete",
+    "action_login": "Login",
+    "action_logout": "Logout",
     "record_count": "({{count}} records)",
     "action_type": "Action Type",
     "table": "Table",

@@ -631,6 +631,8 @@
     "action_create": "Oluşturma",
     "action_update": "Güncelleme",
     "action_delete": "Silme",
+    "action_login": "Giriş",
+    "action_logout": "Çıkış",
     "record_count": "({{count}} kayıt)",
     "action_type": "İşlem Tipi",
     "table": "Tablo",

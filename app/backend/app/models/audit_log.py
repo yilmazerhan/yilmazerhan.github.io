@@ -16,7 +16,7 @@ class AuditLog(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
     action: Mapped[str] = mapped_column(
-        SAEnum("create", "update", "delete", name="audit_action"),
+        SAEnum("create", "update", "delete", "login", "logout", name="audit_action", create_type=False),
         nullable=False,
     )
     table_name: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
