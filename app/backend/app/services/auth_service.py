@@ -1,3 +1,5 @@
+import asyncio
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -16,6 +18,32 @@ from app.core.exceptions import (
     AuthenticationError, ForbiddenError, ConflictError, NotFoundError, ValidationError
 )
 from app.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+async def _write_auth_audit(
+    user_id: uuid.UUID,
+    action: str,
+    ip: Optional[str],
+    user_agent: Optional[str],
+) -> None:
+    """Write login/logout audit entry in a separate session (fire-and-forget)."""
+    try:
+        from app.database import AsyncSessionLocal
+        from app.models.audit_log import AuditLog
+        async with AsyncSessionLocal() as db:
+            db.add(AuditLog(
+                user_id=user_id,
+                action=action,
+                table_name="auth",
+                record_id=str(user_id),
+                ip_address=ip,
+                user_agent=user_agent,
+            ))
+            await db.commit()
+    except Exception as exc:
+        logger.warning("Auth audit log write failed (non-critical): %s", exc)
 
 
 class AuthService:
@@ -102,18 +130,10 @@ class AuthService:
             expires_at=refresh_token_expire(),
         )
         self.db.add(refresh_record)
-
-        from app.models.audit_log import AuditLog
-        self.db.add(AuditLog(
-            user_id=user.id,
-            action="login",
-            table_name="auth",
-            record_id=str(user.id),
-            ip_address=ip,
-            user_agent=user_agent,
-        ))
-
         await self.db.flush()
+
+        # Fire-and-forget in a separate session — must not block or fail login
+        asyncio.ensure_future(_write_auth_audit(user.id, "login", ip, user_agent))
 
         access_token = create_access_token(user.id, user.role)
         return user, access_token, raw_refresh
@@ -172,15 +192,9 @@ class AuthService:
             .values(revoked=True)
         )
 
-        from app.models.audit_log import AuditLog
-        self.db.add(AuditLog(
-            user_id=user_id,
-            action="logout",
-            table_name="auth",
-            record_id=str(user_id) if user_id else "",
-            ip_address=ip,
-            user_agent=user_agent,
-        ))
+        # Fire-and-forget in a separate session — must not block or fail logout
+        if user_id:
+            asyncio.ensure_future(_write_auth_audit(user_id, "logout", ip, user_agent))
 
     async def forgot_password(self, email: str) -> Optional[tuple[User, str]]:
         """Returns (user, raw_token) or None if user not found (silently succeed for security)."""
