@@ -20,7 +20,7 @@ export default function AppShell() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
-      <Sidebar open={sidebarOpen} />
+      <Sidebar open={sidebarOpen} onShortcutsOpen={() => setHelpOpen(true)} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Topbar
           onMenuToggle={() => setSidebarOpen((o) => !o)}

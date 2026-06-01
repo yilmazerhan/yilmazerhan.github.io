@@ -11,6 +11,7 @@ import {
 
 interface SidebarProps {
   open: boolean
+  onShortcutsOpen?: () => void
 }
 
 interface NavItem {
@@ -40,7 +41,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/admin/backup', icon: HardDriveDownload, labelKey: 'nav.backup', requiredRole: ['superadmin'] },
 ]
 
-export default function Sidebar({ open }: SidebarProps) {
+export default function Sidebar({ open, onShortcutsOpen }: SidebarProps) {
   const { t } = useTranslation()
   const user = useAuthStore((s) => s.user)
 
@@ -104,11 +105,15 @@ export default function Sidebar({ open }: SidebarProps) {
           <span>{t('profile.title')}</span>
         </NavLink>
 
-        <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-gray-400 dark:text-gray-600">
+        <button
+          type="button"
+          onClick={onShortcutsOpen}
+          className="flex w-full items-center gap-2 px-3 py-1.5 text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+        >
           <Keyboard className="h-3.5 w-3.5" />
           <span>{t('shortcuts.hint')}</span>
           <kbd className="ml-auto bg-gray-100 dark:bg-gray-800 px-1 rounded font-mono">?</kbd>
-        </div>
+        </button>
 
         <div className="px-3 pt-1 pb-0.5">
           <span className="text-[10px] font-mono text-gray-300 dark:text-gray-700 select-none">
