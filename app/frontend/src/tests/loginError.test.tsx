@@ -16,16 +16,15 @@ vi.mock('@/store/authStore', () => ({
 
 // Custom axios adapter: returns a 401 for any URL that matches a pattern
 function make401Adapter(urlPattern: string) {
-  return async (config: any) => {
+  return async (config: any): Promise<any> => {
     if ((config.url ?? '').includes(urlPattern)) {
       const err: any = new Error('Request failed with status code 401')
-      err.response = { status: 401, data: { detail: 'Wrong credentials.' }, headers: {}, config }
+      err.response = { status: 401, statusText: 'Unauthorized', data: { detail: 'Wrong credentials.' }, headers: {}, config }
       err.config = config
       err.isAxiosError = true
       throw err
     }
-    // Shouldn't be called for other URLs in these tests
-    return { status: 200, data: {}, headers: {}, config }
+    return { status: 200, statusText: 'OK', data: {}, headers: {}, config }
   }
 }
 
