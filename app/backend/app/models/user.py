@@ -37,12 +37,14 @@ class User(Base):
     )
 
     team: Mapped[Optional["Team"]] = relationship("Team", back_populates="members", foreign_keys=[team_id])
-    # Many-to-many: all teams this user belongs to (via user_teams junction)
+    # Many-to-many: all teams this user belongs to (via user_teams junction).
+    # No lazy="selectin" — use selectinload(User.all_teams) explicitly when needed.
+    # Auto-loading via selectin caused MissingGreenlet errors (sync of back_populates
+    # tried to lazy-load Team.all_members in async context).
     all_teams: Mapped[list["Team"]] = relationship(
         "Team",
         secondary="user_teams",
         back_populates="all_members",
-        lazy="selectin",
     )
     permission_overrides: Mapped[list["PermissionOverride"]] = relationship(
         "PermissionOverride", back_populates="user", foreign_keys="PermissionOverride.user_id"
