@@ -292,3 +292,62 @@ async def save_schedule(db: AsyncSession, data: dict) -> dict:
             db.add(AppSetting(key=key, value=str(value)))
     await db.flush()
     return await get_schedule(db)
+
+
+async def run_scheduled_backup_check(db: AsyncSession, now: datetime | None = None) -> bool:
+    """
+    Evaluate whether it is time to take a scheduled backup and, if so, take it.
+
+    Returns True when a backup was created, False when skipped.
+    The caller is responsible for committing the session afterwards.
+    """
+    from datetime import timedelta
+
+    schedule = await get_schedule(db)
+    if schedule.get("backup_enabled", "false").lower() != "true":
+        logger.debug("Scheduled backup: disabled — skipping.")
+        return False
+
+    if now is None:
+        now = datetime.now(timezone.utc)
+
+    backup_hour = int(schedule.get("backup_hour", "2"))
+    frequency = schedule.get("backup_frequency", "daily")
+
+    # Only run at the configured UTC hour
+    if now.hour != backup_hour:
+        logger.debug(
+            "Scheduled backup: current hour %d ≠ configured hour %d — skipping.",
+            now.hour, backup_hour,
+        )
+        return False
+
+    # For weekly frequency: only run on the configured weekday
+    if frequency == "weekly":
+        backup_dow = int(schedule.get("backup_day_of_week", "0"))
+        if now.weekday() != backup_dow:
+            logger.debug(
+                "Scheduled backup: today weekday %d ≠ configured weekday %d — skipping.",
+                now.weekday(), backup_dow,
+            )
+            return False
+
+    # Deduplication: skip if a scheduled backup ran within the past 23 hours
+    cutoff = now - timedelta(hours=23)
+    result = await db.execute(
+        select(BackupRecord)
+        .where(BackupRecord.backup_type == "scheduled")
+        .where(BackupRecord.created_at >= cutoff)
+        .limit(1)
+    )
+    if result.scalar_one_or_none() is not None:
+        logger.debug("Scheduled backup: already ran within the last 23 h — skipping.")
+        return False
+
+    logger.info(
+        "Running scheduled backup (frequency=%s, hour=%d UTC)…", frequency, backup_hour
+    )
+    await create_backup(db, backup_type="scheduled", notes="Otomatik zamanlı yedek")
+    # NOTE: caller is responsible for committing the session.
+    # In production this is done by AsyncSessionLocal.begin() in main.py.
+    return True

@@ -29,46 +29,16 @@ def _start_scheduler():
         scheduler = AsyncIOScheduler()
 
         async def _run_scheduled_backup():
-            """Read schedule settings and run backup if it's time."""
-            from datetime import datetime as _dt
+            """Delegate to backup_service.run_scheduled_backup_check.
+
+            Uses AsyncSessionLocal.begin() so the session is automatically
+            committed on success and rolled back on any exception.
+            """
             try:
                 from app.database import AsyncSessionLocal
-                from app.services import backup_service
-                async with AsyncSessionLocal() as db:
-                    schedule = await backup_service.get_schedule(db)
-                    if schedule.get("backup_enabled", "false").lower() != "true":
-                        return
-
-                    now = _dt.utcnow()
-                    backup_hour = int(schedule.get("backup_hour", "2"))
-                    frequency = schedule.get("backup_frequency", "daily")
-
-                    # Only run at the configured hour
-                    if now.hour != backup_hour:
-                        return
-
-                    # For weekly: only run on the configured day (0=Mon … 6=Sun)
-                    if frequency == "weekly":
-                        backup_dow = int(schedule.get("backup_day_of_week", "0"))
-                        if now.weekday() != backup_dow:
-                            return
-
-                    # Check if a backup already ran in the last 23h to avoid duplicates
-                    from app.models.backup_record import BackupRecord
-                    from sqlalchemy import select
-                    from datetime import timedelta
-                    cutoff = now - timedelta(hours=23)
-                    result = await db.execute(
-                        select(BackupRecord)
-                        .where(BackupRecord.backup_type == "scheduled")
-                        .where(BackupRecord.created_at >= cutoff)
-                    )
-                    if result.scalar_one_or_none() is not None:
-                        logger.debug("Scheduled backup already ran recently; skipping.")
-                        return
-
-                    logger.info("Running scheduled backup (frequency=%s hour=%d)…", frequency, backup_hour)
-                    await backup_service.create_backup(db, backup_type="scheduled", notes="Otomatik zamanlı yedek")
+                from app.services.backup_service import run_scheduled_backup_check
+                async with AsyncSessionLocal.begin() as db:
+                    await run_scheduled_backup_check(db)
             except Exception as exc:
                 logger.error("Scheduled backup failed: %s", exc, exc_info=True)
 
