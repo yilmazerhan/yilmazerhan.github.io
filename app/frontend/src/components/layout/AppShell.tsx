@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom'
 import { useState } from 'react'
 import Sidebar from './Sidebar'
 import Topbar from './Topbar'
+import GlobalLoadingBar from './GlobalLoadingBar'
 import Toaster from '@/components/ui/Toast'
 import CommandPalette from '@/components/ui/CommandPalette'
 import ShortcutsHelp from '@/components/ui/ShortcutsHelp'
@@ -20,6 +21,7 @@ export default function AppShell() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-950">
+      <GlobalLoadingBar />
       <Sidebar open={sidebarOpen} onShortcutsOpen={() => setHelpOpen(true)} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Topbar

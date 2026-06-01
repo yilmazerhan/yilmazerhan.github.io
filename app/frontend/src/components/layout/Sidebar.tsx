@@ -49,6 +49,7 @@ export default function Sidebar({ open, onShortcutsOpen }: SidebarProps) {
     queryKey: ['branding'],
     queryFn: () => axios.get('/api/v1/public/branding').then((r) => r.data),
     staleTime: Infinity,
+    gcTime: Infinity,   // Never evict — branding is static per session
   })
 
   if (!open) return null

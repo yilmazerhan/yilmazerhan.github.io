@@ -9,6 +9,7 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 0,
+      gcTime: 0,          // Evict from cache immediately on unmount — prevents stale data on navigation
       refetchOnWindowFocus: true,
       refetchOnMount: true,
       retry: 1,

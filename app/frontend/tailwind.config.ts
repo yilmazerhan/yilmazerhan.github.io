@@ -18,6 +18,15 @@ const config: Config = {
           700: 'var(--color-primary-700)',
         },
       },
+      keyframes: {
+        indeterminate: {
+          '0%':   { transform: 'translateX(-200%)' },
+          '100%': { transform: 'translateX(600%)' },
+        },
+      },
+      animation: {
+        indeterminate: 'indeterminate 1.4s ease-in-out infinite',
+      },
     },
   },
   plugins: [],
