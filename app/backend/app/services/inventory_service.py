@@ -1,6 +1,6 @@
 import io
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import openpyxl
@@ -256,7 +256,7 @@ class InventoryService:
         """Manually trigger an inventory email schedule."""
         sch = await self.get_schedule(schedule_id)
         sent = await _send_inventory_email(self.db, sch)
-        sch.last_run_at = datetime.utcnow()
+        sch.last_run_at = datetime.now(timezone.utc)
         sch.next_run_at = compute_next_run(
             sch.frequency, sch.day_of_week, sch.day_of_month, sch.hour
         )
@@ -346,11 +346,18 @@ async def _send_inventory_email(db: AsyncSession, schedule: InventoryEmailSchedu
                 )
                 msg.attach(part)
 
-                if smtp.use_tls:
-                    server = smtplib.SMTP(smtp.host, smtp.port)
-                    server.starttls()
+                import ssl as _ssl
+                _ctx = _ssl.create_default_context()
+                if getattr(smtp, 'use_ssl', False):
+                    server = smtplib.SMTP_SSL(smtp.host, smtp.port, context=_ctx, timeout=15)
+                elif smtp.use_tls:
+                    server = smtplib.SMTP(smtp.host, smtp.port, timeout=15)
+                    server.ehlo()
+                    server.starttls(context=_ctx)
+                    server.ehlo()
                 else:
-                    server = smtplib.SMTP_SSL(smtp.host, smtp.port)
+                    server = smtplib.SMTP(smtp.host, smtp.port, timeout=15)
+                    server.ehlo()
 
                 server.login(smtp.username, smtp_password)
                 server.sendmail(smtp.from_email, recipient, msg.as_string())
@@ -366,7 +373,8 @@ async def _send_inventory_email(db: AsyncSession, schedule: InventoryEmailSchedu
 
 async def run_due_inventory_schedules(db: AsyncSession) -> None:
     """Called by APScheduler hourly — sends emails for due schedules."""
-    now = datetime.utcnow()
+    from datetime import timezone as _tz
+    now = datetime.now(_tz.utc)
     result = await db.execute(
         select(InventoryEmailSchedule).where(
             InventoryEmailSchedule.is_active == True,

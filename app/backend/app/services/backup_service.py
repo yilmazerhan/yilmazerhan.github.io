@@ -4,7 +4,7 @@ Backup service: create pg_dump snapshots, store metadata, restore, and prune old
 import logging
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from urllib.parse import urlparse
 
 from fastapi import HTTPException
@@ -61,7 +61,7 @@ def _ensure_backup_dir():
 
 def _safe_filename(record_id: str, display_name: str) -> str:
     """Build a stable, injection-safe on-disk filename."""
-    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+    ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     return f"backup_{ts}_{record_id[:8]}.sql"
 
 
@@ -88,7 +88,7 @@ async def create_backup(
     record_id = str(uuid.uuid4())
     filename = _safe_filename(record_id, backup_type)
     file_path = os.path.join(BACKUP_DIR, filename)
-    display_name = f"backup_{datetime.utcnow().strftime('%Y-%m-%d %H:%M')} ({backup_type})"
+    display_name = f"backup_{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')} ({backup_type})"
 
     # pg_dump with --clean --if-exists so the .sql is self-contained for restore
     cmd = [

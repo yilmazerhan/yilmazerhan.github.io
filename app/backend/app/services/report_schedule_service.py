@@ -1,4 +1,4 @@
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -11,15 +11,15 @@ def compute_next_run(
     day_of_month: Optional[int],
     hour: int,
 ) -> Optional[datetime]:
-    """Compute next run datetime based on frequency settings."""
-    now = datetime.utcnow()
+    """Compute next run datetime (UTC, timezone-aware) based on frequency settings."""
+    now = datetime.now(timezone.utc)
     today = now.date()
 
     if frequency == "daily":
-        run_today = datetime(today.year, today.month, today.day, hour, 0, 0)
+        run_today = datetime(today.year, today.month, today.day, hour, 0, 0, tzinfo=timezone.utc)
         if now < run_today:
             return run_today
-        return datetime(today.year, today.month, today.day, hour, 0, 0) + timedelta(days=1)
+        return datetime(today.year, today.month, today.day, hour, 0, 0, tzinfo=timezone.utc) + timedelta(days=1)
 
     elif frequency == "weekly":
         dow = day_of_week if day_of_week is not None else 0  # default Monday
@@ -27,7 +27,7 @@ def compute_next_run(
         if days_ahead < 0:
             days_ahead += 7
         next_date = today + timedelta(days=days_ahead)
-        candidate = datetime(next_date.year, next_date.month, next_date.day, hour, 0, 0)
+        candidate = datetime(next_date.year, next_date.month, next_date.day, hour, 0, 0, tzinfo=timezone.utc)
         if candidate <= now:
             candidate += timedelta(weeks=1)
         return candidate
@@ -36,20 +36,20 @@ def compute_next_run(
         dom = day_of_month if day_of_month is not None else 1
         # Try this month
         try:
-            candidate = datetime(today.year, today.month, dom, hour, 0, 0)
+            candidate = datetime(today.year, today.month, dom, hour, 0, 0, tzinfo=timezone.utc)
             if candidate > now:
                 return candidate
         except ValueError:
             pass
         # Next month
         if today.month == 12:
-            next_month = datetime(today.year + 1, 1, 1)
+            next_month = datetime(today.year + 1, 1, 1, tzinfo=timezone.utc)
         else:
-            next_month = datetime(today.year, today.month + 1, 1)
+            next_month = datetime(today.year, today.month + 1, 1, tzinfo=timezone.utc)
         try:
-            return datetime(next_month.year, next_month.month, dom, hour, 0, 0)
+            return datetime(next_month.year, next_month.month, dom, hour, 0, 0, tzinfo=timezone.utc)
         except ValueError:
-            return datetime(next_month.year, next_month.month, 1, hour, 0, 0)
+            return datetime(next_month.year, next_month.month, 1, hour, 0, 0, tzinfo=timezone.utc)
 
     return None
 
@@ -146,11 +146,18 @@ async def generate_and_send_report(db: AsyncSession, schedule) -> int:
                 attachment.add_header('Content-Disposition', f'attachment; filename="{filename}"')
                 msg.attach(attachment)
 
-                if smtp.use_tls:
-                    server = smtplib.SMTP(smtp.host, smtp.port)
-                    server.starttls()
+                import ssl as _ssl
+                _ctx = _ssl.create_default_context()
+                if getattr(smtp, 'use_ssl', False):
+                    server = smtplib.SMTP_SSL(smtp.host, smtp.port, context=_ctx, timeout=15)
+                elif smtp.use_tls:
+                    server = smtplib.SMTP(smtp.host, smtp.port, timeout=15)
+                    server.ehlo()
+                    server.starttls(context=_ctx)
+                    server.ehlo()
                 else:
-                    server = smtplib.SMTP_SSL(smtp.host, smtp.port)
+                    server = smtplib.SMTP(smtp.host, smtp.port, timeout=15)
+                    server.ehlo()
 
                 server.login(smtp.username, password)
                 server.sendmail(smtp.from_email, recipient, msg.as_string())

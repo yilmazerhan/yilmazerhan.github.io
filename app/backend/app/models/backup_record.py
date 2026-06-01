@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import String, Text, BigInteger, TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
@@ -16,5 +16,5 @@ class BackupRecord(Base):
     status: Mapped[str] = mapped_column(String(20), default="completed")      # completed | failed
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), default=datetime.utcnow
+        TIMESTAMP(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

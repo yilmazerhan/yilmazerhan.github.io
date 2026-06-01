@@ -672,7 +672,8 @@ async def run_report_schedule(
         raise HTTPException(status_code=404, detail="Zamanlama bulunamadı.")
 
     count = await generate_and_send_report(db, schedule)
-    schedule.last_run_at = datetime.utcnow()
+    from datetime import timezone as _tz
+    schedule.last_run_at = datetime.now(_tz.utc)
     schedule.next_run_at = compute_next_run(schedule.frequency, schedule.day_of_week, schedule.day_of_month, schedule.hour)
     await db.flush()
     return {"sent": count, "message": f"{count} alıcıya rapor gönderildi."}
