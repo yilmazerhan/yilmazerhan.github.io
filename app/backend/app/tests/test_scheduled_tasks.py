@@ -2,7 +2,7 @@
 Scheduled & recurring task tests:
 - compute_next_run (daily, weekly, monthly)
 - generate_and_send_report (CSV email via SMTP mock)
-- run_due_inventory_schedules (APScheduler callback)
+- run_due_inventory_schedules (Celery Beat task)
 - evaluate_scheduled_workflows (Celery task logic: task_due_soon, task_overdue,
   worklog_reminder, dashboard_report)
 - backup_service: create, schedule, prune
@@ -969,26 +969,19 @@ class TestInventoryScheduleAPI:
         assert resp_post.status_code == 403
 
 
-# ─── APScheduler callback integration: inventory commit ───────────────────────
+# ─── Celery task integration: inventory schedule commit ───────────────────────
 
 class TestInventoryScheduleIntegration:
     """
-    Regression tests for the missing commit bug in main.py._run_inventory_email_check.
+    Regression tests for the scheduled inventory email commit path.
 
-    Old buggy code:
-        async with AsyncSessionLocal() as db:      # plain session — no auto-commit
-            await run_due_inventory_schedules(db)  # only flush() → rolled back on close
-
-    Fixed code:
-        async with AsyncSessionLocal.begin() as db:  # auto-commits on success
-
-    These tests simulate the APScheduler callback by opening a begin()-session
-    against the TEST DB (to avoid touching production) and verify that
-    last_run_at / next_run_at are committed and visible to other sessions.
+    These tests simulate the Celery task callback by opening a begin()-session
+    against the TEST DB and verify that last_run_at / next_run_at are committed
+    and visible to other sessions.
     """
 
     async def _call_via_fresh_session(self) -> None:
-        """Mirrors main.py._run_inventory_email_check against the test DB."""
+        """Mirrors the Celery run_inventory_email_check task logic against the test DB."""
         from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
         from app.tests.conftest import TEST_DATABASE_URL
         from app.services.inventory_service import run_due_inventory_schedules

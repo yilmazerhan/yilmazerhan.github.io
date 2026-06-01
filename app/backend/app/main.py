@@ -20,53 +20,6 @@ from app.routers.announcements import router as announcements_router
 logger = logging.getLogger(__name__)
 
 
-def _start_scheduler():
-    """Start APScheduler for periodic backups."""
-    try:
-        from apscheduler.schedulers.asyncio import AsyncIOScheduler
-        from apscheduler.triggers.cron import CronTrigger
-
-        scheduler = AsyncIOScheduler()
-
-        async def _run_scheduled_backup():
-            """Delegate to backup_service.run_scheduled_backup_check.
-
-            Uses AsyncSessionLocal.begin() so the session is automatically
-            committed on success and rolled back on any exception.
-            """
-            try:
-                from app.database import AsyncSessionLocal
-                from app.services.backup_service import run_scheduled_backup_check
-                async with AsyncSessionLocal.begin() as db:
-                    await run_scheduled_backup_check(db)
-            except Exception as exc:
-                logger.error("Scheduled backup failed: %s", exc, exc_info=True)
-
-        async def _run_inventory_email_check():
-            """Check for due inventory email schedules and send them.
-
-            Uses AsyncSessionLocal.begin() so last_run_at / next_run_at updates
-            are committed on success and rolled back on any exception.
-            """
-            try:
-                from app.database import AsyncSessionLocal
-                from app.services.inventory_service import run_due_inventory_schedules
-                async with AsyncSessionLocal.begin() as db:
-                    await run_due_inventory_schedules(db)
-            except Exception as exc:
-                logger.error("Inventory email schedule check failed: %s", exc, exc_info=True)
-
-        # Check every hour on the hour
-        scheduler.add_job(_run_scheduled_backup, CronTrigger(minute=0), id="hourly_backup_check")
-        scheduler.add_job(_run_inventory_email_check, CronTrigger(minute=0), id="hourly_inventory_email_check")
-        scheduler.start()
-        logger.info("APScheduler started (hourly backup check job).")
-        return scheduler
-    except Exception as exc:
-        logger.warning("Could not start APScheduler: %s", exc)
-        return None
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: seed superadmin if needed
@@ -74,13 +27,9 @@ async def lifespan(app: FastAPI):
     from app.services.seed_service import seed_initial_data
     async with AsyncSessionLocal() as db:
         await seed_initial_data(db)
-
-    # Start periodic backup scheduler
-    scheduler = _start_scheduler()
+    # Periodic scheduled jobs (backup, inventory email) run via Celery Beat —
+    # a single dedicated process — to avoid duplicate execution across uvicorn workers.
     yield
-    # Shutdown
-    if scheduler:
-        scheduler.shutdown(wait=False)
 
 
 app = FastAPI(

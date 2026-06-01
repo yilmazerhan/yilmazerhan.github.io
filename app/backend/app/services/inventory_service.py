@@ -372,7 +372,7 @@ async def _send_inventory_email(db: AsyncSession, schedule: InventoryEmailSchedu
 
 
 async def run_due_inventory_schedules(db: AsyncSession) -> None:
-    """Called by APScheduler hourly — sends emails for due schedules."""
+    """Called by Celery Beat hourly — sends emails for due schedules."""
     from datetime import timezone as _tz
     now = datetime.now(_tz.utc)
     result = await db.execute(

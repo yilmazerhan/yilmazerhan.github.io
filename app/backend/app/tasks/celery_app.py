@@ -5,7 +5,7 @@ celery_app = Celery(
     "teamapp",
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL,
-    include=["app.tasks.email_tasks"],
+    include=["app.tasks.email_tasks", "app.tasks.scheduled_tasks"],
 )
 
 celery_app.conf.update(
@@ -35,6 +35,16 @@ celery_app.conf.beat_schedule = {
     },
     "refresh-jira-statuses-hourly": {
         "task": "app.tasks.email_tasks.refresh_jira_statuses",
+        "schedule": 3600.0,  # 1 hour
+    },
+    # Backup and inventory checks moved from APScheduler (ran per-worker) to
+    # Celery Beat (single process) to prevent duplicate execution with --workers N.
+    "run-backup-check-hourly": {
+        "task": "app.tasks.scheduled_tasks.run_backup_check",
+        "schedule": 3600.0,  # 1 hour
+    },
+    "run-inventory-email-check-hourly": {
+        "task": "app.tasks.scheduled_tasks.run_inventory_email_check",
         "schedule": 3600.0,  # 1 hour
     },
 }
