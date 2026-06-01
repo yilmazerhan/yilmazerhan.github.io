@@ -2,6 +2,7 @@
 Celery tasks for email sending, Teams notifications, and scheduled workflow evaluation.
 """
 import asyncio
+import logging
 from datetime import date, timedelta, datetime, timezone
 from typing import Optional
 import smtplib
@@ -11,6 +12,8 @@ import ssl as ssl_lib
 
 from app.tasks.celery_app import celery_app
 
+logger = logging.getLogger(__name__)
+
 
 def _run_async(coro):
     loop = asyncio.new_event_loop()
@@ -18,6 +21,108 @@ def _run_async(coro):
         return loop.run_until_complete(coro)
     finally:
         loop.close()
+
+
+async def send_auth_email_direct(
+    template_slug: str,
+    to_email: str,
+    variables: dict,
+) -> None:
+    """Send a transactional auth email directly (no Celery / Redis required).
+
+    Used for user creation, password reset, and activation emails via
+    FastAPI BackgroundTasks.  Runs in the server process event loop so
+    it never depends on the broker being available.
+    """
+    from app.database import AsyncSessionLocal
+    from app.services.email_service import EmailService
+    from app.models.app_setting import AppSetting
+    from app.core.security import decrypt_field
+    from app.config import settings
+    from sqlalchemy import select
+
+    log = None
+    try:
+        async with AsyncSessionLocal() as db:
+            svc = EmailService(db)
+
+            template = await svc.get_template_by_slug(template_slug)
+            if not template:
+                logger.error("send_auth_email_direct: template not found: %s", template_slug)
+                return
+
+            smtp_cfg = await svc.get_smtp_config()
+            if not smtp_cfg:
+                logger.warning(
+                    "send_auth_email_direct: SMTP not configured — skipping %s to %s",
+                    template_slug, to_email,
+                )
+                return
+
+            # Inject app branding
+            name_row = (await db.execute(
+                select(AppSetting).where(AppSetting.key == "company_name")
+            )).scalar_one_or_none()
+            app_name = (name_row.value if name_row and name_row.value else "")
+            merged_vars = {"app_name": app_name, "app_url": settings.FRONTEND_URL.rstrip("/"), **variables}
+
+            subject, html_body = svc.render_template(template, merged_vars)
+
+            # Decrypt password while session is open so we don't need a second DB round-trip
+            password = decrypt_field(smtp_cfg.password_encrypted, settings.SMTP_ENCRYPTION_KEY)
+
+            log = await svc.create_log_entry(
+                to_email=to_email,
+                subject=subject,
+                template_id=template.id,
+            )
+            await db.commit()
+
+        # Build message outside the session (no DB needed)
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"{smtp_cfg.from_name} <{smtp_cfg.from_email}>"
+        msg["To"] = to_email
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+        ctx = ssl_lib.create_default_context()
+        if smtp_cfg.use_ssl:
+            with smtplib.SMTP_SSL(smtp_cfg.host, smtp_cfg.port, context=ctx, timeout=15) as server:
+                server.login(smtp_cfg.username, password)
+                server.sendmail(smtp_cfg.from_email, [to_email], msg.as_string())
+        elif smtp_cfg.use_tls:
+            with smtplib.SMTP(smtp_cfg.host, smtp_cfg.port, timeout=15) as server:
+                server.ehlo()
+                server.starttls(context=ctx)
+                server.ehlo()
+                server.login(smtp_cfg.username, password)
+                server.sendmail(smtp_cfg.from_email, [to_email], msg.as_string())
+        else:
+            with smtplib.SMTP(smtp_cfg.host, smtp_cfg.port, timeout=15) as server:
+                server.ehlo()
+                server.login(smtp_cfg.username, password)
+                server.sendmail(smtp_cfg.from_email, [to_email], msg.as_string())
+
+        # Mark log sent
+        async with AsyncSessionLocal() as db:
+            await _mark_log_sent(db, str(log.id))
+            await db.commit()
+
+        logger.info("send_auth_email_direct: sent %s to %s", template_slug, to_email)
+
+    except Exception as exc:
+        logger.error(
+            "send_auth_email_direct: failed to send %s to %s: %s",
+            template_slug, to_email, exc, exc_info=True,
+        )
+        # Best-effort: mark log failed (only if the log entry was created)
+        if log is not None:
+            try:
+                async with AsyncSessionLocal() as db:
+                    await _mark_log_failed(db, str(log.id), str(exc)[:1000])
+                    await db.commit()
+            except Exception:
+                pass
 
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
@@ -46,6 +151,7 @@ async def _send_email_async(to_email: str, subject: str, html_body: str, log_id:
         if not smtp_cfg:
             if log_id:
                 await _mark_log_failed(db, log_id, "SMTP yapılandırması yok.")
+                await db.commit()
             return
 
         password = decrypt_field(smtp_cfg.password_encrypted, settings.SMTP_ENCRYPTION_KEY)

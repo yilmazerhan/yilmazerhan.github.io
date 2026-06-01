@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -15,7 +15,8 @@ from app.services.user_service import UserService
 from app.core.dependencies import (
     get_current_user, require_superadmin, require_manager_or_above
 )
-from app.core.task_utils import fire_and_forget
+from app.tasks.email_tasks import send_auth_email_direct
+from app.config import settings
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -54,6 +55,7 @@ async def create_user(
     body: UserCreate,
     _: Annotated[User, Depends(require_superadmin)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    background_tasks: BackgroundTasks,
 ):
     svc = UserService(db)
     user, temp_password = await svc.create_user(
@@ -64,12 +66,17 @@ async def create_user(
         preferred_language=body.preferred_language,
         username=body.username,
     )
-    from app.tasks.email_tasks import send_new_account_email_task
-    fire_and_forget(send_new_account_email_task,
-                    to_email=user.email,
-                    full_name=user.full_name,
-                    username=user.username,
-                    temp_password=temp_password)
+    background_tasks.add_task(
+        send_auth_email_direct,
+        template_slug="new_account",
+        to_email=user.email,
+        variables={
+            "full_name": user.full_name,
+            "username": user.username,
+            "temp_password": temp_password,
+            "login_url": f"{settings.FRONTEND_URL.rstrip('/')}/login",
+        },
+    )
     return user
 
 
@@ -205,12 +212,18 @@ async def resend_activation(
     user_id: uuid.UUID,
     _: Annotated[User, Depends(require_superadmin)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    background_tasks: BackgroundTasks,
 ):
     svc = UserService(db)
     user, token = await svc.resend_activation(user_id)
-    from app.tasks.email_tasks import send_activation_email_task
-    fire_and_forget(send_activation_email_task,
-                    to_email=user.email,
-                    full_name=user.full_name,
-                    activation_token=token)
+    background_tasks.add_task(
+        send_auth_email_direct,
+        template_slug="account_activation",
+        to_email=user.email,
+        variables={
+            "full_name": user.full_name,
+            "activation_url": f"{settings.FRONTEND_URL.rstrip('/')}/activate/{token}",
+            "expires_in": getattr(settings, "ACCOUNT_ACTIVATION_TOKEN_EXPIRE_HOURS", 48),
+        },
+    )
     return {"message": "Aktivasyon emaili yeniden gönderildi."}

@@ -1,6 +1,6 @@
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, Request, Response, Cookie
+from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response, Cookie
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,7 +14,7 @@ from app.core.dependencies import get_current_user
 from app.core.rate_limit import limiter
 from app.config import settings
 from app.models.user import User
-from app.core.task_utils import fire_and_forget
+from app.tasks.email_tasks import send_auth_email_direct
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -55,14 +55,20 @@ async def register(
     request: Request,
     body: RegisterRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
+    background_tasks: BackgroundTasks,
 ):
     svc = AuthService(db)
     user, activation_token = await svc.register(body.email, body.password, body.full_name, body.preferred_language)
-    from app.tasks.email_tasks import send_activation_email_task
-    fire_and_forget(send_activation_email_task,
-                    to_email=user.email,
-                    full_name=user.full_name,
-                    activation_token=activation_token)
+    background_tasks.add_task(
+        send_auth_email_direct,
+        template_slug="account_activation",
+        to_email=user.email,
+        variables={
+            "full_name": user.full_name,
+            "activation_url": f"{settings.FRONTEND_URL.rstrip('/')}/activate/{activation_token}",
+            "expires_in": getattr(settings, "ACCOUNT_ACTIVATION_TOKEN_EXPIRE_HOURS", 48),
+        },
+    )
     return {"message": "Kayıt başarılı. Email adresinize aktivasyon bağlantısı gönderildi."}
 
 
@@ -143,16 +149,22 @@ async def forgot_password(
     request: Request,
     body: ForgotPasswordRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
+    background_tasks: BackgroundTasks,
 ):
     svc = AuthService(db)
     result = await svc.forgot_password(body.email)
     if result:
         user, raw_token = result
-        from app.tasks.email_tasks import send_password_reset_email_task
-        fire_and_forget(send_password_reset_email_task,
-                        to_email=user.email,
-                        full_name=user.full_name,
-                        reset_token=raw_token)
+        background_tasks.add_task(
+            send_auth_email_direct,
+            template_slug="password_reset",
+            to_email=user.email,
+            variables={
+                "full_name": user.full_name,
+                "reset_url": f"{settings.FRONTEND_URL.rstrip('/')}/reset-password?token={raw_token}",
+                "expires_in": getattr(settings, "PASSWORD_RESET_TOKEN_EXPIRE_HOURS", 1),
+            },
+        )
 
     # Always return success message to prevent user enumeration
     return {"message": "Şifre sıfırlama bağlantısı email adresinize gönderildi (eğer kayıtlıysa)."}
