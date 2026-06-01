@@ -5,10 +5,16 @@ import { readFileSync } from 'fs'
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8')) as { version: string }
 
+// Build time suffix: HHmm — makes each intra-day build uniquely identifiable.
+// Combined with the date-based package.json version this gives YYYY.MM.DD.HHmm.
+const _now = new Date()
+const _hhmm = String(_now.getHours()).padStart(2, '0') + String(_now.getMinutes()).padStart(2, '0')
+const BUILD_VERSION = `${pkg.version}.${_hhmm}`
+
 export default defineConfig({
   plugins: [react()],
   define: {
-    __APP_VERSION__: JSON.stringify(pkg.version),
+    __APP_VERSION__: JSON.stringify(BUILD_VERSION),
   },
   resolve: {
     alias: {
