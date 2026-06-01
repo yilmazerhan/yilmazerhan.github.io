@@ -43,11 +43,15 @@ def _start_scheduler():
                 logger.error("Scheduled backup failed: %s", exc, exc_info=True)
 
         async def _run_inventory_email_check():
-            """Check for due inventory email schedules and send them."""
+            """Check for due inventory email schedules and send them.
+
+            Uses AsyncSessionLocal.begin() so last_run_at / next_run_at updates
+            are committed on success and rolled back on any exception.
+            """
             try:
                 from app.database import AsyncSessionLocal
                 from app.services.inventory_service import run_due_inventory_schedules
-                async with AsyncSessionLocal() as db:
+                async with AsyncSessionLocal.begin() as db:
                     await run_due_inventory_schedules(db)
             except Exception as exc:
                 logger.error("Inventory email schedule check failed: %s", exc, exc_info=True)

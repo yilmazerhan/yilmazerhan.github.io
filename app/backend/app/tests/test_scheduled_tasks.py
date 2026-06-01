@@ -967,3 +967,148 @@ class TestInventoryScheduleAPI:
             "recipient_emails": ["x@test.com"],
         })
         assert resp_post.status_code == 403
+
+
+# ─── APScheduler callback integration: inventory commit ───────────────────────
+
+class TestInventoryScheduleIntegration:
+    """
+    Regression tests for the missing commit bug in main.py._run_inventory_email_check.
+
+    Old buggy code:
+        async with AsyncSessionLocal() as db:      # plain session — no auto-commit
+            await run_due_inventory_schedules(db)  # only flush() → rolled back on close
+
+    Fixed code:
+        async with AsyncSessionLocal.begin() as db:  # auto-commits on success
+
+    These tests simulate the APScheduler callback by opening a begin()-session
+    against the TEST DB (to avoid touching production) and verify that
+    last_run_at / next_run_at are committed and visible to other sessions.
+    """
+
+    async def _call_via_fresh_session(self) -> None:
+        """Mirrors main.py._run_inventory_email_check against the test DB."""
+        from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+        from app.tests.conftest import TEST_DATABASE_URL
+        from app.services.inventory_service import run_due_inventory_schedules
+        engine = create_async_engine(TEST_DATABASE_URL, echo=False)
+        Session = async_sessionmaker(engine, expire_on_commit=False)
+        try:
+            async with Session.begin() as db:
+                await run_due_inventory_schedules(db)
+        finally:
+            await engine.dispose()
+
+    async def test_last_run_at_committed_after_scheduler_callback(self, db: AsyncSession):
+        """
+        Bug regression: last_run_at and next_run_at must be committed to the DB
+        after the APScheduler callback, not just flushed inside a rolled-back session.
+
+        Verification note: we use db.refresh(sch) rather than a SELECT query because
+        SQLAlchemy's identity map may return a cached object (stale values) if the
+        session committed the same record earlier and expire_on_commit=False is set.
+        db.refresh() always forces a re-read from the DB.
+        """
+        from app.models.inventory import InventoryEmailSchedule
+        from sqlalchemy import delete as sa_delete
+
+        await db.execute(sa_delete(InventoryEmailSchedule))
+        await db.commit()
+
+        past = datetime.now(timezone.utc) - timedelta(minutes=1)
+        sch = InventoryEmailSchedule(
+            name="Commit Test Schedule",
+            frequency="daily",
+            hour=8,
+            recipient_emails=["commit@test.com"],
+            next_run_at=past,
+            is_active=True,
+        )
+        db.add(sch)
+        await db.commit()
+
+        with patch("app.services.inventory_service._send_inventory_email",
+                   new_callable=AsyncMock, return_value=1):
+            await self._call_via_fresh_session()
+
+        # db.refresh() forces a round-trip to the DB, bypassing the identity-map
+        # cache so we read what the fresh session actually committed.
+        await db.refresh(sch)
+
+        assert sch.last_run_at is not None, (
+            "last_run_at was not committed — old bug: _run_inventory_email_check "
+            "used AsyncSessionLocal() without .begin(), so run_due_inventory_schedules "
+            "flush() was rolled back on session close."
+        )
+        assert sch.next_run_at is not None
+        assert sch.next_run_at > past, (
+            "next_run_at must have been updated beyond the original past value."
+        )
+
+    async def test_schedule_not_retriggered_after_commit(self, db: AsyncSession):
+        """
+        After the first APScheduler callback updates next_run_at to a future time
+        (and commits it), a second callback must skip the schedule.
+        Without the commit fix, next_run_at reverts to the old past value on every
+        run and the schedule fires repeatedly on every hour.
+        """
+        from app.models.inventory import InventoryEmailSchedule
+        from sqlalchemy import delete as sa_delete
+
+        await db.execute(sa_delete(InventoryEmailSchedule))
+        await db.commit()
+
+        past = datetime.now(timezone.utc) - timedelta(minutes=1)
+        db.add(InventoryEmailSchedule(
+            name="Retrigger Test",
+            frequency="daily",
+            hour=8,
+            recipient_emails=["retrigger@test.com"],
+            next_run_at=past,
+            is_active=True,
+        ))
+        await db.commit()
+
+        send_count = 0
+
+        async def _count_sends(db_arg, sch):
+            nonlocal send_count
+            send_count += 1
+            return 1
+
+        with patch("app.services.inventory_service._send_inventory_email",
+                   side_effect=_count_sends):
+            await self._call_via_fresh_session()  # first call — processes schedule
+            await self._call_via_fresh_session()  # second call — must skip (next_run_at in future)
+
+        assert send_count == 1, (
+            f"Schedule triggered {send_count} times but must trigger only once. "
+            "Without the commit fix, next_run_at update is rolled back and the "
+            "schedule appears perpetually due to be re-run."
+        )
+
+    async def test_inactive_schedule_never_processed(self, db: AsyncSession):
+        """An inactive schedule must not be processed by the APScheduler callback."""
+        from app.models.inventory import InventoryEmailSchedule
+        from sqlalchemy import delete as sa_delete
+
+        await db.execute(sa_delete(InventoryEmailSchedule))
+        await db.commit()
+
+        past = datetime.now(timezone.utc) - timedelta(minutes=1)
+        db.add(InventoryEmailSchedule(
+            name="Inactive Integration",
+            frequency="daily",
+            hour=8,
+            recipient_emails=["inactive@test.com"],
+            next_run_at=past,
+            is_active=False,
+        ))
+        await db.commit()
+
+        with patch("app.services.inventory_service._send_inventory_email",
+                   new_callable=AsyncMock) as mock_send:
+            await self._call_via_fresh_session()
+
+        mock_send.assert_not_called()

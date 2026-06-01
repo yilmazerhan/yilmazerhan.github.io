@@ -339,7 +339,7 @@ async def _send_inventory_email(db: AsyncSession, schedule: InventoryEmailSchedu
                 part = MIMEBase("application", "octet-stream")
                 part.set_payload(excel_bytes)
                 encoders.encode_base64(part)
-                today_str = datetime.utcnow().strftime("%Y%m%d")
+                today_str = datetime.now(timezone.utc).strftime("%Y%m%d")
                 part.add_header(
                     "Content-Disposition",
                     f'attachment; filename="inventory_{today_str}.xlsx"',

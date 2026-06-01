@@ -2,7 +2,7 @@ import csv
 import io
 import uuid
 import base64
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime, timezone
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
@@ -383,7 +383,7 @@ async def download_backup(
         )
         raise HTTPException(status_code=500, detail="Veritabanı yedeği alınamadı.")
 
-    filename = f"backup_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.sql"
+    filename = f"backup_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.sql"
     return FastAPIResponse(
         content=stdout,
         media_type="application/octet-stream",
