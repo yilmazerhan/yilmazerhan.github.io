@@ -88,7 +88,7 @@ export default function Sidebar({ open }: SidebarProps) {
         })}
       </nav>
 
-      {/* Bottom: profile + shortcuts hint */}
+      {/* Bottom: profile + shortcuts hint + version */}
       <div className="px-2 py-3 border-t border-gray-200 dark:border-gray-800 space-y-1">
         <NavLink
           to="/profile"
@@ -108,6 +108,12 @@ export default function Sidebar({ open }: SidebarProps) {
           <Keyboard className="h-3.5 w-3.5" />
           <span>{t('shortcuts.hint')}</span>
           <kbd className="ml-auto bg-gray-100 dark:bg-gray-800 px-1 rounded font-mono">?</kbd>
+        </div>
+
+        <div className="px-3 pt-1 pb-0.5">
+          <span className="text-[10px] font-mono text-gray-300 dark:text-gray-700 select-none">
+            v{__APP_VERSION__}
+          </span>
         </div>
       </div>
     </aside>

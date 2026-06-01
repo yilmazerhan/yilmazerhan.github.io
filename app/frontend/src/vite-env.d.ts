@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+declare const __APP_VERSION__: string
+
 declare module 'monaco-editor' {
   export namespace editor {
     interface IStandaloneCodeEditor {
