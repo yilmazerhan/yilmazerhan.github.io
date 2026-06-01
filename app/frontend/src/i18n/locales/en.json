@@ -43,7 +43,8 @@
     "activate_error_title": "Activation Failed",
     "activate_error_default": "Activation failed. The link may be invalid or expired.",
     "activate_invalid_link": "Invalid activation link.",
-    "go_to_login": "Go to Login"
+    "go_to_login": "Go to Login",
+    "idle_timeout_message": "You were signed out after 12 hours of inactivity. Please sign in again."
   },
   "nav": {
     "dashboard": "Dashboard",

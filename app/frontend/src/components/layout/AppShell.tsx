@@ -8,11 +8,14 @@ import CommandPalette from '@/components/ui/CommandPalette'
 import ShortcutsHelp from '@/components/ui/ShortcutsHelp'
 import AnnouncementBanner from '@/components/AnnouncementBanner'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
+import { useIdleTimer } from '@/hooks/useIdleTimer'
 
 export default function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
+
+  useIdleTimer()
 
   useKeyboardShortcuts({
     onSearch: () => setPaletteOpen(true),

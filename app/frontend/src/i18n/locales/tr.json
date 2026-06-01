@@ -43,7 +43,8 @@
     "activate_error_title": "Aktivasyon Başarısız",
     "activate_error_default": "Aktivasyon başarısız. Bağlantı geçersiz veya süresi dolmuş olabilir.",
     "activate_invalid_link": "Geçersiz aktivasyon bağlantısı.",
-    "go_to_login": "Giriş sayfasına git"
+    "go_to_login": "Giriş sayfasına git",
+    "idle_timeout_message": "12 saat boyunca işlem yapılmadığı için güvenliğiniz için oturumunuz sonlandırıldı. Lütfen tekrar giriş yapın."
   },
   "nav": {
     "dashboard": "Gösterge Paneli",

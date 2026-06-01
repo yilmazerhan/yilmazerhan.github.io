@@ -26,7 +26,11 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
 
-    if (error.response?.status === 401 && !original._retry) {
+    // Don't intercept 401s from auth endpoints — they return real errors (wrong password, etc.)
+    const url = original.url ?? ''
+    const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/refresh')
+
+    if (error.response?.status === 401 && !original._retry && !isAuthEndpoint) {
       original._retry = true
 
       try {

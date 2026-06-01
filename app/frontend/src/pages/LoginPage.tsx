@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import axios from 'axios'
@@ -10,6 +10,8 @@ export default function LoginPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { setAuth } = useAuthStore()
+  const [searchParams] = useSearchParams()
+  const idleTimeout = searchParams.get('reason') === 'idle'
 
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -57,6 +59,12 @@ export default function LoginPage() {
 
         <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-800 p-8">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">{t('auth.login')}</h2>
+
+          {idleTimeout && (
+            <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-700 dark:text-amber-400 text-sm">
+              {t('auth.idle_timeout_message')}
+            </div>
+          )}
 
           {error && (
             <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-700 dark:text-red-400 text-sm">

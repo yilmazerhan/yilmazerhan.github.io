@@ -18,9 +18,12 @@ interface AuthState {
   // XSS-based token theft. The token lives only in memory and is refreshed via
   // the httpOnly refresh cookie on each page load (see api/client.ts).
   accessToken: string | null
+  // Persisted so inactivity is tracked across page reloads.
+  lastActivityAt: number | null
   setAuth: (user: CurrentUser, token: string) => void
   setToken: (token: string) => void
   updateUser: (updates: Partial<CurrentUser>) => void
+  updateActivity: () => void
   logout: () => void
   isAuthenticated: () => boolean
   isSuperAdmin: () => boolean
@@ -32,14 +35,16 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       user: null,
       accessToken: null,
+      lastActivityAt: null,
 
-      setAuth: (user, token) => set({ user, accessToken: token }),
+      setAuth: (user, token) => set({ user, accessToken: token, lastActivityAt: Date.now() }),
       setToken: (token) => set({ accessToken: token }),
       updateUser: (updates) =>
         set((state) => ({
           user: state.user ? { ...state.user, ...updates } : null,
         })),
-      logout: () => set({ user: null, accessToken: null }),
+      updateActivity: () => set({ lastActivityAt: Date.now() }),
+      logout: () => set({ user: null, accessToken: null, lastActivityAt: null }),
 
       isAuthenticated: () => !!get().accessToken && !!get().user,
       isSuperAdmin: () => get().user?.role === 'superadmin',
@@ -50,7 +55,7 @@ export const useAuthStore = create<AuthState>()(
       // Only persist the user profile (no role-sensitive data) — NOT the access token.
       // The access token stays in memory only; the httpOnly refresh cookie is used
       // to obtain a new one on page load without exposing the JWT to JavaScript.
-      partialize: (state) => ({ user: state.user }),
+      partialize: (state) => ({ user: state.user, lastActivityAt: state.lastActivityAt }),
     }
   )
 )
