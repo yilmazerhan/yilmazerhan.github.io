@@ -340,11 +340,14 @@ def evaluate_scheduled_workflows():
 
 
 async def _evaluate_workflows_async():
+    from zoneinfo import ZoneInfo
     from app.database import AsyncSessionLocal
     from sqlalchemy import select
     from app.models.email_workflow import EmailWorkflow
     from app.models.kanban import Task
     from app.models.user import User
+
+    _ISTANBUL = ZoneInfo("Europe/Istanbul")
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(
@@ -352,8 +355,9 @@ async def _evaluate_workflows_async():
         )
         workflows = result.scalars().all()
 
-        today = date.today()
         now = datetime.now(timezone.utc)
+        now_local = now.astimezone(_ISTANBUL)
+        today = now_local.date()  # Istanbul local date
 
         for wf in workflows:
             if wf.trigger_type == "task_due_soon":
@@ -366,14 +370,14 @@ async def _evaluate_workflows_async():
 
             elif wf.trigger_type == "worklog_reminder":
                 hour = (wf.trigger_config or {}).get("send_hour", 17)
-                if now.hour == hour:
+                if now_local.hour == hour:
                     await _handle_worklog_reminder(db, wf, today)
 
             elif wf.trigger_type == "dashboard_report":
                 hour = (wf.trigger_config or {}).get("send_hour", 8)
                 frequency = (wf.trigger_config or {}).get("frequency", "daily")
                 day_of_week = (wf.trigger_config or {}).get("day_of_week", 0)  # 0=Mon
-                if now.hour == hour:
+                if now_local.hour == hour:
                     if frequency == "daily" or (frequency == "weekly" and today.weekday() == day_of_week):
                         await _handle_dashboard_report(db, wf, today)
 

@@ -1,8 +1,17 @@
 from datetime import datetime, date, timedelta, timezone
 from typing import Optional
+from zoneinfo import ZoneInfo
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
+
+_ISTANBUL = ZoneInfo("Europe/Istanbul")
+
+
+def _at_istanbul_hour(d: date, h: int) -> datetime:
+    """Return a UTC-aware datetime representing date d at hour h in Istanbul time."""
+    naive = datetime(d.year, d.month, d.day, h, 0, 0)
+    return naive.replace(tzinfo=_ISTANBUL).astimezone(timezone.utc)
 
 
 def compute_next_run(
@@ -11,45 +20,42 @@ def compute_next_run(
     day_of_month: Optional[int],
     hour: int,
 ) -> Optional[datetime]:
-    """Compute next run datetime (UTC, timezone-aware) based on frequency settings."""
+    """Compute next run datetime (UTC-aware) for a schedule whose hour is in Istanbul time."""
     now = datetime.now(timezone.utc)
-    today = now.date()
+    now_local = now.astimezone(_ISTANBUL)
+    today = now_local.date()
 
     if frequency == "daily":
-        run_today = datetime(today.year, today.month, today.day, hour, 0, 0, tzinfo=timezone.utc)
-        if now < run_today:
-            return run_today
-        return datetime(today.year, today.month, today.day, hour, 0, 0, tzinfo=timezone.utc) + timedelta(days=1)
+        candidate = _at_istanbul_hour(today, hour)
+        if now < candidate:
+            return candidate
+        return _at_istanbul_hour(today + timedelta(days=1), hour)
 
     elif frequency == "weekly":
-        dow = day_of_week if day_of_week is not None else 0  # default Monday
-        days_ahead = dow - today.weekday()
-        if days_ahead < 0:
-            days_ahead += 7
-        next_date = today + timedelta(days=days_ahead)
-        candidate = datetime(next_date.year, next_date.month, next_date.day, hour, 0, 0, tzinfo=timezone.utc)
+        dow = day_of_week if day_of_week is not None else 0  # 0=Monday
+        days_ahead = (dow - today.weekday()) % 7
+        candidate = _at_istanbul_hour(today + timedelta(days=days_ahead), hour)
         if candidate <= now:
-            candidate += timedelta(weeks=1)
+            candidate = _at_istanbul_hour(today + timedelta(days=days_ahead + 7), hour)
         return candidate
 
     elif frequency == "monthly":
         dom = day_of_month if day_of_month is not None else 1
-        # Try this month
         try:
-            candidate = datetime(today.year, today.month, dom, hour, 0, 0, tzinfo=timezone.utc)
+            candidate = _at_istanbul_hour(date(today.year, today.month, dom), hour)
             if candidate > now:
                 return candidate
         except ValueError:
             pass
         # Next month
         if today.month == 12:
-            next_month = datetime(today.year + 1, 1, 1, tzinfo=timezone.utc)
+            next_month_date = date(today.year + 1, 1, 1)
         else:
-            next_month = datetime(today.year, today.month + 1, 1, tzinfo=timezone.utc)
+            next_month_date = date(today.year, today.month + 1, 1)
         try:
-            return datetime(next_month.year, next_month.month, dom, hour, 0, 0, tzinfo=timezone.utc)
+            return _at_istanbul_hour(date(next_month_date.year, next_month_date.month, dom), hour)
         except ValueError:
-            return datetime(next_month.year, next_month.month, 1, hour, 0, 0, tzinfo=timezone.utc)
+            return _at_istanbul_hour(date(next_month_date.year, next_month_date.month, 1), hour)
 
     return None
 
