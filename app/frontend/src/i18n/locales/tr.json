@@ -884,7 +884,32 @@
       "DigitalOcean",
       "Diğer"
     ],
-    "view_only_note": "Bu sayfayı sadece görüntüleme yetkiniz var."
+    "view_only_note": "Bu sayfayı sadece görüntüleme yetkiniz var.",
+    "group": "Grup",
+    "groups": {
+      "manage": "Sunucu Grupları",
+      "add": "Grup Ekle",
+      "edit": "Grubu Düzenle",
+      "delete_confirm": "Bu grubu silmek istediğinizden emin misiniz? Öğeler gruptan çıkarılacak ancak silinmeyecektir.",
+      "no_groups": "Henüz grup bulunmuyor.",
+      "name": "Grup Adı",
+      "description": "Açıklama",
+      "type": "Grup Türü",
+      "color": "Renk",
+      "item_count": "öğe",
+      "no_group": "Grup yok",
+      "ungrouped": "Gruba Atanmamış",
+      "grouped_view": "Gruplu Görünüm",
+      "filter_all": "Tüm Gruplar",
+      "types": {
+        "replication": "Replikasyon",
+        "cluster": "Küme",
+        "ha": "Yüksek Erişilebilirlik",
+        "load_balanced": "Yük Dengeleme",
+        "related": "İlişkili",
+        "other": "Diğer"
+      }
+    }
   },
   "patches": {
     "title": "Müşteri Yamaları",

@@ -884,7 +884,32 @@
       "DigitalOcean",
       "Other"
     ],
-    "view_only_note": "You have view-only access to this page."
+    "view_only_note": "You have view-only access to this page.",
+    "group": "Group",
+    "groups": {
+      "manage": "Server Groups",
+      "add": "Add Group",
+      "edit": "Edit Group",
+      "delete_confirm": "Are you sure you want to delete this group? Items will be removed from the group but not deleted.",
+      "no_groups": "No groups yet.",
+      "name": "Group Name",
+      "description": "Description",
+      "type": "Group Type",
+      "color": "Color",
+      "item_count": "items",
+      "no_group": "No group",
+      "ungrouped": "Ungrouped",
+      "grouped_view": "Grouped View",
+      "filter_all": "All Groups",
+      "types": {
+        "replication": "Replication",
+        "cluster": "Cluster",
+        "ha": "High Availability",
+        "load_balanced": "Load Balanced",
+        "related": "Related",
+        "other": "Other"
+      }
+    }
   },
   "patches": {
     "title": "Customer Patches",

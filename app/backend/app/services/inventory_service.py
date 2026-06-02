@@ -5,12 +5,13 @@ from typing import Optional
 
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
-from sqlalchemy import select, or_, func as sa_func
+from sqlalchemy import select, or_, func as sa_func, update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from app.models.inventory import InventoryItem, InventoryEmailSchedule
+from app.models.inventory import InventoryItem, InventoryEmailSchedule, InventoryGroup
 from app.core.security import encrypt_field, decrypt_field
-from app.core.exceptions import NotFoundError, ValidationError, ForbiddenError
+from app.core.exceptions import NotFoundError, ValidationError, ConflictError
 from app.config import settings
 from app.services.report_schedule_service import compute_next_run
 
@@ -46,10 +47,11 @@ class InventoryService:
         search: Optional[str] = None,
         tags: Optional[list[str]] = None,
         is_active: Optional[bool] = None,
+        group_id: Optional[uuid.UUID] = None,
         skip: int = 0,
         limit: int = 200,
     ) -> list[InventoryItem]:
-        q = select(InventoryItem)
+        q = select(InventoryItem).options(selectinload(InventoryItem.group))
 
         if item_type:
             q = q.where(InventoryItem.item_type == item_type)
@@ -65,11 +67,12 @@ class InventoryService:
                 )
             )
         if tags:
-            # JSONB @> operator: item must contain all supplied tags
             for tag in tags:
                 q = q.where(InventoryItem.tags.contains([tag]))
         if is_active is not None:
             q = q.where(InventoryItem.is_active == is_active)
+        if group_id is not None:
+            q = q.where(InventoryItem.group_id == group_id)
 
         q = q.order_by(InventoryItem.display_name).offset(skip).limit(limit)
         result = await self.db.execute(q)
@@ -77,7 +80,9 @@ class InventoryService:
 
     async def get_item(self, item_id: uuid.UUID) -> InventoryItem:
         result = await self.db.execute(
-            select(InventoryItem).where(InventoryItem.id == item_id)
+            select(InventoryItem)
+            .options(selectinload(InventoryItem.group))
+            .where(InventoryItem.id == item_id)
         )
         item = result.scalar_one_or_none()
         if not item:
@@ -104,8 +109,8 @@ class InventoryService:
 
         self.db.add(item)
         await self.db.flush()
-        await self.db.refresh(item)
-        return item
+        # Re-query to load the group relationship via selectinload.
+        return await self.get_item(item.id)
 
     async def update_item(
         self, item_id: uuid.UUID, data: dict, updated_by: uuid.UUID
@@ -114,10 +119,13 @@ class InventoryService:
 
         key = settings.INVENTORY_ENCRYPTION_KEY
         for field, value in data.items():
+            if field == "group_id":
+                # Allow explicit None to remove item from its group.
+                setattr(item, "group_id", value)
+                continue
             if value is None:
                 continue
             if field in _ENCRYPTED_FIELDS:
-                # Re-encrypt only if a new value is explicitly supplied
                 if not key:
                     raise ValidationError("INVENTORY_ENCRYPTION_KEY yapılandırılmamış.")
                 setattr(item, _ENCRYPTED_FIELDS[field], encrypt_field(value, key))
@@ -126,8 +134,118 @@ class InventoryService:
 
         item.updated_by = updated_by
         await self.db.flush()
-        await self.db.refresh(item)
-        return item
+        return await self.get_item(item_id)
+
+    # ─── Group CRUD ───────────────────────────────────────────────────────────
+
+    async def list_groups(self) -> list[dict]:
+        groups_result = await self.db.execute(
+            select(InventoryGroup).order_by(InventoryGroup.name)
+        )
+        groups = list(groups_result.scalars().all())
+
+        # Fetch item counts in a single query
+        counts_result = await self.db.execute(
+            select(InventoryItem.group_id, sa_func.count(InventoryItem.id).label("cnt"))
+            .where(InventoryItem.group_id.isnot(None))
+            .group_by(InventoryItem.group_id)
+        )
+        count_map: dict[uuid.UUID, int] = {row.group_id: row.cnt for row in counts_result}
+
+        return [
+            {
+                "id": g.id,
+                "name": g.name,
+                "description": g.description,
+                "group_type": g.group_type,
+                "color": g.color,
+                "item_count": count_map.get(g.id, 0),
+                "created_at": g.created_at,
+                "updated_at": g.updated_at,
+            }
+            for g in groups
+        ]
+
+    async def get_group(self, group_id: uuid.UUID) -> InventoryGroup:
+        result = await self.db.execute(
+            select(InventoryGroup).where(InventoryGroup.id == group_id)
+        )
+        group = result.scalar_one_or_none()
+        if not group:
+            raise NotFoundError("Grup")
+        return group
+
+    async def create_group(
+        self, data: "InventoryGroupCreate", created_by: uuid.UUID
+    ) -> dict:
+        existing = await self.db.execute(
+            select(InventoryGroup).where(InventoryGroup.name == data.name)
+        )
+        if existing.scalar_one_or_none():
+            raise ConflictError("Bu isimde bir grup zaten mevcut.")
+
+        group = InventoryGroup(
+            name=data.name,
+            description=data.description,
+            group_type=data.group_type,
+            color=data.color,
+            created_by=created_by,
+        )
+        self.db.add(group)
+        await self.db.flush()
+        await self.db.refresh(group)
+        return {"id": group.id, "name": group.name, "description": group.description,
+                "group_type": group.group_type, "color": group.color, "item_count": 0,
+                "created_at": group.created_at, "updated_at": group.updated_at}
+
+    async def update_group(
+        self, group_id: uuid.UUID, data: "InventoryGroupUpdate"
+    ) -> dict:
+        group = await self.get_group(group_id)
+
+        if data.name is not None and data.name != group.name:
+            existing = await self.db.execute(
+                select(InventoryGroup).where(InventoryGroup.name == data.name)
+            )
+            if existing.scalar_one_or_none():
+                raise ConflictError("Bu isimde bir grup zaten mevcut.")
+            group.name = data.name
+        if data.description is not None:
+            group.description = data.description
+        if data.group_type is not None:
+            group.group_type = data.group_type
+        if data.color is not None:
+            group.color = data.color
+
+        await self.db.flush()
+        await self.db.refresh(group)
+
+        count_result = await self.db.execute(
+            select(sa_func.count(InventoryItem.id)).where(InventoryItem.group_id == group_id)
+        )
+        item_count = count_result.scalar_one()
+        return {"id": group.id, "name": group.name, "description": group.description,
+                "group_type": group.group_type, "color": group.color, "item_count": item_count,
+                "created_at": group.created_at, "updated_at": group.updated_at}
+
+    async def delete_group(self, group_id: uuid.UUID) -> None:
+        group = await self.get_group(group_id)
+        await self.db.delete(group)
+        await self.db.flush()
+
+    async def assign_items_to_group(
+        self, group_id: Optional[uuid.UUID], item_ids: list[uuid.UUID]
+    ) -> int:
+        if group_id is not None:
+            await self.get_group(group_id)  # raises NotFoundError if missing
+
+        result = await self.db.execute(
+            sa_update(InventoryItem)
+            .where(InventoryItem.id.in_(item_ids))
+            .values(group_id=group_id)
+        )
+        await self.db.flush()
+        return result.rowcount
 
     async def delete_item(self, item_id: uuid.UUID) -> None:
         item = await self.get_item(item_id)

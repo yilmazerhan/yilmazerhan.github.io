@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Plus, Search, Pencil, Trash2, Eye, EyeOff, Download, Server, Database, Mail,
-  Cloud, Package, Copy, Check, ChevronDown, ChevronRight, Send, X, Calendar,
+  Cloud, Package, Copy, Check, ChevronDown, ChevronRight, Send, X, Calendar, Layers,
 } from 'lucide-react'
 import {
   useInventoryItems,
@@ -16,11 +16,18 @@ import {
   useUpdateInventorySchedule,
   useDeleteInventorySchedule,
   useSendInventoryScheduleNow,
+  useInventoryGroups,
+  useCreateInventoryGroup,
+  useUpdateInventoryGroup,
+  useDeleteInventoryGroup,
   type InventoryItem,
   type InventoryItemCreate,
   type InventorySchedule,
   type InventoryScheduleCreate,
+  type InventoryGroup,
+  type InventoryGroupCreate,
   type ItemType,
+  type GroupType,
 } from '@/api/inventory'
 import { useAuthStore } from '@/store/authStore'
 
@@ -45,6 +52,8 @@ const TYPE_COLORS: Record<string, string> = {
 const ALL_ITEM_TYPES: ItemType[] = ['server', 'database', 'email_account', 'cloud_account', 'generic']
 const DB_TYPES = ['PostgreSQL', 'MySQL', 'MSSQL', 'Oracle', 'Redis', 'MongoDB', 'Other']
 const CLOUD_PROVIDERS = ['AWS', 'Azure', 'GCP', 'DigitalOcean', 'Other']
+const ALL_GROUP_TYPES: GroupType[] = ['replication', 'cluster', 'ha', 'load_balanced', 'related', 'other']
+const GROUP_COLORS = ['#6366f1', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4']
 
 // ─── Reveal field component ────────────────────────────────────────────────────
 
@@ -104,15 +113,16 @@ function RevealField({ itemId, field }: { itemId: string; field: string }) {
 interface ItemFormModalProps {
   item: InventoryItem | null
   onClose: () => void
+  groups?: InventoryGroup[]
 }
 
-function ItemFormModal({ item, onClose }: ItemFormModalProps) {
+function ItemFormModal({ item, onClose, groups = [] }: ItemFormModalProps) {
   const { t } = useTranslation()
   const create = useCreateInventoryItem()
   const update = useUpdateInventoryItem()
 
   const isEdit = !!item
-  const [form, setForm] = useState<Partial<InventoryItemCreate>>({
+  const [form, setForm] = useState<Partial<InventoryItemCreate> & { group_id?: string | null }>({
     item_type: item?.item_type ?? 'server',
     display_name: item?.display_name ?? '',
     description: item?.description ?? '',
@@ -135,6 +145,7 @@ function ItemFormModal({ item, onClose }: ItemFormModalProps) {
     account_id: item?.account_id ?? '',
     region: item?.region ?? '',
     url: item?.url ?? '',
+    group_id: item?.group_id ?? null,
   })
   const [tagsInput, setTagsInput] = useState((item?.tags ?? []).join(', '))
   const [error, setError] = useState('')
@@ -146,22 +157,22 @@ function ItemFormModal({ item, onClose }: ItemFormModalProps) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    const payload: Partial<InventoryItemCreate> = {
+    const payload: Record<string, unknown> = {
       ...form,
       tags: tagsInput.split(',').map((s) => s.trim()).filter(Boolean),
     }
-    // Remove empty strings
+    // Remove empty strings (but keep explicit null for group_id)
     Object.keys(payload).forEach((k) => {
-      if (payload[k as keyof InventoryItemCreate] === '') {
-        delete payload[k as keyof InventoryItemCreate]
+      if (k !== 'group_id' && payload[k] === '') {
+        delete payload[k]
       }
     })
 
     try {
       if (isEdit) {
-        await update.mutateAsync({ id: item.id, data: payload })
+        await update.mutateAsync({ id: item.id, data: payload as Parameters<typeof update.mutateAsync>[0]['data'] })
       } else {
-        await create.mutateAsync(payload as InventoryItemCreate)
+        await create.mutateAsync(payload as unknown as InventoryItemCreate)
       }
       onClose()
     } catch (err: unknown) {
@@ -357,6 +368,25 @@ function ItemFormModal({ item, onClose }: ItemFormModalProps) {
             <div className="border-t pt-4 dark:border-gray-700">
               <label className={labelCls}>{t('inventory.fields.url')}</label>
               <input type="text" placeholder="https://..." value={form.url} onChange={(e) => set('url', e.target.value)} className={inputCls} />
+            </div>
+          )}
+
+          {/* Group */}
+          {groups.length > 0 && (
+            <div className="border-t pt-4 dark:border-gray-700">
+              <label className={labelCls}>{t('inventory.group')}</label>
+              <select
+                value={form.group_id ?? ''}
+                onChange={(e) => setForm((p) => ({ ...p, group_id: e.target.value || null }))}
+                className={inputCls}
+              >
+                <option value="">{t('inventory.groups.no_group')}</option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name} ({t(`inventory.groups.types.${g.group_type}`)})
+                  </option>
+                ))}
+              </select>
             </div>
           )}
 
@@ -566,6 +596,140 @@ function ScheduleModal({ schedule, onClose }: ScheduleModalProps) {
   )
 }
 
+// ─── Group Modal ──────────────────────────────────────────────────────────────
+
+interface GroupModalProps {
+  group: InventoryGroup | null
+  onClose: () => void
+}
+
+function GroupModal({ group, onClose }: GroupModalProps) {
+  const { t } = useTranslation()
+  const isEdit = !!group
+  const create = useCreateInventoryGroup()
+  const update = useUpdateInventoryGroup()
+
+  const [form, setForm] = useState<InventoryGroupCreate>({
+    name: group?.name ?? '',
+    description: group?.description ?? '',
+    group_type: group?.group_type ?? 'related',
+    color: group?.color ?? '#6366f1',
+  })
+  const [error, setError] = useState('')
+
+  const inputCls =
+    'w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500'
+  const labelCls = 'block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    try {
+      if (isEdit) {
+        await update.mutateAsync({ id: group.id, data: form })
+      } else {
+        await create.mutateAsync(form)
+      }
+      onClose()
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setError(msg || 'Bir hata oluştu.')
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md">
+        <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {isEdit ? t('inventory.groups.edit') : t('inventory.groups.add')}
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className={labelCls}>{t('inventory.groups.name')} *</label>
+            <input
+              required
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+              className={inputCls}
+            />
+          </div>
+
+          <div>
+            <label className={labelCls}>{t('inventory.groups.description')}</label>
+            <textarea
+              rows={2}
+              value={form.description ?? ''}
+              onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+              className={inputCls}
+            />
+          </div>
+
+          <div>
+            <label className={labelCls}>{t('inventory.groups.type')}</label>
+            <select
+              value={form.group_type}
+              onChange={(e) => setForm((p) => ({ ...p, group_type: e.target.value as GroupType }))}
+              className={inputCls}
+            >
+              {ALL_GROUP_TYPES.map((gt) => (
+                <option key={gt} value={gt}>{t(`inventory.groups.types.${gt}`)}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className={labelCls}>{t('inventory.groups.color')}</label>
+            <div className="flex flex-wrap gap-2 mt-1">
+              {GROUP_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setForm((p) => ({ ...p, color: c }))}
+                  className="w-7 h-7 rounded-full border-2 transition-all"
+                  style={{
+                    backgroundColor: c,
+                    borderColor: form.color === c ? '#1f2937' : 'transparent',
+                    transform: form.color === c ? 'scale(1.2)' : 'scale(1)',
+                  }}
+                />
+              ))}
+              <input
+                type="color"
+                value={form.color}
+                onChange={(e) => setForm((p) => ({ ...p, color: e.target.value }))}
+                className="w-7 h-7 rounded cursor-pointer border border-gray-300 dark:border-gray-600"
+                title="Özel renk"
+              />
+            </div>
+          </div>
+
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+              {t('common.cancel')}
+            </button>
+            <button
+              type="submit"
+              disabled={create.isPending || update.isPending}
+              className="px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium transition-colors disabled:opacity-60"
+            >
+              {t('common.save')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function InventoryPage() {
@@ -574,8 +738,12 @@ export default function InventoryPage() {
 
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('')
+  const [groupFilter, setGroupFilter] = useState<string>('')
   const [editItem, setEditItem] = useState<InventoryItem | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
+  const [groupsOpen, setGroupsOpen] = useState(false)
+  const [editGroup, setEditGroup] = useState<InventoryGroup | null>(null)
+  const [groupCreateOpen, setGroupCreateOpen] = useState(false)
   const [schedulesOpen, setSchedulesOpen] = useState(false)
   const [editSchedule, setEditSchedule] = useState<InventorySchedule | null>(null)
   const [scheduleCreateOpen, setScheduleCreateOpen] = useState(false)
@@ -587,9 +755,12 @@ export default function InventoryPage() {
   const { data: items = [], isLoading } = useInventoryItems({
     search: search || undefined,
     item_type: typeFilter || undefined,
+    group_id: groupFilter || undefined,
   })
 
   const deleteItem = useDeleteInventoryItem()
+  const { data: groups = [] } = useInventoryGroups()
+  const deleteGroup = useDeleteInventoryGroup()
   const { data: schedules = [] } = useInventorySchedules()
   const deleteSchedule = useDeleteInventorySchedule()
   const sendNow = useSendInventoryScheduleNow()
@@ -597,6 +768,12 @@ export default function InventoryPage() {
   async function handleDelete(item: InventoryItem) {
     if (!confirm(t('inventory.delete_confirm'))) return
     await deleteItem.mutateAsync(item.id)
+  }
+
+  async function handleDeleteGroup(group: InventoryGroup) {
+    if (!confirm(t('inventory.groups.delete_confirm'))) return
+    await deleteGroup.mutateAsync(group.id)
+    if (groupFilter === group.id) setGroupFilter('')
   }
 
   async function handleDeleteSchedule(sch: InventorySchedule) {
@@ -721,6 +898,35 @@ export default function InventoryPage() {
             </button>
           ))}
         </div>
+
+        {/* Group filter */}
+        {groups.length > 0 && (
+          <div className="flex flex-wrap gap-2 items-center">
+            <span className="text-xs text-gray-500 dark:text-gray-400">{t('inventory.groups.manage')}:</span>
+            <button
+              onClick={() => setGroupFilter('')}
+              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                groupFilter === '' ? 'bg-indigo-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              {t('inventory.groups.filter_all')}
+            </button>
+            {groups.map((g) => (
+              <button
+                key={g.id}
+                onClick={() => setGroupFilter(groupFilter === g.id ? '' : g.id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  groupFilter === g.id ? 'text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                }`}
+                style={groupFilter === g.id ? { backgroundColor: g.color } : {}}
+              >
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
+                {g.name}
+                <span className="opacity-70">({g.item_count})</span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Items list */}
@@ -743,6 +949,7 @@ export default function InventoryPage() {
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400 hidden xl:table-cell">{t('inventory.fields.username')}</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400 hidden xl:table-cell">Gizli Bilgiler</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400 hidden lg:table-cell">{t('inventory.fields.tags')}</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400 hidden md:table-cell">{t('inventory.group')}</th>
                 <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-400">İşlemler</th>
               </tr>
             </thead>
@@ -792,6 +999,19 @@ export default function InventoryPage() {
                       )}
                     </div>
                   </td>
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    {item.group ? (
+                      <span
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white"
+                        style={{ backgroundColor: item.group.color }}
+                      >
+                        <Layers className="h-3 w-3" />
+                        {item.group.name}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-400 dark:text-gray-500">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
                       {canEdit && (
@@ -818,6 +1038,77 @@ export default function InventoryPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Groups Section */}
+      {canEdit && (
+        <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+          <button
+            className="w-full flex items-center justify-between px-6 py-4 bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
+            onClick={() => setGroupsOpen((v) => !v)}
+          >
+            <div className="flex items-center gap-2 font-semibold text-gray-800 dark:text-white">
+              <Layers className="h-4 w-4" />
+              {t('inventory.groups.manage')}
+              <span className="text-xs font-normal text-gray-500 dark:text-gray-400">({groups.length})</span>
+            </div>
+            {groupsOpen ? <ChevronDown className="h-4 w-4 text-gray-400" /> : <ChevronRight className="h-4 w-4 text-gray-400" />}
+          </button>
+
+          {groupsOpen && (
+            <div className="p-4 space-y-3">
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setGroupCreateOpen(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  <Plus className="h-4 w-4" />
+                  {t('inventory.groups.add')}
+                </button>
+              </div>
+
+              {groups.length === 0 ? (
+                <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">{t('inventory.groups.no_groups')}</p>
+              ) : (
+                <div className="space-y-2">
+                  {groups.map((g) => (
+                    <div key={g.id} className="flex items-center justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-gray-900 dark:text-white text-sm">{g.name}</span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
+                              {t(`inventory.groups.types.${g.group_type}`)}
+                            </span>
+                          </div>
+                          {g.description && (
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">{g.description}</div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 ml-4">
+                        <span className="text-xs text-gray-500 dark:text-gray-400">{g.item_count} {t('inventory.groups.item_count')}</span>
+                        <button
+                          onClick={() => setEditGroup(g)}
+                          className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-blue-600 transition-colors"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteGroup(g)}
+                          className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 hover:text-red-600 transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -906,9 +1197,20 @@ export default function InventoryPage() {
       {(createOpen || editItem) && (
         <ItemFormModal
           item={editItem}
+          groups={groups}
           onClose={() => {
             setCreateOpen(false)
             setEditItem(null)
+          }}
+        />
+      )}
+
+      {(groupCreateOpen || editGroup) && (
+        <GroupModal
+          group={editGroup}
+          onClose={() => {
+            setGroupCreateOpen(false)
+            setEditGroup(null)
           }}
         />
       )}

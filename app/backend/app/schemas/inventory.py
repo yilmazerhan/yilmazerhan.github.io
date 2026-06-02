@@ -2,12 +2,55 @@ import ipaddress
 import uuid
 from datetime import datetime
 from typing import Literal, Optional
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 VALID_ITEM_TYPES = ["server", "database", "email_account", "cloud_account", "generic"]
 VALID_FREQUENCIES = ["daily", "weekly", "monthly"]
+VALID_GROUP_TYPES = ["replication", "cluster", "ha", "load_balanced", "related", "other"]
 
+
+# ── Group schemas ─────────────────────────────────────────────────────────────
+
+class InventoryGroupCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = None
+    group_type: str = Field("related")
+    color: str = Field("#6366f1")
+
+
+class InventoryGroupUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    description: Optional[str] = None
+    group_type: Optional[str] = None
+    color: Optional[str] = None
+
+
+class InventoryGroupSummary(BaseModel):
+    id: uuid.UUID
+    name: str
+    group_type: str
+    color: str
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InventoryGroupResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    description: Optional[str] = None
+    group_type: str
+    color: str
+    item_count: int = 0
+    created_at: datetime
+    updated_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InventoryGroupAssign(BaseModel):
+    item_ids: list[uuid.UUID]
+
+
+# ── Item schemas ──────────────────────────────────────────────────────────────
 
 class InventoryItemCreate(BaseModel):
     item_type: Literal["server", "database", "email_account", "cloud_account", "generic"]
@@ -46,6 +89,9 @@ class InventoryItemCreate(BaseModel):
 
     # Generic
     url: Optional[str] = Field(None, max_length=1000)
+
+    # Group assignment
+    group_id: Optional[uuid.UUID] = None
 
     @field_validator("ip_address")
     @classmethod
@@ -100,6 +146,9 @@ class InventoryItemUpdate(BaseModel):
 
     url: Optional[str] = Field(None, max_length=1000)
 
+    # Group assignment (None = remove from group)
+    group_id: Optional[uuid.UUID] = None
+
     @field_validator("ip_address")
     @classmethod
     def validate_ip(cls, v: Optional[str]) -> Optional[str]:
@@ -150,12 +199,16 @@ class InventoryItemResponse(BaseModel):
     # Generic
     url: Optional[str] = None
 
+    # Group
+    group_id: Optional[uuid.UUID] = None
+    group: Optional[InventoryGroupSummary] = None
+
     created_by: Optional[uuid.UUID] = None
     updated_by: Optional[uuid.UUID] = None
     created_at: datetime
     updated_at: datetime
 
-    model_config = {"from_attributes": True}
+    model_config = ConfigDict(from_attributes=True)
 
 
 class InventoryRevealRequest(BaseModel):

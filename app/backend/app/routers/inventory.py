@@ -15,6 +15,11 @@ from app.schemas.inventory import (
     InventoryScheduleCreate,
     InventoryScheduleUpdate,
     InventoryScheduleResponse,
+    InventoryGroupCreate,
+    InventoryGroupUpdate,
+    InventoryGroupResponse,
+    InventoryGroupSummary,
+    InventoryGroupAssign,
 )
 from app.schemas.auth import MessageResponse
 from app.services.inventory_service import InventoryService
@@ -52,6 +57,13 @@ def _item_to_response(item) -> InventoryItemResponse:
         has_access_key=bool(item.access_key_id_encrypted),
         region=item.region,
         url=item.url,
+        group_id=item.group_id,
+        group=InventoryGroupSummary(
+            id=item.group.id,
+            name=item.group.name,
+            group_type=item.group.group_type,
+            color=item.group.color,
+        ) if item.group else None,
         created_by=item.created_by,
         updated_by=item.updated_by,
         created_at=item.created_at,
@@ -69,6 +81,7 @@ async def list_items(
     search: Optional[str] = Query(None),
     tags: Optional[str] = Query(None, description="Comma-separated tags"),
     is_active: Optional[bool] = Query(None),
+    group_id: Optional[uuid.UUID] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(200, ge=1, le=1000),
 ):
@@ -79,6 +92,7 @@ async def list_items(
         search=search,
         tags=tags_list,
         is_active=is_active,
+        group_id=group_id,
         skip=skip,
         limit=limit,
     )
@@ -118,6 +132,9 @@ async def update_item(
 ):
     svc = InventoryService(db)
     data = body.model_dump(exclude_none=True)
+    # Allow explicit null for group_id (remove from group)
+    if "group_id" in body.model_fields_set and body.group_id is None:
+        data["group_id"] = None
     item = await svc.update_item(item_id, data, updated_by=current_user.id)
     return _item_to_response(item)
 
@@ -145,6 +162,72 @@ async def reveal_field(
     svc = InventoryService(db)
     value = await svc.reveal_field(item_id, body.field)
     return {"field": body.field, "value": value}
+
+
+# ─── Groups ──────────────────────────────────────────────────────────────────
+
+@router.get("/groups", response_model=list[InventoryGroupResponse])
+async def list_groups(
+    _: Annotated[User, Depends(require_permission("inventory", "view"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = InventoryService(db)
+    return await svc.list_groups()
+
+
+@router.post("/groups", response_model=InventoryGroupResponse, status_code=201)
+async def create_group(
+    body: InventoryGroupCreate,
+    current_user: Annotated[User, Depends(require_permission("inventory", "create"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = InventoryService(db)
+    return await svc.create_group(body, created_by=current_user.id)
+
+
+@router.patch("/groups/{group_id}", response_model=InventoryGroupResponse)
+async def update_group(
+    group_id: uuid.UUID,
+    body: InventoryGroupUpdate,
+    _: Annotated[User, Depends(require_permission("inventory", "edit"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = InventoryService(db)
+    return await svc.update_group(group_id, body)
+
+
+@router.delete("/groups/{group_id}", response_model=MessageResponse)
+async def delete_group(
+    group_id: uuid.UUID,
+    _: Annotated[User, Depends(require_permission("inventory", "delete"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = InventoryService(db)
+    await svc.delete_group(group_id)
+    return {"message": "Grup silindi."}
+
+
+@router.post("/groups/{group_id}/assign", response_model=dict)
+async def assign_items_to_group(
+    group_id: uuid.UUID,
+    body: InventoryGroupAssign,
+    _: Annotated[User, Depends(require_permission("inventory", "edit"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = InventoryService(db)
+    count = await svc.assign_items_to_group(group_id, body.item_ids)
+    return {"updated": count}
+
+
+@router.post("/groups/unassign", response_model=dict)
+async def unassign_items_from_group(
+    body: InventoryGroupAssign,
+    _: Annotated[User, Depends(require_permission("inventory", "edit"))],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = InventoryService(db)
+    count = await svc.assign_items_to_group(None, body.item_ids)
+    return {"updated": count}
 
 
 # ─── Export ──────────────────────────────────────────────────────────────────

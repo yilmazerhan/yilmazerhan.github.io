@@ -4,6 +4,39 @@ import apiClient from './client'
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type ItemType = 'server' | 'database' | 'email_account' | 'cloud_account' | 'generic'
+export type GroupType = 'replication' | 'cluster' | 'ha' | 'load_balanced' | 'related' | 'other'
+
+export interface InventoryGroup {
+  id: string
+  name: string
+  description?: string
+  group_type: GroupType
+  color: string
+  item_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface InventoryGroupCreate {
+  name: string
+  description?: string
+  group_type?: GroupType
+  color?: string
+}
+
+export interface InventoryGroupUpdate {
+  name?: string
+  description?: string
+  group_type?: GroupType
+  color?: string
+}
+
+export interface InventoryGroupSummary {
+  id: string
+  name: string
+  group_type: GroupType
+  color: string
+}
 
 export interface InventoryItem {
   id: string
@@ -43,6 +76,10 @@ export interface InventoryItem {
   // Generic
   url?: string
 
+  // Group
+  group_id?: string
+  group?: InventoryGroupSummary
+
   created_by?: string
   updated_by?: string
   created_at: string
@@ -76,9 +113,10 @@ export interface InventoryItemCreate {
   secret_access_key?: string
   region?: string
   url?: string
+  group_id?: string | null
 }
 
-export type InventoryItemUpdate = Partial<Omit<InventoryItemCreate, 'item_type'>>
+export type InventoryItemUpdate = Partial<Omit<InventoryItemCreate, 'item_type'>> & { group_id?: string | null }
 
 export interface InventorySchedule {
   id: string
@@ -112,6 +150,7 @@ const inventoryKeys = {
   all: ['inventory'] as const,
   items: (params?: object) => [...inventoryKeys.all, 'items', params] as const,
   item: (id: string) => [...inventoryKeys.all, 'item', id] as const,
+  groups: () => [...inventoryKeys.all, 'groups'] as const,
   schedules: () => [...inventoryKeys.all, 'schedules'] as const,
 }
 
@@ -122,6 +161,7 @@ export interface InventoryListParams {
   search?: string
   tags?: string
   is_active?: boolean
+  group_id?: string
   skip?: number
   limit?: number
 }
@@ -135,6 +175,7 @@ export function useInventoryItems(params?: InventoryListParams) {
       if (params?.search) searchParams.set('search', params.search)
       if (params?.tags) searchParams.set('tags', params.tags)
       if (params?.is_active !== undefined) searchParams.set('is_active', String(params.is_active))
+      if (params?.group_id) searchParams.set('group_id', params.group_id)
       if (params?.skip !== undefined) searchParams.set('skip', String(params.skip))
       if (params?.limit !== undefined) searchParams.set('limit', String(params.limit))
       const qs = searchParams.toString()
@@ -202,6 +243,58 @@ export async function exportInventory(format: 'excel' | 'csv', item_type?: strin
   a.download = `inventory.${ext}`
   a.click()
   URL.revokeObjectURL(url)
+}
+
+// ─── Group Hooks ─────────────────────────────────────────────────────────────
+
+export function useInventoryGroups() {
+  return useQuery({
+    queryKey: inventoryKeys.groups(),
+    queryFn: async () => {
+      const res = await apiClient.get<InventoryGroup[]>('/inventory/groups')
+      return res.data
+    },
+  })
+}
+
+export function useCreateInventoryGroup() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: InventoryGroupCreate) =>
+      apiClient.post<InventoryGroup>('/inventory/groups', data).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: inventoryKeys.all }),
+  })
+}
+
+export function useUpdateInventoryGroup() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: InventoryGroupUpdate }) =>
+      apiClient.patch<InventoryGroup>(`/inventory/groups/${id}`, data).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: inventoryKeys.all }),
+  })
+}
+
+export function useDeleteInventoryGroup() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiClient.delete(`/inventory/groups/${id}`).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: inventoryKeys.all }),
+  })
+}
+
+export function useAssignItemsToGroup() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ groupId, itemIds }: { groupId: string | null; itemIds: string[] }) => {
+      if (groupId === null) {
+        return apiClient.post<{ updated: number }>('/inventory/groups/unassign', { item_ids: itemIds }).then((r) => r.data)
+      }
+      return apiClient.post<{ updated: number }>(`/inventory/groups/${groupId}/assign`, { item_ids: itemIds }).then((r) => r.data)
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: inventoryKeys.all }),
+  })
 }
 
 // ─── Schedule Hooks ───────────────────────────────────────────────────────────
