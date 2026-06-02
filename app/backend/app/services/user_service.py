@@ -165,6 +165,7 @@ class UserService:
                 raise NotFoundError("Takım")
 
         # Generate unique username
+
         final_username = await self._generate_unique_username(email, hint=username)
 
         # Check if requested username is already taken (normalize hint same way as _generate_unique_username)
@@ -186,6 +187,15 @@ class UserService:
         )
         self.db.add(user)
         await self.db.flush()
+
+        # Sync junction table so team-scoped queries (worklog, user list) find this user
+        if team_id:
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+            await self.db.execute(
+                pg_insert(user_teams)
+                .values(user_id=user.id, team_id=team_id)
+                .on_conflict_do_nothing()
+            )
 
         # Auto-create personal kanban board for the new user
         from app.services.kanban_service import KanbanService
@@ -258,6 +268,13 @@ class UserService:
             if not team_exists.scalar_one_or_none():
                 raise NotFoundError("Takım")
             user.team_id = team_id
+            # Sync junction table so team-scoped queries find this user in the new team
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+            await self.db.execute(
+                pg_insert(user_teams)
+                .values(user_id=user_id, team_id=team_id)
+                .on_conflict_do_nothing()
+            )
         if is_active is not None:
             user.is_active = is_active
         if preferred_language is not None:
