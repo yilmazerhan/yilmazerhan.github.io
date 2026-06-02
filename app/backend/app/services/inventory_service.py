@@ -24,14 +24,46 @@ _ENCRYPTED_FIELDS = {
     "secret_access_key": "secret_access_key_encrypted",
 }
 
-EXPORT_HEADERS = [
-    "ID", "Type", "Display Name", "Description", "Hostname", "IP Address",
-    "Port", "Username", "Has Password", "Has SSH Key", "Operating System",
-    "Database Name", "Database Type",
-    "Email Address", "SMTP Host", "SMTP Port", "IMAP Host", "IMAP Port",
-    "Provider", "Account ID", "Has Access Key", "Region",
-    "URL", "Tags", "Notes", "Is Active", "Created At",
-]
+_TYPE_ORDER = ["server", "database", "email_account", "cloud_account", "generic"]
+
+_TYPE_TITLE = {
+    "server": "Sunucular",
+    "database": "Veritabanları",
+    "email_account": "E-posta Hesapları",
+    "cloud_account": "Bulut Hesapları",
+    "generic": "Genel",
+}
+
+_TYPE_COLOR = {
+    "server": "2563EB",
+    "database": "7C3AED",
+    "email_account": "D97706",
+    "cloud_account": "EA580C",
+    "generic": "4B5563",
+}
+
+_COMMON_TAIL_HEADERS = ["Grup", "Etiketler", "Notlar", "Aktif", "Oluşturulma"]
+
+_TYPE_HEADERS: dict[str, list[str]] = {
+    "server": [
+        "ID", "Ad", "Açıklama", "Hostname", "IP Adresi", "Port",
+        "Kullanıcı Adı", "Şifre", "SSH Anahtarı", "İşletim Sistemi",
+    ] + _COMMON_TAIL_HEADERS,
+    "database": [
+        "ID", "Ad", "Açıklama", "Hostname", "IP Adresi", "Port",
+        "Kullanıcı Adı", "Şifre", "Veritabanı Adı", "Veritabanı Türü",
+    ] + _COMMON_TAIL_HEADERS,
+    "email_account": [
+        "ID", "Ad", "Açıklama", "E-posta Adresi", "Kullanıcı Adı", "Şifre",
+        "SMTP Sunucusu", "SMTP Port", "IMAP Sunucusu", "IMAP Port",
+    ] + _COMMON_TAIL_HEADERS,
+    "cloud_account": [
+        "ID", "Ad", "Açıklama", "Sağlayıcı", "Hesap ID", "Erişim Anahtarı", "Bölge",
+    ] + _COMMON_TAIL_HEADERS,
+    "generic": [
+        "ID", "Ad", "Açıklama", "URL",
+    ] + _COMMON_TAIL_HEADERS,
+}
 
 
 class InventoryService:
@@ -271,32 +303,96 @@ class InventoryService:
     # ─── Export ───────────────────────────────────────────────────────────────
 
     async def export_excel(self, item_type: Optional[str] = None) -> bytes:
-        """Generate an Excel file with all (non-secret) inventory items."""
+        """Generate a grouped Excel file — one sheet per item type + summary sheet."""
+        from collections import defaultdict
         items = await self.list_items(item_type=item_type, limit=10000)
 
+        by_type: dict[str, list] = defaultdict(list)
+        for item in items:
+            by_type[item.item_type].append(item)
+
         wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = "Inventory"
+        wb.remove(wb.active)  # remove default empty sheet
 
-        # Header style
-        header_fill = PatternFill(start_color="3B82F6", end_color="3B82F6", fill_type="solid")
-        header_font = Font(color="FFFFFF", bold=True)
+        # ── Summary sheet ────────────────────────────────────────────────────
+        ws_sum = wb.create_sheet("Özet")
+        ws_sum["A1"] = "Envanter Özeti"
+        ws_sum["A1"].font = Font(bold=True, size=14, color="1E293B")
+        ws_sum.merge_cells("A1:E1")
 
-        for col_idx, header in enumerate(EXPORT_HEADERS, start=1):
-            cell = ws.cell(row=1, column=col_idx, value=header)
-            cell.fill = header_fill
-            cell.font = header_font
-            cell.alignment = Alignment(horizontal="center")
+        ws_sum["A2"] = f"Oluşturulma: {datetime.now(timezone.utc).strftime('%d.%m.%Y %H:%M')} UTC"
+        ws_sum["A2"].font = Font(italic=True, color="6B7280", size=10)
+        ws_sum.merge_cells("A2:E2")
 
-        for row_idx, item in enumerate(items, start=2):
-            row = _item_to_row(item)
-            for col_idx, value in enumerate(row, start=1):
-                ws.cell(row=row_idx, column=col_idx, value=value)
+        dark_fill = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid")
+        dark_font = Font(color="FFFFFF", bold=True)
+        center = Alignment(horizontal="center")
 
-        # Auto-fit columns (approximate)
-        for col in ws.columns:
-            max_len = max(len(str(cell.value or "")) for cell in col)
-            ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 50)
+        for col_idx, hdr in enumerate(["Tür", "Toplam", "Aktif", "Pasif", "Sayfa Adı"], start=1):
+            cell = ws_sum.cell(row=4, column=col_idx, value=hdr)
+            cell.fill = dark_fill
+            cell.font = dark_font
+            cell.alignment = center
+
+        grand = [0, 0, 0]
+        types_written = [tp for tp in _TYPE_ORDER if by_type.get(tp) and (item_type is None or tp == item_type)]
+
+        for row_offset, tp in enumerate(types_written, start=1):
+            type_items = by_type[tp]
+            active = sum(1 for i in type_items if i.is_active)
+            inactive = len(type_items) - active
+            grand[0] += len(type_items); grand[1] += active; grand[2] += inactive
+
+            tp_fill = PatternFill(start_color=_TYPE_COLOR[tp], end_color=_TYPE_COLOR[tp], fill_type="solid")
+            r = 4 + row_offset
+            c1 = ws_sum.cell(row=r, column=1, value=_TYPE_TITLE[tp])
+            c1.fill = tp_fill; c1.font = Font(color="FFFFFF", bold=True)
+            ws_sum.cell(row=r, column=2, value=len(type_items)).alignment = center
+            ws_sum.cell(row=r, column=3, value=active).font = Font(color="16A34A", bold=True)
+            c4 = ws_sum.cell(row=r, column=4, value=inactive)
+            c4.font = Font(color="DC2626", bold=True) if inactive else Font(color="6B7280")
+            ws_sum.cell(row=r, column=5, value=_TYPE_TITLE[tp]).alignment = center
+
+        total_row = 4 + len(types_written) + 2
+        ws_sum.cell(row=total_row, column=1, value="TOPLAM").font = Font(bold=True, size=11)
+        ws_sum.cell(row=total_row, column=2, value=grand[0]).font = Font(bold=True, size=11)
+        c3 = ws_sum.cell(row=total_row, column=3, value=grand[1])
+        c3.font = Font(bold=True, color="16A34A", size=11)
+        c4 = ws_sum.cell(row=total_row, column=4, value=grand[2])
+        c4.font = Font(bold=True, color="DC2626" if grand[2] else "6B7280", size=11)
+
+        ws_sum.column_dimensions["A"].width = 26
+        for col in "BCDE":
+            ws_sum.column_dimensions[col].width = 14
+
+        # ── Per-type sheets ──────────────────────────────────────────────────
+        for tp in _TYPE_ORDER:
+            type_items = by_type.get(tp, [])
+            if not type_items or (item_type and tp != item_type):
+                continue
+
+            ws = wb.create_sheet(_TYPE_TITLE[tp])
+            try:
+                ws.sheet_properties.tabColor = _TYPE_COLOR[tp]
+            except Exception:
+                pass
+
+            tp_fill = PatternFill(start_color=_TYPE_COLOR[tp], end_color=_TYPE_COLOR[tp], fill_type="solid")
+            hdr_font = Font(color="FFFFFF", bold=True)
+
+            for col_idx, hdr in enumerate(_TYPE_HEADERS[tp], start=1):
+                cell = ws.cell(row=1, column=col_idx, value=hdr)
+                cell.fill = tp_fill
+                cell.font = hdr_font
+                cell.alignment = center
+
+            for row_idx, item in enumerate(type_items, start=2):
+                for col_idx, value in enumerate(_item_to_typed_row(item), start=1):
+                    ws.cell(row=row_idx, column=col_idx, value=value)
+
+            for col in ws.columns:
+                max_len = max(len(str(cell.value or "")) for cell in col)
+                ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 50)
 
         buf = io.BytesIO()
         wb.save(buf)
@@ -304,15 +400,33 @@ class InventoryService:
         return buf.read()
 
     async def export_csv(self, item_type: Optional[str] = None) -> str:
-        """Generate CSV content with all (non-secret) inventory items."""
+        """Generate grouped CSV — each item type has its own header row, sections separated by blank lines."""
         import csv as _csv
+        from collections import defaultdict
         items = await self.list_items(item_type=item_type, limit=10000)
+
+        by_type: dict[str, list] = defaultdict(list)
+        for item in items:
+            by_type[item.item_type].append(item)
 
         output = io.StringIO()
         writer = _csv.writer(output)
-        writer.writerow(EXPORT_HEADERS)
-        for item in items:
-            writer.writerow(_item_to_row(item))
+
+        types_to_write = [
+            tp for tp in _TYPE_ORDER
+            if by_type.get(tp) and (item_type is None or tp == item_type)
+        ]
+
+        for section_idx, tp in enumerate(types_to_write):
+            type_items = by_type[tp]
+            if section_idx > 0:
+                writer.writerow([])  # blank line between sections
+
+            writer.writerow([f"=== {_TYPE_TITLE[tp]} ({len(type_items)}) ==="])
+            writer.writerow(_TYPE_HEADERS[tp])
+            for item in type_items:
+                writer.writerow(_item_to_typed_row(item))
+
         return output.getvalue()
 
     # ─── Email Schedules ─────────────────────────────────────────────────────
@@ -384,36 +498,51 @@ class InventoryService:
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
-def _item_to_row(item: InventoryItem) -> list:
-    return [
-        str(item.id),
-        item.item_type,
-        item.display_name,
-        item.description or "",
-        item.hostname or "",
-        item.ip_address or "",
-        item.port or "",
-        item.username or "",
-        "yes" if item.password_encrypted else "no",
-        "yes" if item.ssh_key_encrypted else "no",
-        item.operating_system or "",
-        item.database_name or "",
-        item.database_type or "",
-        item.email_address or "",
-        item.smtp_host or "",
-        item.smtp_port or "",
-        item.imap_host or "",
-        item.imap_port or "",
-        item.provider or "",
-        item.account_id or "",
-        "yes" if item.access_key_id_encrypted else "no",
-        item.region or "",
-        item.url or "",
-        ", ".join(item.tags) if item.tags else "",
-        item.notes or "",
-        "yes" if item.is_active else "no",
-        item.created_at.isoformat() if item.created_at else "",
-    ]
+def _item_to_typed_row(item: InventoryItem) -> list:
+    """Return a type-specific row matching _TYPE_HEADERS[item.item_type]."""
+    group_name = item.group.name if item.group else ""
+    tags = ", ".join(item.tags) if item.tags else ""
+    tail = [group_name, tags, item.notes or "", "Evet" if item.is_active else "Hayır",
+            item.created_at.strftime("%Y-%m-%d %H:%M") if item.created_at else ""]
+
+    t = item.item_type
+    if t == "server":
+        return [
+            str(item.id), item.display_name, item.description or "",
+            item.hostname or "", item.ip_address or "", item.port or "",
+            item.username or "",
+            "Var" if item.password_encrypted else "Yok",
+            "Var" if item.ssh_key_encrypted else "Yok",
+            item.operating_system or "",
+        ] + tail
+    elif t == "database":
+        return [
+            str(item.id), item.display_name, item.description or "",
+            item.hostname or "", item.ip_address or "", item.port or "",
+            item.username or "",
+            "Var" if item.password_encrypted else "Yok",
+            item.database_name or "", item.database_type or "",
+        ] + tail
+    elif t == "email_account":
+        return [
+            str(item.id), item.display_name, item.description or "",
+            item.email_address or "", item.username or "",
+            "Var" if item.password_encrypted else "Yok",
+            item.smtp_host or "", item.smtp_port or "",
+            item.imap_host or "", item.imap_port or "",
+        ] + tail
+    elif t == "cloud_account":
+        return [
+            str(item.id), item.display_name, item.description or "",
+            item.provider or "", item.account_id or "",
+            "Var" if item.access_key_id_encrypted else "Yok",
+            item.region or "",
+        ] + tail
+    else:  # generic
+        return [
+            str(item.id), item.display_name, item.description or "",
+            item.url or "",
+        ] + tail
 
 
 async def _send_inventory_email(db: AsyncSession, schedule: InventoryEmailSchedule) -> int:
