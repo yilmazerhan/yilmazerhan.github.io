@@ -16,7 +16,7 @@ depends_on = None
 def upgrade() -> None:
     op.execute("""
         CREATE TABLE IF NOT EXISTS customer_patches (
-            id          UUID PRIMARY KEY,
+            id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             customer    VARCHAR(255) NOT NULL,
             jira_ticket VARCHAR(100),
             app_version VARCHAR(100) NOT NULL,

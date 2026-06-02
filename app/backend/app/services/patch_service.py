@@ -101,7 +101,7 @@ class PatchService:
             setattr(patch, field, value)
 
         await self.db.flush()
-        return patch
+        return await self.get_patch(patch_id)
 
     async def delete_patch(self, patch_id: uuid.UUID, requester: User) -> None:
         patch = await self.get_patch(patch_id)
