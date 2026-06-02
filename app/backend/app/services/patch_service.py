@@ -66,8 +66,9 @@ class PatchService:
         )
         self.db.add(patch)
         await self.db.flush()
-        await self.db.refresh(patch)
-        return patch
+        # Re-query so created_by_user is loaded via selectinload (refresh() alone
+        # does not trigger the selectin strategy for relationships).
+        return await self.get_patch(patch.id)
 
     async def get_patch(self, patch_id: uuid.UUID) -> CustomerPatch:
         result = await self.db.execute(
@@ -93,7 +94,9 @@ class PatchService:
         patch = await self.get_patch(patch_id)
         self._check_permission(patch, requester)
 
-        update_data = data.model_dump(exclude_none=True)
+        # exclude_unset so that fields not sent in the request are left unchanged,
+        # but explicitly null-ed fields (e.g. jira_ticket: null) ARE applied.
+        update_data = data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
             setattr(patch, field, value)
 
