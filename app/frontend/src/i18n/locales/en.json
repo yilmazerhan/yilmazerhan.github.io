@@ -63,6 +63,7 @@
     "auditLogs": "Audit Logs",
     "backup": "Backup",
     "inventory": "Inventory",
+    "patches": "Customer Patches",
     "announcements": "Announcements"
   },
   "dashboard": {
@@ -884,5 +885,39 @@
       "Other"
     ],
     "view_only_note": "You have view-only access to this page."
+  },
+  "patches": {
+    "title": "Customer Patches",
+    "add": "Add Patch",
+    "edit": "Edit Patch",
+    "customer": "Customer",
+    "jira_ticket": "Jira Ticket",
+    "app_version": "App Version",
+    "apply_date": "Apply Date",
+    "environment": "Environment",
+    "status": "Status",
+    "description": "Description / Notes",
+    "created_by": "Added By",
+    "status_planned": "Planned",
+    "status_applied": "Applied",
+    "status_failed": "Failed",
+    "status_rolled_back": "Rolled Back",
+    "env_production": "Production",
+    "env_staging": "Staging",
+    "env_test": "Test",
+    "env_dev": "Dev",
+    "filter_all_status": "All Statuses",
+    "filter_all_env": "All Environments",
+    "no_records": "No records found.",
+    "record_count": "{{count}} records",
+    "date_from": "Date From",
+    "date_to": "Date To",
+    "search_placeholder": "Search by customer, version or ticket...",
+    "confirm_delete": "Are you sure you want to delete this patch?",
+    "deleted": "Patch deleted successfully.",
+    "jira_link": "Open in Jira",
+    "version_placeholder": "e.g. 2026.05.15.1",
+    "ticket_placeholder": "e.g. PROJ-123",
+    "env_placeholder": "e.g. production"
   }
 }

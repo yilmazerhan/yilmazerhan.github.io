@@ -63,6 +63,7 @@
     "auditLogs": "Denetim Kayıtları",
     "backup": "Yedek",
     "inventory": "Envanter",
+    "patches": "Müşteri Yamaları",
     "announcements": "Duyurular"
   },
   "dashboard": {
@@ -884,5 +885,39 @@
       "Diğer"
     ],
     "view_only_note": "Bu sayfayı sadece görüntüleme yetkiniz var."
+  },
+  "patches": {
+    "title": "Müşteri Yamaları",
+    "add": "Yama Ekle",
+    "edit": "Yamayı Düzenle",
+    "customer": "Müşteri",
+    "jira_ticket": "Jira Ticket",
+    "app_version": "Uygulama Versiyonu",
+    "apply_date": "Uygulama Tarihi",
+    "environment": "Ortam",
+    "status": "Durum",
+    "description": "Açıklama / Notlar",
+    "created_by": "Ekleyen",
+    "status_planned": "Planlandı",
+    "status_applied": "Uygulandı",
+    "status_failed": "Başarısız",
+    "status_rolled_back": "Geri Alındı",
+    "env_production": "Production",
+    "env_staging": "Staging",
+    "env_test": "Test",
+    "env_dev": "Dev",
+    "filter_all_status": "Tüm Durumlar",
+    "filter_all_env": "Tüm Ortamlar",
+    "no_records": "Kayıt bulunamadı.",
+    "record_count": "{{count}} kayıt",
+    "date_from": "Başlangıç Tarihi",
+    "date_to": "Bitiş Tarihi",
+    "search_placeholder": "Müşteri, versiyon veya ticket ile ara...",
+    "confirm_delete": "Bu yamayı silmek istediğinize emin misiniz?",
+    "deleted": "Yama başarıyla silindi.",
+    "jira_link": "Jira'da Aç",
+    "version_placeholder": "örn. 2026.05.15.1",
+    "ticket_placeholder": "örn. PROJ-123",
+    "env_placeholder": "örn. production"
   }
 }

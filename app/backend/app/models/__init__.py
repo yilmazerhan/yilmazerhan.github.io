@@ -22,3 +22,4 @@ from app.models.report_schedule import ReportSchedule  # noqa: F401
 from app.models.leave_request import LeaveRequest  # noqa: F401
 from app.models.backup_record import BackupRecord  # noqa: F401
 from app.models.inventory import InventoryItem, InventoryEmailSchedule  # noqa: F401
+from app.models.patch import CustomerPatch  # noqa: F401

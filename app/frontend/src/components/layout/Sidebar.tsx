@@ -6,7 +6,7 @@ import { useAuthStore } from '@/store/authStore'
 import {
   LayoutDashboard, ClipboardList, Kanban, Users, Users2,
   Mail, Settings, ScrollText, BarChart3, ShieldCheck, UserCircle, Keyboard, HardDriveDownload,
-  GanttChartSquare, Activity, CalendarDays, CalendarRange, Database, Megaphone,
+  GanttChartSquare, Activity, CalendarDays, CalendarRange, Database, Megaphone, Layers,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -31,6 +31,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/leave/calendar', icon: CalendarRange, labelKey: 'nav.leave_calendar', requiredRole: ['superadmin', 'team_manager'] },
   { to: '/reports', icon: BarChart3, labelKey: 'nav.reports' },
   { to: '/inventory', icon: Database, labelKey: 'nav.inventory' },
+  { to: '/patches', icon: Layers, labelKey: 'nav.patches' },
   { to: '/users', icon: Users, labelKey: 'nav.users', requiredRole: ['superadmin'] },
   { to: '/teams', icon: Users2, labelKey: 'nav.teams', requiredRole: ['superadmin'] },
   { to: '/permissions', icon: ShieldCheck, labelKey: 'nav.permissions', requiredRole: ['superadmin'] },
