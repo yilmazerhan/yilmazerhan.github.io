@@ -1,4 +1,5 @@
 from celery import Celery
+from celery.schedules import crontab
 from app.config import settings
 
 celery_app = Celery(
@@ -46,5 +47,9 @@ celery_app.conf.beat_schedule = {
     "run-inventory-email-check-hourly": {
         "task": "app.tasks.scheduled_tasks.run_inventory_email_check",
         "schedule": 3600.0,  # 1 hour
+    },
+    "send-worklog-reminders-daily": {
+        "task": "app.tasks.email_tasks.send_worklog_reminders",
+        "schedule": crontab(hour=17, minute=0, day_of_week="1-5"),  # Mon-Fri 17:00 Istanbul
     },
 }

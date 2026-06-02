@@ -635,3 +635,85 @@ async def _refresh_jira_async():
         svc = JiraService(db)
         await svc.bulk_refresh_jira_statuses()
         await db.commit()
+
+
+@celery_app.task(name="app.tasks.email_tasks.send_worklog_reminders")
+def send_worklog_reminders():
+    _run_async(_send_worklog_reminders_async())
+
+
+async def _send_worklog_reminders_async():
+    from datetime import date, datetime, timezone
+    from sqlalchemy import select, func
+    from app.database import AsyncSessionLocal
+    from app.models.user import User
+    from app.models.worklog import WorkLog
+    from app.models.email_log import EmailLog
+    from app.services.email_service import EmailService
+
+    today = date.today()
+    if today.weekday() >= 5:  # Saturday=5, Sunday=6
+        logger.info("send_worklog_reminders: skipping — today is a weekend")
+        return
+
+    async with AsyncSessionLocal() as db:
+        svc = EmailService(db)
+
+        smtp_cfg = await svc.get_smtp_config()
+        if not smtp_cfg:
+            logger.warning("send_worklog_reminders: SMTP not configured — skipping")
+            return
+
+        template = await svc.get_template_by_slug("worklog_reminder")
+        if not template:
+            logger.error("send_worklog_reminders: 'worklog_reminder' template not found in DB")
+            return
+
+        active_users = (await db.execute(
+            select(User).where(User.is_active == True, User.is_deleted == False)
+        )).scalars().all()
+
+        logged_today = (await db.execute(
+            select(WorkLog.user_id).where(WorkLog.log_date == today).distinct()
+        )).scalars().all()
+        logged_ids = set(logged_today)
+
+        today_start = datetime.combine(today, datetime.min.time()).replace(tzinfo=timezone.utc)
+
+        for user in active_users:
+            if user.id in logged_ids:
+                continue
+
+            already_sent = (await db.execute(
+                select(func.count(EmailLog.id)).where(
+                    EmailLog.template_id == template.id,
+                    EmailLog.recipient_id == user.id,
+                    EmailLog.created_at >= today_start,
+                )
+            )).scalar_one()
+            if already_sent > 0:
+                continue
+
+            subject, html = svc.render_template(template, {
+                "user_name": user.full_name,
+                "date": str(today),
+            })
+
+            log = await svc.create_log_entry(
+                to_email=user.email,
+                subject=subject,
+                template_id=template.id,
+                recipient_id=user.id,
+            )
+            await db.flush()
+
+            send_email_task.delay(
+                to_email=user.email,
+                subject=subject,
+                html_body=html,
+                log_id=str(log.id),
+            )
+            logger.info("send_worklog_reminders: queued reminder for %s", user.email)
+
+        await db.commit()
+        logger.info("send_worklog_reminders: done for %s", today)
