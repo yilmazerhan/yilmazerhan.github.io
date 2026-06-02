@@ -57,14 +57,22 @@ class UserService:
 
         # Role-based scoping: users only see colleagues in their teams
         if requester.role == "team_manager":
-            # Managers see users in any of their teams (via junction table)
+            # Use IN subquery (not JOIN) to avoid duplicate rows when a user belongs
+            # to multiple teams all managed by the same manager, and to keep the
+            # count subquery accurate. Always include the manager themselves in case
+            # their junction row is missing (repaired by migration 0023).
             my_team_ids = (
                 select(user_teams.c.team_id)
                 .where(user_teams.c.user_id == requester.id)
                 .scalar_subquery()
             )
-            query = query.join(user_teams, User.id == user_teams.c.user_id).where(
-                user_teams.c.team_id.in_(my_team_ids)
+            visible_user_ids = (
+                select(user_teams.c.user_id)
+                .where(user_teams.c.team_id.in_(my_team_ids))
+                .scalar_subquery()
+            )
+            query = query.where(
+                (User.id == requester.id) | (User.id.in_(visible_user_ids))
             )
         elif requester.role == "user":
             # Regular users see only their own team members (to enable task assignment)

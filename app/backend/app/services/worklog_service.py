@@ -93,6 +93,7 @@ class WorkLogService:
             q = q.where(WorkLog.user_id == requester.id)
         elif requester.role == "team_manager":
             from app.models.user_team import user_teams
+            from sqlalchemy import or_
             my_team_ids = (
                 select(user_teams.c.team_id)
                 .where(user_teams.c.user_id == requester.id)
@@ -103,7 +104,11 @@ class WorkLogService:
                 .where(user_teams.c.team_id.in_(my_team_ids))
                 .scalar_subquery()
             )
-            q = q.where(WorkLog.user_id.in_(visible_user_ids))
+            # Always include own logs even if the manager's junction row is somehow
+            # missing; the migration 0023 repairs this for existing installs.
+            q = q.where(
+                or_(WorkLog.user_id == requester.id, WorkLog.user_id.in_(visible_user_ids))
+            )
             if user_id:
                 q = q.where(WorkLog.user_id == user_id)
         else:  # superadmin
@@ -242,6 +247,7 @@ class WorkLogService:
             q = q.where(WorkLog.user_id == requester.id)
         elif requester.role == "team_manager":
             from app.models.user_team import user_teams
+            from sqlalchemy import or_
             my_team_ids = (
                 select(user_teams.c.team_id)
                 .where(user_teams.c.user_id == requester.id)
@@ -252,7 +258,9 @@ class WorkLogService:
                 .where(user_teams.c.team_id.in_(my_team_ids))
                 .scalar_subquery()
             )
-            q = q.where(WorkLog.user_id.in_(visible_user_ids))
+            q = q.where(
+                or_(WorkLog.user_id == requester.id, WorkLog.user_id.in_(visible_user_ids))
+            )
         if user_id and requester.role != "user":
             q = q.where(WorkLog.user_id == user_id)
         if date_from:
