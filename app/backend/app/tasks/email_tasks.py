@@ -339,13 +339,21 @@ def evaluate_scheduled_workflows():
     _run_async(_evaluate_workflows_async())
 
 
+def _workflow_tz(wf):
+    """Return the ZoneInfo for a workflow's configured timezone (default: Istanbul)."""
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+    tz_name = (wf.trigger_config or {}).get("timezone", "Europe/Istanbul") or "Europe/Istanbul"
+    try:
+        return ZoneInfo(tz_name)
+    except (ZoneInfoNotFoundError, Exception):
+        return ZoneInfo("Europe/Istanbul")
+
+
 async def _evaluate_workflows_async():
     from zoneinfo import ZoneInfo
     from app.database import AsyncSessionLocal
     from sqlalchemy import select
     from app.models.email_workflow import EmailWorkflow
-    from app.models.kanban import Task
-    from app.models.user import User
 
     _ISTANBUL = ZoneInfo("Europe/Istanbul")
 
@@ -356,30 +364,36 @@ async def _evaluate_workflows_async():
         workflows = result.scalars().all()
 
         now = datetime.now(timezone.utc)
-        now_local = now.astimezone(_ISTANBUL)
-        today = now_local.date()  # Istanbul local date
+        # Use Istanbul for date-only comparisons (task due/overdue)
+        now_istanbul = now.astimezone(_ISTANBUL)
+        today_istanbul = now_istanbul.date()
 
         for wf in workflows:
             if wf.trigger_type == "task_due_soon":
                 days_before = (wf.trigger_config or {}).get("days_before", 3)
-                target_date = today + timedelta(days=days_before)
+                target_date = today_istanbul + timedelta(days=days_before)
                 await _handle_task_due_soon(db, wf, target_date)
 
             elif wf.trigger_type == "task_overdue":
-                await _handle_task_overdue(db, wf, today)
+                await _handle_task_overdue(db, wf, today_istanbul)
 
-            elif wf.trigger_type == "worklog_reminder":
-                hour = (wf.trigger_config or {}).get("send_hour", 17)
-                if now_local.hour == hour:
-                    await _handle_worklog_reminder(db, wf, today)
+            elif wf.trigger_type in ("worklog_reminder", "dashboard_report"):
+                # Use the workflow's own configured timezone for hour-based firing
+                wf_tz = _workflow_tz(wf)
+                now_local = now.astimezone(wf_tz)
+                today_local = now_local.date()
+                hour = (wf.trigger_config or {}).get(
+                    "send_hour", 17 if wf.trigger_type == "worklog_reminder" else 8
+                )
 
-            elif wf.trigger_type == "dashboard_report":
-                hour = (wf.trigger_config or {}).get("send_hour", 8)
-                frequency = (wf.trigger_config or {}).get("frequency", "daily")
-                day_of_week = (wf.trigger_config or {}).get("day_of_week", 0)  # 0=Mon
                 if now_local.hour == hour:
-                    if frequency == "daily" or (frequency == "weekly" and today.weekday() == day_of_week):
-                        await _handle_dashboard_report(db, wf, today)
+                    if wf.trigger_type == "worklog_reminder":
+                        await _handle_worklog_reminder(db, wf, today_local)
+                    else:
+                        frequency = (wf.trigger_config or {}).get("frequency", "daily")
+                        day_of_week = (wf.trigger_config or {}).get("day_of_week", 0)
+                        if frequency == "daily" or (frequency == "weekly" and today_local.weekday() == day_of_week):
+                            await _handle_dashboard_report(db, wf, today_local)
 
             wf.last_run_at = now
 
