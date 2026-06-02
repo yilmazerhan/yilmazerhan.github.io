@@ -1,6 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import apiClient from './client'
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface Customer {
+  id: string
+  name: string
+}
+
 export interface PatchUser {
   id: string
   full_name: string
@@ -8,7 +15,7 @@ export interface PatchUser {
 
 export interface CustomerPatch {
   id: string
-  customer: string
+  customers: string[]
   jira_ticket: string | null
   app_version: string
   apply_date: string
@@ -29,7 +36,7 @@ export interface PatchListResponse {
 }
 
 export interface PatchCreate {
-  customer: string
+  customers: string[]
   jira_ticket?: string
   app_version: string
   apply_date: string
@@ -39,7 +46,7 @@ export interface PatchCreate {
 }
 
 export interface PatchUpdate {
-  customer?: string
+  customers?: string[]
   jira_ticket?: string | null
   app_version?: string
   apply_date?: string
@@ -48,11 +55,35 @@ export interface PatchUpdate {
   description?: string | null
 }
 
+// ─── Query keys ───────────────────────────────────────────────────────────────
+
 export const patchKeys = {
   all: ['patches'] as const,
   list: (params?: object) => [...patchKeys.all, 'list', params] as const,
   detail: (id: string) => [...patchKeys.all, 'detail', id] as const,
+  customers: () => [...patchKeys.all, 'customers'] as const,
 }
+
+// ─── Customer Hooks ───────────────────────────────────────────────────────────
+
+export function useCustomers() {
+  return useQuery({
+    queryKey: patchKeys.customers(),
+    queryFn: () =>
+      apiClient.get<Customer[]>('/patches/customers').then((r) => r.data),
+  })
+}
+
+export function useCreateCustomer() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (name: string) =>
+      apiClient.post<Customer>('/patches/customers', { name }).then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: patchKeys.customers() }),
+  })
+}
+
+// ─── Patch Hooks ──────────────────────────────────────────────────────────────
 
 export function usePatches(params?: {
   search?: string

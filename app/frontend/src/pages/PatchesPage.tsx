@@ -146,7 +146,7 @@ export default function PatchesPage() {
             <thead>
               <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
                 <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('patches.apply_date')}</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('patches.customer')}</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('patches.customers')}</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('patches.jira_ticket')}</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('patches.app_version')}</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('patches.environment')}</th>
@@ -174,8 +174,14 @@ export default function PatchesPage() {
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">
                       {format(new Date(patch.apply_date + 'T12:00:00'), 'dd MMM yyyy')}
                     </td>
-                    <td className="px-4 py-3 text-gray-900 dark:text-white font-medium">
-                      {patch.customer}
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-1">
+                        {(patch.customers ?? []).map((c) => (
+                          <span key={c} className="px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
+                            {c}
+                          </span>
+                        ))}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       {patch.jira_ticket ? (

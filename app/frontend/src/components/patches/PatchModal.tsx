@@ -1,8 +1,11 @@
-import { useState } from 'react'
-import { X } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { X, Plus, ChevronDown } from 'lucide-react'
 import { format } from 'date-fns'
 import { useTranslation } from 'react-i18next'
-import { useCreatePatch, useUpdatePatch, type CustomerPatch, type PatchCreate, type PatchUpdate } from '@/api/patches'
+import {
+  useCreatePatch, useUpdatePatch, useCustomers, useCreateCustomer,
+  type CustomerPatch, type PatchCreate, type PatchUpdate,
+} from '@/api/patches'
 
 interface Props {
   patch?: CustomerPatch
@@ -12,13 +15,158 @@ interface Props {
 const STATUS_OPTIONS = ['planned', 'applied', 'failed', 'rolled_back'] as const
 const ENV_SUGGESTIONS = ['production', 'staging', 'test', 'dev']
 
+// ─── Customer multi-select combobox ──────────────────────────────────────────
+
+interface CustomerPickerProps {
+  selected: string[]
+  onChange: (v: string[]) => void
+}
+
+function CustomerPicker({ selected, onChange }: CustomerPickerProps) {
+  const { t } = useTranslation()
+  const { data: customers = [] } = useCustomers()
+  const createCustomer = useCreateCustomer()
+
+  const [open, setOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [addingError, setAddingError] = useState('')
+  const containerRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  const filtered = customers.filter(
+    (c) =>
+      c.name.toLowerCase().includes(query.toLowerCase()) &&
+      !selected.includes(c.name),
+  )
+
+  const exactMatch = customers.some(
+    (c) => c.name.toLowerCase() === query.toLowerCase(),
+  )
+  const showAddNew = query.trim().length > 0 && !exactMatch
+
+  function toggle(name: string) {
+    if (selected.includes(name)) {
+      onChange(selected.filter((n) => n !== name))
+    } else {
+      onChange([...selected, name])
+    }
+    setQuery('')
+  }
+
+  async function handleAddNew() {
+    const name = query.trim()
+    if (!name) return
+    setAddingError('')
+    try {
+      const created = await createCustomer.mutateAsync(name)
+      onChange([...selected, created.name])
+      setQuery('')
+    } catch {
+      setAddingError(t('patches.customer_add_error'))
+    }
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      {/* Selected chips */}
+      {selected.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {selected.map((name) => (
+            <span
+              key={name}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900/40 dark:text-primary-300"
+            >
+              {name}
+              <button
+                type="button"
+                onClick={() => onChange(selected.filter((n) => n !== name))}
+                className="hover:text-primary-600 dark:hover:text-primary-200"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Input + toggle */}
+      <div
+        className="flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 cursor-text"
+        onClick={() => { setOpen(true); inputRef.current?.focus() }}
+      >
+        <input
+          ref={inputRef}
+          type="text"
+          value={query}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
+          onFocus={() => setOpen(true)}
+          placeholder={selected.length === 0 ? t('patches.customers_placeholder') : t('patches.customers_add_more')}
+          className="flex-1 text-sm bg-transparent text-gray-900 dark:text-white outline-none placeholder-gray-400"
+        />
+        <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </div>
+
+      {/* Dropdown */}
+      {open && (
+        <div className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg max-h-52 overflow-y-auto">
+          {filtered.length === 0 && !showAddNew && (
+            <p className="px-3 py-2 text-xs text-gray-400 dark:text-gray-500">
+              {query ? t('patches.customer_not_found') : t('patches.customer_list_empty')}
+            </p>
+          )}
+
+          {filtered.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => toggle(c.name)}
+              className="w-full text-left px-3 py-2 text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-colors"
+            >
+              {c.name}
+            </button>
+          ))}
+
+          {showAddNew && (
+            <button
+              type="button"
+              onClick={handleAddNew}
+              disabled={createCustomer.isPending}
+              className="w-full text-left px-3 py-2 text-sm text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 flex items-center gap-1.5 border-t border-gray-100 dark:border-gray-700 transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {t('patches.customer_add_new')}: <strong className="ml-1">{query.trim()}</strong>
+            </button>
+          )}
+        </div>
+      )}
+
+      {addingError && (
+        <p className="text-xs text-red-600 dark:text-red-400 mt-1">{addingError}</p>
+      )}
+    </div>
+  )
+}
+
+// ─── Patch modal ──────────────────────────────────────────────────────────────
+
 export default function PatchModal({ patch, onClose }: Props) {
   const { t } = useTranslation()
   const isEdit = !!patch
 
   const today = format(new Date(), 'yyyy-MM-dd')
 
-  const [customer, setCustomer] = useState(patch?.customer || '')
+  const [customers, setCustomers] = useState<string[]>(patch?.customers ?? [])
   const [appVersion, setAppVersion] = useState(patch?.app_version || '')
   const [jiraTicket, setJiraTicket] = useState(patch?.jira_ticket || '')
   const [applyDate, setApplyDate] = useState(patch?.apply_date || today)
@@ -35,10 +183,15 @@ export default function PatchModal({ patch, onClose }: Props) {
     e.preventDefault()
     setError('')
 
+    if (customers.length === 0) {
+      setError(t('patches.customer_required'))
+      return
+    }
+
     try {
       if (isEdit) {
         const data: PatchUpdate = {
-          customer: customer.trim(),
+          customers,
           app_version: appVersion.trim(),
           jira_ticket: jiraTicket.trim() || null,
           apply_date: applyDate,
@@ -49,7 +202,7 @@ export default function PatchModal({ patch, onClose }: Props) {
         await updatePatch.mutateAsync(data)
       } else {
         const data: PatchCreate = {
-          customer: customer.trim(),
+          customers,
           app_version: appVersion.trim(),
           apply_date: applyDate,
           status,
@@ -60,15 +213,19 @@ export default function PatchModal({ patch, onClose }: Props) {
         await createPatch.mutateAsync(data)
       }
       onClose()
-    } catch (err: any) {
-      setError(err.response?.data?.detail || t('common.error'))
+    } catch (err: unknown) {
+      setError((err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || t('common.error'))
     }
   }
 
+  const inputCls =
+    'w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500'
+  const labelCls = 'block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-lg shadow-xl">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 z-10">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             {isEdit ? t('patches.edit') : t('patches.add')}
           </h2>
@@ -84,22 +241,17 @@ export default function PatchModal({ patch, onClose }: Props) {
             </p>
           )}
 
+          {/* Customer multi-select */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {t('patches.customer')} <span className="text-red-500">*</span>
+            <label className={labelCls}>
+              {t('patches.customers')} <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              value={customer}
-              onChange={(e) => setCustomer(e.target.value)}
-              required
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
+            <CustomerPicker selected={customers} onChange={setCustomers} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className={labelCls}>
                 {t('patches.app_version')} <span className="text-red-500">*</span>
               </label>
               <input
@@ -108,26 +260,24 @@ export default function PatchModal({ patch, onClose }: Props) {
                 onChange={(e) => setAppVersion(e.target.value)}
                 required
                 placeholder={t('patches.version_placeholder')}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className={inputCls}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                {t('patches.jira_ticket')}
-              </label>
+              <label className={labelCls}>{t('patches.jira_ticket')}</label>
               <input
                 type="text"
                 value={jiraTicket}
                 onChange={(e) => setJiraTicket(e.target.value)}
                 placeholder={t('patches.ticket_placeholder')}
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className={inputCls}
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className={labelCls}>
                 {t('patches.apply_date')} <span className="text-red-500">*</span>
               </label>
               <input
@@ -135,18 +285,18 @@ export default function PatchModal({ patch, onClose }: Props) {
                 value={applyDate}
                 onChange={(e) => setApplyDate(e.target.value)}
                 required
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className={inputCls}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className={labelCls}>
                 {t('patches.status')} <span className="text-red-500">*</span>
               </label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
                 required
-                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className={inputCls}
               >
                 {STATUS_OPTIONS.map((s) => (
                   <option key={s} value={s}>{t(`patches.status_${s}`)}</option>
@@ -156,16 +306,14 @@ export default function PatchModal({ patch, onClose }: Props) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {t('patches.environment')}
-            </label>
+            <label className={labelCls}>{t('patches.environment')}</label>
             <input
               type="text"
               value={environment}
               onChange={(e) => setEnvironment(e.target.value)}
               placeholder={t('patches.env_placeholder')}
               list="env-suggestions"
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className={inputCls}
             />
             <datalist id="env-suggestions">
               {ENV_SUGGESTIONS.map((e) => (
@@ -175,14 +323,12 @@ export default function PatchModal({ patch, onClose }: Props) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {t('patches.description')}
-            </label>
+            <label className={labelCls}>{t('patches.description')}</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
+              className={`${inputCls} resize-none`}
             />
           </div>
 

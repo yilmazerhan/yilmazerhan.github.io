@@ -7,13 +7,39 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.user import User
-from app.schemas.patch import PatchCreate, PatchUpdate, PatchResponse, PatchListResponse
+from app.schemas.patch import (
+    PatchCreate, PatchUpdate, PatchResponse, PatchListResponse,
+    CustomerCreate, CustomerResponse,
+)
 from app.schemas.auth import MessageResponse
 from app.services.patch_service import PatchService
 from app.core.dependencies import get_current_user
 
 router = APIRouter(prefix="/patches", tags=["patches"])
 
+
+# ─── Customer endpoints ───────────────────────────────────────────────────────
+
+@router.get("/customers", response_model=list[CustomerResponse])
+async def list_customers(
+    _: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = PatchService(db)
+    return await svc.list_customers()
+
+
+@router.post("/customers", response_model=CustomerResponse, status_code=201)
+async def create_customer(
+    body: CustomerCreate,
+    _: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = PatchService(db)
+    return await svc.create_customer(body)
+
+
+# ─── Patch endpoints ──────────────────────────────────────────────────────────
 
 @router.get("", response_model=PatchListResponse)
 async def list_patches(

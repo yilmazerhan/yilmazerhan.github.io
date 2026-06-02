@@ -1,11 +1,21 @@
 import uuid
 from datetime import date, datetime
 from typing import Optional
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class CustomerCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+
+
+class CustomerResponse(BaseModel):
+    id: uuid.UUID
+    name: str
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PatchCreate(BaseModel):
-    customer: str
+    customers: list[str] = Field(..., min_length=1)
     jira_ticket: Optional[str] = None
     app_version: str
     apply_date: date
@@ -15,7 +25,7 @@ class PatchCreate(BaseModel):
 
 
 class PatchUpdate(BaseModel):
-    customer: Optional[str] = None
+    customers: Optional[list[str]] = None
     jira_ticket: Optional[str] = None
     app_version: Optional[str] = None
     apply_date: Optional[date] = None
@@ -33,7 +43,7 @@ class PatchUserInfo(BaseModel):
 
 class PatchResponse(BaseModel):
     id: uuid.UUID
-    customer: str
+    customers: list[str] = []
     jira_ticket: Optional[str] = None
     app_version: str
     apply_date: date
