@@ -3,6 +3,7 @@ FROM python:3.12-slim AS development
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    procps \
     postgresql-client && \
     rm -rf /var/lib/apt/lists/*
 
@@ -17,6 +18,7 @@ FROM python:3.12-slim AS production
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    procps \
     postgresql-client && \
     rm -rf /var/lib/apt/lists/*
 
