@@ -112,6 +112,23 @@ export function useUpdateUser(id: string) {
   })
 }
 
+export interface ProfileUpdatePayload {
+  full_name?: string
+  preferred_language?: string
+  preferred_theme?: string
+}
+
+export function useUpdateMyProfile() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: ProfileUpdatePayload) =>
+      apiClient.patch<User>('/users/me/profile', data).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: userKeys.all })
+    },
+  })
+}
+
 export function useDeleteUser() {
   const qc = useQueryClient()
   return useMutation({

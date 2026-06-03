@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,8 +11,7 @@ from app.models.user import User, RefreshToken, PasswordResetToken
 from app.core.security import (
     hash_password, verify_password, needs_rehash,
     create_access_token, generate_refresh_token, hash_token,
-    refresh_token_expire, generate_secure_token,
-    password_reset_expire, activation_token_expire,
+    generate_secure_token, password_reset_expire, activation_token_expire,
 )
 from app.core.exceptions import (
     AuthenticationError, ForbiddenError, ConflictError, NotFoundError, ValidationError
@@ -138,10 +137,11 @@ class AuthService:
         user.last_login_at = datetime.now(timezone.utc)
 
         raw_refresh, refresh_hash = generate_refresh_token()
+        session_expires_at = datetime.now(timezone.utc) + timedelta(hours=settings.SESSION_MAX_DURATION_HOURS)
         refresh_record = RefreshToken(
             user_id=user.id,
             token_hash=refresh_hash,
-            expires_at=refresh_token_expire(),
+            expires_at=session_expires_at,
         )
         self.db.add(refresh_record)
         await self.db.flush()
@@ -174,13 +174,13 @@ class AuthService:
         if not user:
             raise AuthenticationError("Kullanıcı bulunamadı.")
 
-        # Rotate: revoke old, issue new
+        # Rotate: revoke old, issue new — carry forward the original session deadline
         record.revoked = True
         raw_new, hash_new = generate_refresh_token()
         new_record = RefreshToken(
             user_id=user.id,
             token_hash=hash_new,
-            expires_at=refresh_token_expire(),
+            expires_at=record.expires_at,  # Preserve the absolute 12h session deadline, never extend
         )
         self.db.add(new_record)
         await self.db.flush()

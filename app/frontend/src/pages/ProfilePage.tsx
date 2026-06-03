@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Mail, Globe, Save, KeyRound } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
-import { useUpdateUser } from '@/api/users'
+import { useUpdateMyProfile } from '@/api/users'
 import { toast } from '@/store/toastStore'
 import ChangePasswordModal from '@/components/users/ChangePasswordModal'
 import i18n from '@/i18n'
@@ -20,7 +20,7 @@ function getInitials(name: string) {
 export default function ProfilePage() {
   const { t } = useTranslation()
   const { user, updateUser } = useAuthStore()
-  const updateMutation = useUpdateUser(user?.id ?? '')
+  const updateMutation = useUpdateMyProfile()
 
   const [fullName, setFullName] = useState(user?.full_name ?? '')
   const [language, setLanguage] = useState(user?.preferred_language ?? 'tr')
