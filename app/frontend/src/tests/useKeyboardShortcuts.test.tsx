@@ -1,7 +1,7 @@
 import { renderHook } from '@testing-library/react'
 import { fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { vi, describe, it, expect, beforeEach } from 'vitest'
+import { vi, describe, it, expect, beforeEach, type Mock } from 'vitest'
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts'
 
 function wrapper({ children }: { children: React.ReactNode }) {
@@ -9,12 +9,12 @@ function wrapper({ children }: { children: React.ReactNode }) {
 }
 
 describe('useKeyboardShortcuts', () => {
-  let onSearch: ReturnType<typeof vi.fn>
-  let onHelp: ReturnType<typeof vi.fn>
+  let onSearch: Mock<() => void>
+  let onHelp: Mock<() => void>
 
   beforeEach(() => {
-    onSearch = vi.fn()
-    onHelp = vi.fn()
+    onSearch = vi.fn<() => void>()
+    onHelp = vi.fn<() => void>()
   })
 
   it('calls onHelp when ? key is pressed', () => {
