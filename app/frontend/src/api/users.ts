@@ -180,3 +180,27 @@ export function useSetPermissions(userId: string) {
     },
   })
 }
+
+export type BulkCellAction = 'skip' | 'grant' | 'deny' | 'reset'
+
+export interface BulkPermissionItem {
+  module: string
+  action: string
+  cell_action: BulkCellAction
+}
+
+export interface BulkApplyPayload {
+  items: BulkPermissionItem[]
+  role_filter?: string | null
+}
+
+export function useBulkApplyPermissions() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: BulkApplyPayload) =>
+      apiClient.post<{ affected_users: number; message: string }>('/permissions/bulk-apply', payload).then((r) => r.data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: userKeys.all })
+    },
+  })
+}

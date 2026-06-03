@@ -296,7 +296,21 @@
     "action_create": "Create",
     "action_edit": "Edit",
     "action_delete": "Delete",
-    "saved": "Saved!"
+    "saved": "Saved!",
+    "bulk_button": "Bulk Permissions",
+    "bulk_title": "Bulk Permission Edit",
+    "bulk_subtitle": "Apply selected module/action combinations to all users at once",
+    "bulk_target": "Target Users",
+    "bulk_role_all": "All users (except superadmin)",
+    "bulk_cycle_hint": "— Click a cell to cycle through states",
+    "bulk_cell_skip": "− Skip",
+    "bulk_cell_grant": "✓ Grant",
+    "bulk_cell_deny": "✗ Deny",
+    "bulk_cell_reset": "↺ Default",
+    "bulk_no_changes": "No cells selected to change yet.",
+    "bulk_will_apply": "{{count}} cells will be changed",
+    "bulk_apply": "Apply",
+    "bulk_done": "{{count}} users updated!"
   },
   "settings": {
     "title": "Settings",

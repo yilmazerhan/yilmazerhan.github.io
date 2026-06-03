@@ -296,7 +296,21 @@
     "action_create": "Oluştur",
     "action_edit": "Düzenle",
     "action_delete": "Sil",
-    "saved": "Kaydedildi!"
+    "saved": "Kaydedildi!",
+    "bulk_button": "Toplu Yetki",
+    "bulk_title": "Toplu Yetki Düzenle",
+    "bulk_subtitle": "Seçili modül/aksiyon kombinasyonlarını tüm kullanıcılara aynı anda uygula",
+    "bulk_target": "Hedef Kullanıcılar",
+    "bulk_role_all": "Tüm kullanıcılar (superadmin hariç)",
+    "bulk_cycle_hint": "— Hücreye tıklayarak döngüde ilerle",
+    "bulk_cell_skip": "− Değiştirme",
+    "bulk_cell_grant": "✓ Ver",
+    "bulk_cell_deny": "✗ Reddet",
+    "bulk_cell_reset": "↺ Varsayılan",
+    "bulk_no_changes": "Henüz değiştirilecek hücre seçilmedi.",
+    "bulk_will_apply": "{{count}} hücre değiştirilecek",
+    "bulk_apply": "Uygula",
+    "bulk_done": "{{count}} kullanıcı güncellendi!"
   },
   "settings": {
     "title": "Ayarlar",

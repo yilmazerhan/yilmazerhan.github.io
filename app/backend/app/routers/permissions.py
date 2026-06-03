@@ -7,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.user import User
 from app.schemas.permission import (
-    PermissionOverrideResponse, SetPermissionsRequest, EffectivePermissions
+    PermissionOverrideResponse, SetPermissionsRequest, EffectivePermissions,
+    BulkApplyPermissionsRequest, BulkApplyPermissionsResponse,
 )
 from app.schemas.auth import MessageResponse
 from app.services.permission_service import PermissionService
@@ -53,6 +54,21 @@ async def delete_override(
     svc = PermissionService(db)
     await svc.delete_override(user_id, module, action)
     return {"message": "Yetki override'ı silindi."}
+
+
+@router.post("/bulk-apply", response_model=BulkApplyPermissionsResponse)
+async def bulk_apply_permissions(
+    body: BulkApplyPermissionsRequest,
+    current_user: Annotated[User, Depends(require_superadmin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = PermissionService(db)
+    result = await svc.bulk_apply_permissions(
+        items=[i.model_dump() for i in body.items],
+        role_filter=body.role_filter,
+        set_by=current_user.id,
+    )
+    return result
 
 
 @router.get("/effective/me", response_model=EffectivePermissions)

@@ -78,3 +78,49 @@ class PermissionService:
                 PermissionOverride.action == action,
             )
         )
+
+    async def bulk_apply_permissions(
+        self,
+        items: list[dict],
+        role_filter: Optional[str],
+        set_by: uuid.UUID,
+    ) -> dict:
+        non_skip = [i for i in items if i["cell_action"] != "skip"]
+        if not non_skip:
+            return {"affected_users": 0, "message": "Değiştirilecek hücre seçilmedi."}
+
+        for item in non_skip:
+            if item["module"] not in ALL_MODULES:
+                raise ValidationError(f"Geçersiz modül: {item['module']}")
+            if item["action"] not in ALL_ACTIONS:
+                raise ValidationError(f"Geçersiz aksiyon: {item['action']}")
+
+        query = select(User).where(User.is_deleted == False, User.role != "superadmin")
+        if role_filter in ("user", "team_manager"):
+            query = query.where(User.role == role_filter)
+        result = await self.db.execute(query)
+        users = list(result.scalars().all())
+
+        for user in users:
+            for item in non_skip:
+                module = item["module"]
+                action = item["action"]
+                cell_action = item["cell_action"]
+                await self.db.execute(
+                    delete(PermissionOverride).where(
+                        PermissionOverride.user_id == user.id,
+                        PermissionOverride.module == module,
+                        PermissionOverride.action == action,
+                    )
+                )
+                if cell_action in ("grant", "deny"):
+                    self.db.add(PermissionOverride(
+                        user_id=user.id,
+                        module=module,
+                        action=action,
+                        is_allowed=(cell_action == "grant"),
+                        created_by=set_by,
+                    ))
+
+        await self.db.flush()
+        return {"affected_users": len(users), "message": f"{len(users)} kullanıcı güncellendi."}

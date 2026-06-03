@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Plus, Search, Pencil, Trash2, ShieldCheck, KeyRound, BarChart3, RotateCcw, Skull, UserX } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, ShieldCheck, KeyRound, BarChart3, RotateCcw, Skull, UserX, ShieldPlus } from 'lucide-react'
 import { useUsers, useDeleteUser, useRestoreUser, useHardDeleteUser, type User } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
 import UserFormModal from '@/components/users/UserFormModal'
 import PermissionMatrixModal from '@/components/users/PermissionMatrixModal'
+import BulkPermissionModal from '@/components/users/BulkPermissionModal'
 import SetPasswordModal from '@/components/users/SetPasswordModal'
 
 export default function UsersPage() {
@@ -18,6 +19,7 @@ export default function UsersPage() {
   const [editUser, setEditUser] = useState<User | null>(null)
   const [permUser, setPermUser] = useState<User | null>(null)
   const [setPwUser, setSetPwUser] = useState<User | null>(null)
+  const [bulkPermOpen, setBulkPermOpen] = useState(false)
 
   const isSuperAdmin = currentUser?.role === 'superadmin'
 
@@ -72,13 +74,24 @@ export default function UsersPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('users.title')}</h1>
-        <button
-          onClick={() => setCreateOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm font-medium transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          {t('users.invite')}
-        </button>
+        <div className="flex items-center gap-2">
+          {isSuperAdmin && (
+            <button
+              onClick={() => setBulkPermOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium transition-colors border border-gray-300 dark:border-gray-600"
+            >
+              <ShieldPlus className="h-4 w-4" />
+              {t('permissions.bulk_button')}
+            </button>
+          )}
+          <button
+            onClick={() => setCreateOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm font-medium transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            {t('users.invite')}
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -281,6 +294,7 @@ export default function UsersPage() {
       {editUser && <UserFormModal user={editUser} onClose={() => setEditUser(null)} />}
       {permUser && <PermissionMatrixModal user={permUser} onClose={() => setPermUser(null)} />}
       {setPwUser && <SetPasswordModal user={setPwUser} onClose={() => setSetPwUser(null)} />}
+      {bulkPermOpen && <BulkPermissionModal onClose={() => setBulkPermOpen(false)} />}
     </div>
   )
 }
