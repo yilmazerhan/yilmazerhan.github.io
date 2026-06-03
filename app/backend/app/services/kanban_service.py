@@ -931,26 +931,18 @@ class KanbanService:
         if len(task_ids) > 200:
             from fastapi import HTTPException
             raise HTTPException(status_code=400, detail="En fazla 200 görev aynı anda güncellenebilir.")
-        result = await self.db.execute(
-            select(Task)
-            .options(selectinload(Task.assignee), selectinload(Task.creator))
-            .where(Task.id.in_(task_ids))
-        )
-        tasks = list(result.scalars().all())
+        # Validate access for every task using the same junction-table ACL as get_task().
+        # This prevents BOLA: an attacker passing arbitrary task IDs in a bulk request
+        # cannot bypass per-task authorization the way the old FK-based check allowed.
+        tasks: list[Task] = []
+        for tid in task_ids:
+            if requester:
+                task = await self.get_task(tid, requester)  # raises ForbiddenError if unauthorized
+            else:
+                task = await self._get_task(tid)
+            tasks.append(task)
+
         for task in tasks:
-            if requester and requester.role != "superadmin":
-                if requester.role == "team_manager":
-                    # team_manager can only update tasks belonging to their team (BOLA/IDOR fix)
-                    assignee_team = task.assignee.team_id if task.assignee else None
-                    creator_team = task.creator.team_id if task.creator else None
-                    if assignee_team != requester.team_id and creator_team != requester.team_id:
-                        from fastapi import HTTPException
-                        raise HTTPException(status_code=403, detail="Bazı görevler için güncelleme yetkiniz yok.")
-                else:
-                    # Regular users can only update tasks they created or are assigned to
-                    if task.created_by != requester.id and task.assignee_id != requester.id:
-                        from fastapi import HTTPException
-                        raise HTTPException(status_code=403, detail="Bazı görevler için güncelleme yetkiniz yok.")
             if column_id is not None:
                 task.column_id = column_id
             if assignee_id is not None:
