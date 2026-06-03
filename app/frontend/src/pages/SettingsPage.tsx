@@ -152,6 +152,7 @@ export default function SettingsPage() {
 
   const [companyName, setCompanyName] = useState(branding?.company_name ?? '')
   const [primaryColor, setPrimaryColor] = useState(branding?.primary_color ?? '#3b82f6')
+  const [jiraBaseUrl, setJiraBaseUrl] = useState(branding?.jira_base_url ?? '')
   const [brandingError, setBrandingError] = useState('')
 
   // Sync branding form state when server data loads
@@ -159,8 +160,9 @@ export default function SettingsPage() {
     if (branding) {
       setCompanyName(branding.company_name ?? '')
       setPrimaryColor(branding.primary_color ?? '#3b82f6')
+      setJiraBaseUrl(branding.jira_base_url ?? '')
     }
-  }, [branding?.company_name, branding?.primary_color])
+  }, [branding?.company_name, branding?.primary_color, branding?.jira_base_url])
 
   async function handleSslUpload(e: React.FormEvent) {
     e.preventDefault(); setSslError('')
@@ -179,7 +181,7 @@ export default function SettingsPage() {
   async function handleBrandingSave(e: React.FormEvent) {
     e.preventDefault(); setBrandingError('')
     try {
-      await updateBranding.mutateAsync({ company_name: companyName, primary_color: primaryColor })
+      await updateBranding.mutateAsync({ company_name: companyName, primary_color: primaryColor, jira_base_url: jiraBaseUrl })
     } catch (err: any) { setBrandingError(err.response?.data?.detail || t('settings.save_failed')) }
   }
 
@@ -556,6 +558,16 @@ export default function SettingsPage() {
                   <input value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="flex-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm font-mono text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
                 </div>
               </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('settings.jira_base_url')}</label>
+              <input
+                value={jiraBaseUrl}
+                onChange={(e) => setJiraBaseUrl(e.target.value)}
+                placeholder={t('settings.jira_base_url_placeholder')}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{t('settings.jira_base_url_hint')}</p>
             </div>
             <div className="flex justify-end">
               <button type="submit" disabled={updateBranding.isPending} className="px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium disabled:opacity-50">

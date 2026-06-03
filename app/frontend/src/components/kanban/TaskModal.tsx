@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { X, Trash2, Send, History, MessageSquare, ClipboardList, CheckSquare, Square, ListChecks, Plus, Paperclip, Download, Tag } from 'lucide-react'
+import { JiraTicketLink } from '@/components/JiraTicketLink'
 import { format } from 'date-fns'
 import { useTranslation } from 'react-i18next'
 import {
@@ -555,6 +556,11 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
                   placeholder="PROJ-123"
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-60"
                 />
+                {jiraTicket.trim() && (
+                  <div className="mt-1">
+                    <JiraTicketLink ticket={jiraTicket.trim()} />
+                  </div>
+                )}
               </div>
 
               {isEdit && task && (

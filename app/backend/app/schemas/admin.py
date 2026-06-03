@@ -18,11 +18,13 @@ class BrandingResponse(BaseModel):
     company_name: str
     company_logo: str
     primary_color: str
+    jira_base_url: str
 
 
 class BrandingUpdate(BaseModel):
     company_name: Optional[str] = None
     primary_color: Optional[str] = None
+    jira_base_url: Optional[str] = None
 
 
 class AuditLogResponse(BaseModel):

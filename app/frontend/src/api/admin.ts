@@ -14,6 +14,7 @@ export interface BrandingData {
   company_name: string
   company_logo: string
   primary_color: string
+  jira_base_url: string
 }
 
 export interface AuditLog {
@@ -128,7 +129,7 @@ export function useBranding() {
 export function useUpdateBranding() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: { company_name?: string; primary_color?: string }) =>
+    mutationFn: (data: { company_name?: string; primary_color?: string; jira_base_url?: string }) =>
       apiClient.put<BrandingData>('/admin/settings/branding', data).then((r) => r.data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: adminKeys.branding })

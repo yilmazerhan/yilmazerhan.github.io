@@ -105,7 +105,7 @@ async def update_branding_settings(
     current_user: Annotated[User, Depends(require_superadmin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    return await update_branding(db, current_user.id, body.company_name, body.primary_color)
+    return await update_branding(db, current_user.id, body.company_name, body.primary_color, body.jira_base_url)
 
 
 @router.post("/settings/branding/logo", response_model=BrandingResponse)

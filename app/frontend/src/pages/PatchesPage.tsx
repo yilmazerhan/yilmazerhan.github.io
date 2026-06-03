@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format } from 'date-fns'
-import { Plus, Pencil, Trash2, ExternalLink } from 'lucide-react'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { usePatches, useDeletePatch, type CustomerPatch } from '@/api/patches'
 import { useAuthStore } from '@/store/authStore'
 import PatchModal from '@/components/patches/PatchModal'
+import { JiraTicketLink } from '@/components/JiraTicketLink'
 
 const STATUS_OPTIONS = ['planned', 'applied', 'failed', 'rolled_back'] as const
 const ENV_OPTIONS = ['production', 'staging', 'test', 'dev'] as const
@@ -23,8 +24,6 @@ function statusBadgeClass(status: string): string {
       return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
   }
 }
-
-const JIRA_PATTERN = /^[A-Z][A-Z0-9]+-\d+$/
 
 function canModifyPatch(patch: CustomerPatch, userId: string, role: string): boolean {
   if (role === 'superadmin' || role === 'team_manager') return true
@@ -168,7 +167,6 @@ export default function PatchesPage() {
                 </tr>
               ) : data?.items.map((patch) => {
                 const canModify = canModifyPatch(patch, user?.id || '', user?.role || '')
-                const isJiraLink = patch.jira_ticket && JIRA_PATTERN.test(patch.jira_ticket)
                 const files = patch.patch_files ?? []
 
                 return (
@@ -208,23 +206,7 @@ export default function PatchesPage() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      {patch.jira_ticket ? (
-                        isJiraLink ? (
-                          <a
-                            href={`#jira-${patch.jira_ticket}`}
-                            className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline"
-                            title={t('patches.jira_link')}
-                            onClick={(e) => e.preventDefault()}
-                          >
-                            {patch.jira_ticket}
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
-                        ) : (
-                          <span className="text-gray-600 dark:text-gray-400">{patch.jira_ticket}</span>
-                        )
-                      ) : (
-                        <span className="text-gray-300 dark:text-gray-700">—</span>
-                      )}
+                      <JiraTicketLink ticket={patch.jira_ticket} />
                     </td>
                     <td className="px-4 py-3 text-gray-700 dark:text-gray-300 font-mono text-xs">
                       {patch.app_version}

@@ -6,7 +6,7 @@ from sqlalchemy import select
 from app.models.app_setting import AppSetting
 
 
-BRANDING_KEYS = ("company_name", "company_logo", "primary_color")
+BRANDING_KEYS = ("company_name", "company_logo", "primary_color", "jira_base_url")
 
 
 async def get_branding(db: AsyncSession) -> dict:
@@ -19,6 +19,7 @@ async def get_branding(db: AsyncSession) -> dict:
         "company_name": data.get("company_name", "Ekip Yönetimi"),
         "company_logo": data.get("company_logo", ""),
         "primary_color": data.get("primary_color", "#3b82f6"),
+        "jira_base_url": data.get("jira_base_url", ""),
     }
 
 
@@ -27,12 +28,15 @@ async def update_branding(
     updated_by: uuid.UUID,
     company_name: Optional[str] = None,
     primary_color: Optional[str] = None,
+    jira_base_url: Optional[str] = None,
 ) -> dict:
     updates = {}
     if company_name is not None:
         updates["company_name"] = company_name
     if primary_color is not None:
         updates["primary_color"] = primary_color
+    if jira_base_url is not None:
+        updates["jira_base_url"] = jira_base_url
 
     for key, value in updates.items():
         result = await db.execute(select(AppSetting).where(AppSetting.key == key))
