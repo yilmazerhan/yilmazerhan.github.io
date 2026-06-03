@@ -167,11 +167,13 @@ export default function PatchModal({ patch, onClose }: Props) {
   const today = format(new Date(), 'yyyy-MM-dd')
 
   const [customers, setCustomers] = useState<string[]>(patch?.customers ?? [])
+  const [patchName, setPatchName] = useState(patch?.patch_name || '')
   const [appVersion, setAppVersion] = useState(patch?.app_version || '')
   const [jiraTicket, setJiraTicket] = useState(patch?.jira_ticket || '')
   const [applyDate, setApplyDate] = useState(patch?.apply_date || today)
   const [environment, setEnvironment] = useState(patch?.environment || '')
   const [status, setStatus] = useState(patch?.status || 'planned')
+  const [md5sum, setMd5sum] = useState(patch?.md5sum || '')
   const [description, setDescription] = useState(patch?.description || '')
   const [error, setError] = useState('')
 
@@ -192,11 +194,13 @@ export default function PatchModal({ patch, onClose }: Props) {
       if (isEdit) {
         const data: PatchUpdate = {
           customers,
+          patch_name: patchName.trim() || null,
           app_version: appVersion.trim(),
           jira_ticket: jiraTicket.trim() || null,
           apply_date: applyDate,
           environment: environment.trim() || null,
           status,
+          md5sum: md5sum.trim() || null,
           description: description.trim() || null,
         }
         await updatePatch.mutateAsync(data)
@@ -207,8 +211,10 @@ export default function PatchModal({ patch, onClose }: Props) {
           apply_date: applyDate,
           status,
         }
+        if (patchName.trim()) data.patch_name = patchName.trim()
         if (jiraTicket.trim()) data.jira_ticket = jiraTicket.trim()
         if (environment.trim()) data.environment = environment.trim()
+        if (md5sum.trim()) data.md5sum = md5sum.trim()
         if (description.trim()) data.description = description.trim()
         await createPatch.mutateAsync(data)
       }
@@ -247,6 +253,18 @@ export default function PatchModal({ patch, onClose }: Props) {
               {t('patches.customers')} <span className="text-red-500">*</span>
             </label>
             <CustomerPicker selected={customers} onChange={setCustomers} />
+          </div>
+
+          {/* Patch name */}
+          <div>
+            <label className={labelCls}>{t('patches.patch_name')}</label>
+            <input
+              type="text"
+              value={patchName}
+              onChange={(e) => setPatchName(e.target.value)}
+              placeholder={t('patches.patch_name_placeholder')}
+              className={inputCls}
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -320,6 +338,19 @@ export default function PatchModal({ patch, onClose }: Props) {
                 <option key={e} value={e} />
               ))}
             </datalist>
+          </div>
+
+          {/* MD5 checksum */}
+          <div>
+            <label className={labelCls}>{t('patches.md5sum')}</label>
+            <input
+              type="text"
+              value={md5sum}
+              onChange={(e) => setMd5sum(e.target.value)}
+              placeholder={t('patches.md5sum_placeholder')}
+              className={`${inputCls} font-mono text-xs`}
+              maxLength={64}
+            />
           </div>
 
           <div>

@@ -16,21 +16,25 @@ class CustomerResponse(BaseModel):
 
 class PatchCreate(BaseModel):
     customers: list[str] = Field(..., min_length=1)
+    patch_name: Optional[str] = None
     jira_ticket: Optional[str] = None
     app_version: str
     apply_date: date
     environment: Optional[str] = None
     status: str = "applied"
+    md5sum: Optional[str] = None
     description: Optional[str] = None
 
 
 class PatchUpdate(BaseModel):
     customers: Optional[list[str]] = None
+    patch_name: Optional[str] = None
     jira_ticket: Optional[str] = None
     app_version: Optional[str] = None
     apply_date: Optional[date] = None
     environment: Optional[str] = None
     status: Optional[str] = None
+    md5sum: Optional[str] = None
     description: Optional[str] = None
 
 
@@ -44,11 +48,13 @@ class PatchUserInfo(BaseModel):
 class PatchResponse(BaseModel):
     id: uuid.UUID
     customers: list[str] = []
+    patch_name: Optional[str] = None
     jira_ticket: Optional[str] = None
     app_version: str
     apply_date: date
     environment: Optional[str] = None
     status: str
+    md5sum: Optional[str] = None
     description: Optional[str] = None
     created_by: Optional[uuid.UUID] = None
     created_by_user: Optional[PatchUserInfo] = None
