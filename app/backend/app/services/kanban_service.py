@@ -878,15 +878,26 @@ class KanbanService:
         if len(task_ids) > 200:
             from fastapi import HTTPException
             raise HTTPException(status_code=400, detail="En fazla 200 görev aynı anda güncellenebilir.")
-        result = await self.db.execute(select(Task).where(Task.id.in_(task_ids)))
+        result = await self.db.execute(
+            select(Task)
+            .options(selectinload(Task.assignee), selectinload(Task.creator))
+            .where(Task.id.in_(task_ids))
+        )
         tasks = list(result.scalars().all())
-        is_manager = requester and requester.role in ("superadmin", "team_manager")
         for task in tasks:
-            # Authorization: regular users can only bulk-update tasks they created or are assigned to
-            if requester and not is_manager:
-                if task.created_by != requester.id and task.assignee_id != requester.id:
-                    from fastapi import HTTPException
-                    raise HTTPException(status_code=403, detail="Bazı görevler için güncelleme yetkiniz yok.")
+            if requester and requester.role != "superadmin":
+                if requester.role == "team_manager":
+                    # team_manager can only update tasks belonging to their team (BOLA/IDOR fix)
+                    assignee_team = task.assignee.team_id if task.assignee else None
+                    creator_team = task.creator.team_id if task.creator else None
+                    if assignee_team != requester.team_id and creator_team != requester.team_id:
+                        from fastapi import HTTPException
+                        raise HTTPException(status_code=403, detail="Bazı görevler için güncelleme yetkiniz yok.")
+                else:
+                    # Regular users can only update tasks they created or are assigned to
+                    if task.created_by != requester.id and task.assignee_id != requester.id:
+                        from fastapi import HTTPException
+                        raise HTTPException(status_code=403, detail="Bazı görevler için güncelleme yetkiniz yok.")
             if column_id is not None:
                 task.column_id = column_id
             if assignee_id is not None:

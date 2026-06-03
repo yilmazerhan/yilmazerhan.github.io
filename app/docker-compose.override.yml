@@ -19,11 +19,9 @@ services:
       - ./backend:/workspace
     ports:
       - "8000:8000"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     environment:
       ENVIRONMENT: development
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@host.docker.internal:${POSTGRES_PORT:-5432}/${POSTGRES_DB}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
