@@ -30,6 +30,7 @@ import {
   type GroupType,
 } from '@/api/inventory'
 import { useAuthStore } from '@/store/authStore'
+import { useEffectivePermissions } from '@/api/users'
 
 // ─── Type badge helpers ────────────────────────────────────────────────────────
 
@@ -735,6 +736,8 @@ function GroupModal({ group, onClose }: GroupModalProps) {
 export default function InventoryPage() {
   const { t } = useTranslation()
   const currentUser = useAuthStore((s) => s.user)
+  const { data: effectivePerms } = useEffectivePermissions(currentUser?.id ?? '', !!currentUser?.id)
+  const invPerms = effectivePerms?.permissions?.inventory
 
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState<string>('')
@@ -749,8 +752,12 @@ export default function InventoryPage() {
   const [scheduleCreateOpen, setScheduleCreateOpen] = useState(false)
   const [exportLoading, setExportLoading] = useState(false)
 
-  const canEdit =
-    currentUser?.role === 'superadmin' || currentUser?.role === 'team_manager'
+  // Use effective permissions (role defaults + overrides) so granted users see full UI
+  const isMgrOrAbove = currentUser?.role === 'superadmin' || currentUser?.role === 'team_manager'
+  const canCreate = invPerms?.create ?? isMgrOrAbove
+  const canEdit = invPerms?.edit ?? isMgrOrAbove
+  const canDelete = invPerms?.delete ?? isMgrOrAbove
+  const canManage = canCreate || canEdit || canDelete
 
   const { data: items = [], isLoading } = useInventoryItems({
     search: search || undefined,
@@ -843,7 +850,7 @@ export default function InventoryPage() {
             CSV
           </button>
 
-          {canEdit && (
+          {canCreate && (
             <button
               onClick={() => setCreateOpen(true)}
               className="flex items-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm font-medium transition-colors"
@@ -856,7 +863,7 @@ export default function InventoryPage() {
       </div>
 
       {/* View-only notice */}
-      {!canEdit && (
+      {!canManage && (
         <div className="rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 px-4 py-3 text-sm text-yellow-800 dark:text-yellow-200">
           {t('inventory.view_only_note')}
         </div>
@@ -1015,22 +1022,22 @@ export default function InventoryPage() {
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
                       {canEdit && (
-                        <>
-                          <button
-                            onClick={() => setEditItem(item)}
-                            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                            title={t('inventory.edit')}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(item)}
-                            className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                            title={t('inventory.delete')}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </>
+                        <button
+                          onClick={() => setEditItem(item)}
+                          className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                          title={t('inventory.edit')}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button
+                          onClick={() => handleDelete(item)}
+                          className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                          title={t('inventory.delete')}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       )}
                     </div>
                   </td>
@@ -1042,7 +1049,7 @@ export default function InventoryPage() {
       )}
 
       {/* Groups Section */}
-      {canEdit && (
+      {canManage && (
         <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
           <button
             className="w-full flex items-center justify-between px-6 py-4 bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
@@ -1113,7 +1120,7 @@ export default function InventoryPage() {
       )}
 
       {/* Email Schedules Section */}
-      {canEdit && (
+      {canManage && (
         <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
           <button
             className="w-full flex items-center justify-between px-6 py-4 bg-gray-50 dark:bg-gray-800/60 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
