@@ -94,7 +94,11 @@
     "health_redis": "Redis",
     "health_worker": "Celery Worker",
     "health_uptime": "Uptime",
-    "widget_health_check": "System Health"
+    "widget_health_check": "System Health",
+    "daily_worklog_title": "Daily Work Log",
+    "daily_worklog_no_data": "No users found for the selected day.",
+    "daily_worklog_no_record": "No record",
+    "widget_daily_worklog": "Daily Work Log"
   },
   "worklog": {
     "title": "Work Log",

@@ -5,11 +5,12 @@ import { tr, enUS } from 'date-fns/locale'
 import { Clock, AlertTriangle, CheckCircle2, ListTodo, TrendingUp, Users, Database, Mail, Settings2, Eye, EyeOff, Check, CheckCircle, XCircle, AlertCircle, Activity } from 'lucide-react'
 import { useTasks } from '@/api/kanban'
 import { useWorkLogs } from '@/api/worklog'
+import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
 import { useDashboardStats, useSystemHealth } from '@/api/admin'
 import { resolveName } from '@/utils/i18nName'
 
-const WIDGET_KEYS = ['db_stats', 'charts', 'overdue', 'recent_logs', 'health_check'] as const
+const WIDGET_KEYS = ['db_stats', 'charts', 'daily_worklog', 'overdue', 'recent_logs', 'health_check'] as const
 type WidgetKey = typeof WIDGET_KEYS[number]
 
 function formatUptime(seconds: number): string {
@@ -35,6 +36,7 @@ export default function DashboardPage() {
   const { t, i18n } = useTranslation()
   const [editMode, setEditMode] = useState(false)
   const [hiddenWidgets, setHiddenWidgets] = useState<Set<WidgetKey>>(loadHiddenWidgets)
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'))
 
   const toggleWidget = useCallback((key: WidgetKey) => {
     setHiddenWidgets((prev) => {
@@ -54,6 +56,8 @@ export default function DashboardPage() {
 
   const { data: tasksData } = useTasks({ limit: 500 })
   const { data: logsData } = useWorkLogs({ date_from: weekAgo, date_to: today })
+  const { data: dailyLogsData } = useWorkLogs({ date_from: selectedDate, date_to: selectedDate, limit: 500 })
+  const { data: allUsersData } = useUsers({ is_active: true, limit: 200 }, canSeeTeamData)
   const { data: dbStats } = useDashboardStats({ enabled: isSuperAdmin })
 
   const stats = useMemo(() => {
@@ -98,6 +102,41 @@ export default function DashboardPage() {
 
   const maxPersonHours = hoursByPerson[0]?.hours ?? 1
   const maxTypeHours = workTypeBreakdown[0]?.hours ?? 1
+
+  const dailyPersonData = useMemo(() => {
+    if (!canSeeTeamData) return []
+    const logs = dailyLogsData?.items ?? []
+    const allUsers = allUsersData?.items ?? []
+    const map = new Map<string, {
+      userId: string
+      name: string
+      hours: number
+      workTypes: Array<{ name: string; name_key: string | null; color: string; hours: number }>
+    }>()
+    for (const u of allUsers) {
+      map.set(u.id, { userId: u.id, name: u.full_name, hours: 0, workTypes: [] })
+    }
+    for (const log of logs) {
+      if (!map.has(log.user_id)) {
+        map.set(log.user_id, { userId: log.user_id, name: log.user.full_name, hours: 0, workTypes: [] })
+      }
+      const entry = map.get(log.user_id)!
+      entry.hours += log.duration_hours
+      const idx = entry.workTypes.findIndex((wt) => wt.name === log.work_type.name)
+      if (idx >= 0) {
+        entry.workTypes[idx].hours += log.duration_hours
+      } else {
+        entry.workTypes.push({ name: log.work_type.name, name_key: log.work_type.name_key ?? null, color: log.work_type.color, hours: log.duration_hours })
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => {
+      if (a.hours === 0 && b.hours > 0) return 1
+      if (b.hours === 0 && a.hours > 0) return -1
+      return b.hours - a.hours
+    })
+  }, [dailyLogsData, allUsersData, canSeeTeamData])
+
+  const maxDailyHours = dailyPersonData.find((p) => p.hours > 0)?.hours ?? 1
 
   const recentLogs = logsData?.items.slice(0, 5) ?? []
   const urgentTasks = (tasksData?.items ?? [])
@@ -308,6 +347,85 @@ export default function DashboardPage() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Daily worklog bar chart */}
+      {canSeeTeamData && (!isHidden('daily_worklog') || editMode) && (
+        <div className={`bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-5 ${isHidden('daily_worklog') ? 'opacity-40' : ''}`}>
+          <div className="flex items-center gap-3 mb-4 flex-wrap">
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <Users className="h-4 w-4 text-blue-500 flex-shrink-0" />
+              <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                {t('dashboard.daily_worklog_title')}
+              </h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                max={today}
+                className="text-sm border border-gray-300 dark:border-gray-700 rounded-lg px-2 py-1 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              {editMode && (
+                <button onClick={() => toggleWidget('daily_worklog')} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-800">
+                  {isHidden('daily_worklog') ? <Eye className="h-4 w-4 text-gray-400" /> : <EyeOff className="h-4 w-4 text-gray-400" />}
+                </button>
+              )}
+            </div>
+          </div>
+          {dailyPersonData.length === 0 ? (
+            <p className="text-sm text-gray-400 py-4 text-center">{t('dashboard.daily_worklog_no_data')}</p>
+          ) : (
+            <div className="space-y-3">
+              {dailyPersonData.map((person) => (
+                <div key={person.userId}>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-full bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs font-semibold text-primary-700 dark:text-primary-300">
+                          {person.name.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <span className={`text-sm truncate max-w-[150px] ${person.hours === 0 ? 'text-gray-400 dark:text-gray-600' : 'text-gray-700 dark:text-gray-300'}`}>
+                        {person.name}
+                      </span>
+                    </div>
+                    <span className={`text-sm font-medium ml-2 flex-shrink-0 ${person.hours === 0 ? 'text-gray-400 dark:text-gray-600' : 'text-gray-900 dark:text-white'}`}>
+                      {person.hours > 0 ? `${person.hours.toFixed(1)}${hourAbbr}` : t('dashboard.daily_worklog_no_record')}
+                    </span>
+                  </div>
+                  <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                    {person.hours > 0 && (
+                      <div
+                        className="h-full flex overflow-hidden transition-all duration-500"
+                        style={{ width: `${(person.hours / maxDailyHours) * 100}%` }}
+                      >
+                        {person.workTypes.map((wt) => (
+                          <div
+                            key={wt.name}
+                            style={{ width: `${(wt.hours / person.hours) * 100}%`, backgroundColor: wt.color }}
+                            title={`${resolveName(t, wt.name, wt.name_key)}: ${wt.hours.toFixed(1)}${hourAbbr}`}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {person.hours > 0 && (
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
+                      {person.workTypes.map((wt) => (
+                        <span key={wt.name} className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: wt.color }} />
+                          {resolveName(t, wt.name, wt.name_key)} {wt.hours.toFixed(1)}{hourAbbr}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </div>

@@ -94,7 +94,11 @@
     "health_redis": "Redis",
     "health_worker": "Celery Worker",
     "health_uptime": "Çalışma Süresi",
-    "widget_health_check": "Sistem Sağlığı"
+    "widget_health_check": "Sistem Sağlığı",
+    "daily_worklog_title": "Günlük İş Günlüğü",
+    "daily_worklog_no_data": "Seçilen gün için kullanıcı bulunamadı.",
+    "daily_worklog_no_record": "Kayıt yok",
+    "widget_daily_worklog": "Günlük İş Günlüğü"
   },
   "worklog": {
     "title": "İş Günlüğü",
