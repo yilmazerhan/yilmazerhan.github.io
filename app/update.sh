@@ -9,7 +9,9 @@ echo "==> Kod güncelleniyor..."
 git -C "$(dirname "$0")/.." pull
 
 echo "==> Production image'lar derleniyor (cache bypass)..."
-$COMPOSE build --no-cache backend frontend
+# backend, celery_worker ve celery_beat aynı Dockerfile'ı kullanır;
+# üçünü de build etmek gerekir yoksa celery image'ları güncellenmez.
+$COMPOSE build --no-cache backend celery_worker celery_beat frontend
 
 echo "==> Servisler yeniden başlatılıyor..."
 $COMPOSE up -d
