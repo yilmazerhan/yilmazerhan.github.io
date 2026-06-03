@@ -142,17 +142,16 @@ export default function PatchesPage() {
 
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[1100px]">
+          <table className="w-full text-sm min-w-[1000px]">
             <thead>
               <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
                 <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('patches.apply_date')}</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('patches.customers')}</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('patches.patch_name')}</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('patches.patch_files')}</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('patches.jira_ticket')}</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('patches.app_version')}</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('patches.environment')}</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('patches.status')}</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('patches.md5sum')}</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('patches.description')}</th>
                 <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('patches.created_by')}</th>
                 <th className="text-right px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('common.actions')}</th>
@@ -161,15 +160,16 @@ export default function PatchesPage() {
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={11} className="text-center py-8 text-gray-400">{t('common.loading')}</td>
+                  <td colSpan={10} className="text-center py-8 text-gray-400">{t('common.loading')}</td>
                 </tr>
               ) : data?.items.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="text-center py-8 text-gray-400">{t('patches.no_records')}</td>
+                  <td colSpan={10} className="text-center py-8 text-gray-400">{t('patches.no_records')}</td>
                 </tr>
               ) : data?.items.map((patch) => {
                 const canModify = canModifyPatch(patch, user?.id || '', user?.role || '')
                 const isJiraLink = patch.jira_ticket && JIRA_PATTERN.test(patch.jira_ticket)
+                const files = patch.patch_files ?? []
 
                 return (
                   <tr key={patch.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30">
@@ -185,8 +185,27 @@ export default function PatchesPage() {
                         ))}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-gray-700 dark:text-gray-300 max-w-[180px] truncate" title={patch.patch_name || ''}>
-                      {patch.patch_name || <span className="text-gray-300 dark:text-gray-700">—</span>}
+                    <td className="px-4 py-3 max-w-[220px]">
+                      {files.length === 0 ? (
+                        <span className="text-gray-300 dark:text-gray-700">—</span>
+                      ) : (
+                        <div className="space-y-1">
+                          {files.map((f, i) => (
+                            <div key={i} className="flex flex-col gap-0.5">
+                              {f.patch_name && (
+                                <span className="text-xs text-gray-700 dark:text-gray-300 truncate" title={f.patch_name}>
+                                  {f.patch_name}
+                                </span>
+                              )}
+                              {f.md5sum && (
+                                <code className="text-xs font-mono text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded w-fit" title={f.md5sum}>
+                                  {f.md5sum.length > 12 ? `${f.md5sum.slice(0, 12)}…` : f.md5sum}
+                                </code>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {patch.jira_ticket ? (
@@ -217,15 +236,6 @@ export default function PatchesPage() {
                       <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusBadgeClass(patch.status)}`}>
                         {t(`patches.status_${patch.status}`)}
                       </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {patch.md5sum ? (
-                        <code className="text-xs font-mono text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded" title={patch.md5sum}>
-                          {patch.md5sum.length > 12 ? `${patch.md5sum.slice(0, 12)}…` : patch.md5sum}
-                        </code>
-                      ) : (
-                        <span className="text-gray-300 dark:text-gray-700">—</span>
-                      )}
                     </td>
                     <td className="px-4 py-3 text-gray-600 dark:text-gray-400 max-w-xs truncate" title={patch.description || ''}>
                       {patch.description || <span className="text-gray-300 dark:text-gray-700">—</span>}

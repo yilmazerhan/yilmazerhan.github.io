@@ -943,6 +943,8 @@
     "customer_not_found": "Customer not found. Click to add.",
     "customer_list_empty": "No customers added yet.",
     "customer_required": "At least one customer must be selected.",
+    "patch_files": "Patch Files",
+    "patch_file_add": "Add file",
     "patch_name": "Patch Name",
     "patch_name_placeholder": "e.g. http-proxy.jar",
     "md5sum": "MD5 Checksum",

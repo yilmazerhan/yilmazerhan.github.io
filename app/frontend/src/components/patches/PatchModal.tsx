@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
-import { X, Plus, ChevronDown } from 'lucide-react'
+import { X, Plus, ChevronDown, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { useTranslation } from 'react-i18next'
 import {
   useCreatePatch, useUpdatePatch, useCustomers, useCreateCustomer,
-  type CustomerPatch, type PatchCreate, type PatchUpdate,
+  type CustomerPatch, type PatchFile, type PatchCreate, type PatchUpdate,
 } from '@/api/patches'
 
 interface Props {
@@ -33,7 +33,6 @@ function CustomerPicker({ selected, onChange }: CustomerPickerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
@@ -79,7 +78,6 @@ function CustomerPicker({ selected, onChange }: CustomerPickerProps) {
 
   return (
     <div ref={containerRef} className="relative">
-      {/* Selected chips */}
       {selected.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2">
           {selected.map((name) => (
@@ -100,7 +98,6 @@ function CustomerPicker({ selected, onChange }: CustomerPickerProps) {
         </div>
       )}
 
-      {/* Input + toggle */}
       <div
         className="flex items-center gap-1 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 cursor-text"
         onClick={() => { setOpen(true); inputRef.current?.focus() }}
@@ -117,7 +114,6 @@ function CustomerPicker({ selected, onChange }: CustomerPickerProps) {
         <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
       </div>
 
-      {/* Dropdown */}
       {open && (
         <div className="absolute z-50 mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-lg max-h-52 overflow-y-auto">
           {filtered.length === 0 && !showAddNew && (
@@ -158,6 +154,72 @@ function CustomerPicker({ selected, onChange }: CustomerPickerProps) {
   )
 }
 
+// ─── Patch Files dynamic list ─────────────────────────────────────────────────
+
+interface PatchFilesEditorProps {
+  value: PatchFile[]
+  onChange: (v: PatchFile[]) => void
+}
+
+function PatchFilesEditor({ value, onChange }: PatchFilesEditorProps) {
+  const { t } = useTranslation()
+
+  function addRow() {
+    onChange([...value, { patch_name: '', md5sum: '' }])
+  }
+
+  function removeRow(idx: number) {
+    onChange(value.filter((_, i) => i !== idx))
+  }
+
+  function updateRow(idx: number, field: keyof PatchFile, v: string) {
+    onChange(value.map((row, i) => i === idx ? { ...row, [field]: v } : row))
+  }
+
+  return (
+    <div className="space-y-2">
+      {value.map((row, idx) => (
+        <div key={idx} className="flex gap-2 items-start">
+          <div className="flex-1">
+            <input
+              type="text"
+              value={row.patch_name}
+              onChange={(e) => updateRow(idx, 'patch_name', e.target.value)}
+              placeholder={t('patches.patch_name_placeholder')}
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+          <div className="flex-1">
+            <input
+              type="text"
+              value={row.md5sum}
+              onChange={(e) => updateRow(idx, 'md5sum', e.target.value)}
+              placeholder={t('patches.md5sum_placeholder')}
+              maxLength={64}
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white font-mono focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => removeRow(idx)}
+            className="mt-1 p-1.5 text-gray-400 hover:text-red-600 dark:hover:text-red-400 rounded"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={addRow}
+        className="flex items-center gap-1.5 text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
+      >
+        <Plus className="h-4 w-4" />
+        {t('patches.patch_file_add')}
+      </button>
+    </div>
+  )
+}
+
 // ─── Patch modal ──────────────────────────────────────────────────────────────
 
 export default function PatchModal({ patch, onClose }: Props) {
@@ -167,13 +229,12 @@ export default function PatchModal({ patch, onClose }: Props) {
   const today = format(new Date(), 'yyyy-MM-dd')
 
   const [customers, setCustomers] = useState<string[]>(patch?.customers ?? [])
-  const [patchName, setPatchName] = useState(patch?.patch_name || '')
+  const [patchFiles, setPatchFiles] = useState<PatchFile[]>(patch?.patch_files ?? [])
   const [appVersion, setAppVersion] = useState(patch?.app_version || '')
   const [jiraTicket, setJiraTicket] = useState(patch?.jira_ticket || '')
   const [applyDate, setApplyDate] = useState(patch?.apply_date || today)
   const [environment, setEnvironment] = useState(patch?.environment || '')
   const [status, setStatus] = useState(patch?.status || 'planned')
-  const [md5sum, setMd5sum] = useState(patch?.md5sum || '')
   const [description, setDescription] = useState(patch?.description || '')
   const [error, setError] = useState('')
 
@@ -190,31 +251,31 @@ export default function PatchModal({ patch, onClose }: Props) {
       return
     }
 
+    const cleanedFiles = patchFiles.filter((f) => f.patch_name.trim() || f.md5sum.trim())
+
     try {
       if (isEdit) {
         const data: PatchUpdate = {
           customers,
-          patch_name: patchName.trim() || null,
+          patch_files: cleanedFiles,
           app_version: appVersion.trim(),
           jira_ticket: jiraTicket.trim() || null,
           apply_date: applyDate,
           environment: environment.trim() || null,
           status,
-          md5sum: md5sum.trim() || null,
           description: description.trim() || null,
         }
         await updatePatch.mutateAsync(data)
       } else {
         const data: PatchCreate = {
           customers,
+          patch_files: cleanedFiles,
           app_version: appVersion.trim(),
           apply_date: applyDate,
           status,
         }
-        if (patchName.trim()) data.patch_name = patchName.trim()
         if (jiraTicket.trim()) data.jira_ticket = jiraTicket.trim()
         if (environment.trim()) data.environment = environment.trim()
-        if (md5sum.trim()) data.md5sum = md5sum.trim()
         if (description.trim()) data.description = description.trim()
         await createPatch.mutateAsync(data)
       }
@@ -230,7 +291,7 @@ export default function PatchModal({ patch, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-lg shadow-xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-2xl shadow-xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white dark:bg-gray-900 z-10">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
             {isEdit ? t('patches.edit') : t('patches.add')}
@@ -255,16 +316,17 @@ export default function PatchModal({ patch, onClose }: Props) {
             <CustomerPicker selected={customers} onChange={setCustomers} />
           </div>
 
-          {/* Patch name */}
+          {/* Patch files — dynamic list of {patch_name, md5sum} */}
           <div>
-            <label className={labelCls}>{t('patches.patch_name')}</label>
-            <input
-              type="text"
-              value={patchName}
-              onChange={(e) => setPatchName(e.target.value)}
-              placeholder={t('patches.patch_name_placeholder')}
-              className={inputCls}
-            />
+            <div className="flex items-center justify-between mb-2">
+              <label className={labelCls + ' mb-0'}>{t('patches.patch_files')}</label>
+              <div className="grid grid-cols-2 gap-2 flex-1 ml-4">
+                <span className="text-xs text-gray-400 dark:text-gray-500">{t('patches.patch_name')}</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500">{t('patches.md5sum')}</span>
+              </div>
+              <div className="w-8" />
+            </div>
+            <PatchFilesEditor value={patchFiles} onChange={setPatchFiles} />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -338,19 +400,6 @@ export default function PatchModal({ patch, onClose }: Props) {
                 <option key={e} value={e} />
               ))}
             </datalist>
-          </div>
-
-          {/* MD5 checksum */}
-          <div>
-            <label className={labelCls}>{t('patches.md5sum')}</label>
-            <input
-              type="text"
-              value={md5sum}
-              onChange={(e) => setMd5sum(e.target.value)}
-              placeholder={t('patches.md5sum_placeholder')}
-              className={`${inputCls} font-mono text-xs`}
-              maxLength={64}
-            />
           </div>
 
           <div>

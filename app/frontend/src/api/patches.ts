@@ -13,16 +13,20 @@ export interface PatchUser {
   full_name: string
 }
 
+export interface PatchFile {
+  patch_name: string
+  md5sum: string
+}
+
 export interface CustomerPatch {
   id: string
   customers: string[]
-  patch_name: string | null
+  patch_files: PatchFile[]
   jira_ticket: string | null
   app_version: string
   apply_date: string
   environment: string | null
   status: string
-  md5sum: string | null
   description: string | null
   created_by: string | null
   created_by_user: PatchUser | null
@@ -39,25 +43,23 @@ export interface PatchListResponse {
 
 export interface PatchCreate {
   customers: string[]
-  patch_name?: string
+  patch_files?: PatchFile[]
   jira_ticket?: string
   app_version: string
   apply_date: string
   environment?: string
   status?: string
-  md5sum?: string
   description?: string
 }
 
 export interface PatchUpdate {
   customers?: string[]
-  patch_name?: string | null
+  patch_files?: PatchFile[]
   jira_ticket?: string | null
   app_version?: string
   apply_date?: string
   environment?: string | null
   status?: string
-  md5sum?: string | null
   description?: string | null
 }
 

@@ -54,12 +54,10 @@ class PatchService:
             pattern = f"%{search}%"
             q = q.where(
                 or_(
-                    # Cast JSONB array to text for customer name search
                     cast(CustomerPatch.customers, Text).ilike(pattern),
-                    CustomerPatch.patch_name.ilike(pattern),
+                    cast(CustomerPatch.patch_files, Text).ilike(pattern),
                     CustomerPatch.jira_ticket.ilike(pattern),
                     CustomerPatch.app_version.ilike(pattern),
-                    CustomerPatch.md5sum.ilike(pattern),
                     CustomerPatch.description.ilike(pattern),
                 )
             )
@@ -82,13 +80,12 @@ class PatchService:
     async def create_patch(self, data: PatchCreate, created_by_id: uuid.UUID) -> CustomerPatch:
         patch = CustomerPatch(
             customers=data.customers,
-            patch_name=data.patch_name,
+            patch_files=[pf.model_dump() for pf in data.patch_files],
             jira_ticket=data.jira_ticket,
             app_version=data.app_version,
             apply_date=data.apply_date,
             environment=data.environment,
             status=data.status,
-            md5sum=data.md5sum,
             description=data.description,
             created_by=created_by_id,
         )

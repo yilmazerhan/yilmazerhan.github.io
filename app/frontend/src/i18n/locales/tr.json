@@ -943,6 +943,8 @@
     "customer_not_found": "Müşteri bulunamadı. Eklemek için tıklayın.",
     "customer_list_empty": "Henüz müşteri eklenmemiş.",
     "customer_required": "En az bir müşteri seçilmelidir.",
+    "patch_files": "Yama Dosyaları",
+    "patch_file_add": "Dosya ekle",
     "patch_name": "Yama Adı",
     "patch_name_placeholder": "örn. http-proxy.jar",
     "md5sum": "MD5 Checksum",

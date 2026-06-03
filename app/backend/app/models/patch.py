@@ -21,13 +21,12 @@ class CustomerPatch(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     customers: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
-    patch_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    patch_files: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     jira_ticket: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
     app_version: Mapped[str] = mapped_column(String(100), nullable=False)
     apply_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     environment: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="applied", index=True)
-    md5sum: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_by: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
