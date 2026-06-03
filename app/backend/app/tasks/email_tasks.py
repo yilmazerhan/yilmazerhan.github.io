@@ -15,14 +15,6 @@ from app.tasks.celery_app import celery_app
 logger = logging.getLogger(__name__)
 
 
-def _run_async(coro):
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
-
-
 async def send_auth_email_direct(
     template_slug: str,
     to_email: str,
@@ -134,16 +126,18 @@ def send_email_task(
     log_id: Optional[str] = None,
 ):
     try:
-        _run_async(_send_email_async(to_email, subject, html_body, log_id))
+        asyncio.run(_send_email_async(to_email, subject, html_body, log_id))
     except Exception as exc:
         raise self.retry(exc=exc)
 
 
 async def _send_email_async(to_email: str, subject: str, html_body: str, log_id: Optional[str]):
-    from app.database import AsyncSessionLocal
+    from app.database import engine, AsyncSessionLocal
     from app.services.email_service import EmailService
     from app.core.security import decrypt_field
     from app.config import settings
+    # Discard pool connections from the previous event loop before acquiring new ones.
+    await engine.dispose()
 
     async with AsyncSessionLocal() as db:
         svc = EmailService(db)
@@ -219,7 +213,7 @@ async def _mark_log_failed(db, log_id: str, error: str):
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=30)
 def send_activation_email_task(self, to_email: str, full_name: str, activation_token: str):
     try:
-        _run_async(_send_auth_email_async(
+        asyncio.run(_send_auth_email_async(
             to_email=to_email,
             template_slug="account_activation",
             variables={
@@ -235,7 +229,7 @@ def send_activation_email_task(self, to_email: str, full_name: str, activation_t
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=30)
 def send_new_account_email_task(self, to_email: str, full_name: str, username: str, temp_password: str):
     try:
-        _run_async(_send_auth_email_async(
+        asyncio.run(_send_auth_email_async(
             to_email=to_email,
             template_slug="new_account",
             variables={
@@ -252,7 +246,7 @@ def send_new_account_email_task(self, to_email: str, full_name: str, username: s
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=30)
 def send_password_reset_email_task(self, to_email: str, full_name: str, reset_token: str):
     try:
-        _run_async(_send_auth_email_async(
+        asyncio.run(_send_auth_email_async(
             to_email=to_email,
             template_slug="password_reset",
             variables={
@@ -276,11 +270,13 @@ def _get_setting(attr: str, default):
 
 
 async def _send_auth_email_async(to_email: str, template_slug: str, variables: dict):
-    from app.database import AsyncSessionLocal
+    from app.database import engine, AsyncSessionLocal
     from app.services.email_service import EmailService
     from app.models.app_setting import AppSetting
     from app.config import settings
     from sqlalchemy import select
+    # Discard pool connections from the previous event loop before acquiring new ones.
+    await engine.dispose()
 
     async with AsyncSessionLocal() as db:
         svc = EmailService(db)
@@ -319,15 +315,17 @@ def send_teams_message_task(
     action_url: Optional[str] = None,
 ):
     try:
-        _run_async(_send_teams_async(webhook_id, title, body, action_url))
+        asyncio.run(_send_teams_async(webhook_id, title, body, action_url))
     except Exception as exc:
         raise self.retry(exc=exc)
 
 
 async def _send_teams_async(webhook_id: str, title: str, body: str, action_url: Optional[str]):
     import uuid
-    from app.database import AsyncSessionLocal
+    from app.database import engine, AsyncSessionLocal
     from app.services.teams_service import TeamsService
+    # Discard pool connections from the previous event loop before acquiring new ones.
+    await engine.dispose()
     async with AsyncSessionLocal() as db:
         svc = TeamsService(db)
         await svc.send_message(uuid.UUID(webhook_id), title, body, action_url)
@@ -336,7 +334,7 @@ async def _send_teams_async(webhook_id: str, title: str, body: str, action_url: 
 
 @celery_app.task
 def evaluate_scheduled_workflows():
-    _run_async(_evaluate_workflows_async())
+    asyncio.run(_evaluate_workflows_async())
 
 
 def _workflow_tz(wf):
@@ -351,9 +349,11 @@ def _workflow_tz(wf):
 
 async def _evaluate_workflows_async():
     from zoneinfo import ZoneInfo
-    from app.database import AsyncSessionLocal
+    from app.database import engine, AsyncSessionLocal
     from sqlalchemy import select
     from app.models.email_workflow import EmailWorkflow
+    # Discard pool connections from the previous event loop before acquiring new ones.
+    await engine.dispose()
 
     _ISTANBUL = ZoneInfo("Europe/Istanbul")
 
@@ -643,12 +643,14 @@ async def _handle_dashboard_report(db, workflow, today: date):
 
 @celery_app.task
 def refresh_jira_statuses():
-    _run_async(_refresh_jira_async())
+    asyncio.run(_refresh_jira_async())
 
 
 async def _refresh_jira_async():
-    from app.database import AsyncSessionLocal
+    from app.database import engine, AsyncSessionLocal
     from app.services.jira_service import JiraService
+    # Discard pool connections from the previous event loop before acquiring new ones.
+    await engine.dispose()
     async with AsyncSessionLocal() as db:
         svc = JiraService(db)
         await svc.bulk_refresh_jira_statuses()
@@ -657,17 +659,19 @@ async def _refresh_jira_async():
 
 @celery_app.task(name="app.tasks.email_tasks.send_worklog_reminders")
 def send_worklog_reminders():
-    _run_async(_send_worklog_reminders_async())
+    asyncio.run(_send_worklog_reminders_async())
 
 
 async def _send_worklog_reminders_async():
     from datetime import date, datetime, timezone
     from sqlalchemy import select, func
-    from app.database import AsyncSessionLocal
+    from app.database import engine, AsyncSessionLocal
     from app.models.user import User
     from app.models.worklog import WorkLog
     from app.models.email_log import EmailLog
     from app.services.email_service import EmailService
+    # Discard pool connections from the previous event loop before acquiring new ones.
+    await engine.dispose()
 
     today = date.today()
     if today.weekday() >= 5:  # Saturday=5, Sunday=6
