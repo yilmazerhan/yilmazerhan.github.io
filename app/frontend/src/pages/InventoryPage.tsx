@@ -30,7 +30,7 @@ import {
   type GroupType,
 } from '@/api/inventory'
 import { useAuthStore } from '@/store/authStore'
-import { useEffectivePermissions } from '@/api/users'
+import { useMyEffectivePermissions } from '@/api/users'
 
 // ─── Type badge helpers ────────────────────────────────────────────────────────
 
@@ -736,7 +736,7 @@ function GroupModal({ group, onClose }: GroupModalProps) {
 export default function InventoryPage() {
   const { t } = useTranslation()
   const currentUser = useAuthStore((s) => s.user)
-  const { data: effectivePerms } = useEffectivePermissions(currentUser?.id ?? '', !!currentUser?.id)
+  const { data: effectivePerms } = useMyEffectivePermissions()
   const invPerms = effectivePerms?.permissions?.inventory
 
   const [search, setSearch] = useState('')

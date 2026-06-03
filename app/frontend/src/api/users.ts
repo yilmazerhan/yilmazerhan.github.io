@@ -154,6 +154,14 @@ export function useEffectivePermissions(userId: string, enabled = true) {
   })
 }
 
+export function useMyEffectivePermissions() {
+  return useQuery({
+    queryKey: [...userKeys.all, 'myEffectivePermissions'] as const,
+    queryFn: () =>
+      apiClient.get<EffectivePermissions>('/permissions/effective/me').then((r) => r.data),
+  })
+}
+
 export function useChangeOwnPassword() {
   return useMutation({
     mutationFn: (data: { old_password: string; new_password: string }) =>
