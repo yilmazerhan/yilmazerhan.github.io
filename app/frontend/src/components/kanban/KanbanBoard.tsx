@@ -10,6 +10,7 @@ import {
   type DragEndEvent,
   closestCorners,
 } from '@dnd-kit/core'
+import { arrayMove } from '@dnd-kit/sortable'
 import { useTranslation } from 'react-i18next'
 import { useColumns, useTasks, useMoveTask, type Task, type KanbanColumn } from '@/api/kanban'
 import KanbanColumnComp from './KanbanColumn'
@@ -94,13 +95,37 @@ export default function KanbanBoard({ taskParams, columns: columnsProp, selectio
     const overCol = sortedColumns.find((c) => c.id === overId)
     const targetColumnId = overTask ? overTask.column_id : overCol?.id
 
-    if (!targetColumnId || dragged.column_id === targetColumnId) return
+    if (!targetColumnId) return
 
-    const updated = current.map((t) =>
-      t.id === activeId ? { ...t, column_id: targetColumnId } : t
-    )
-    localTasksRef.current = updated
-    setLocalTasksSnapshot(updated)
+    if (dragged.column_id === targetColumnId) {
+      // Same-column reorder — only act when hovering over another task
+      if (!overTask) return
+
+      const colTasks = current
+        .filter((t) => t.column_id === targetColumnId && !t.is_archived)
+        .sort((a, b) => a.sort_order - b.sort_order)
+
+      const oldIndex = colTasks.findIndex((t) => t.id === activeId)
+      const newIndex = colTasks.findIndex((t) => t.id === overId)
+      if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return
+
+      const reordered = arrayMove(colTasks, oldIndex, newIndex).map((t, i) => ({
+        ...t,
+        sort_order: i + 1,
+      }))
+
+      const colTaskIds = new Set(colTasks.map((t) => t.id))
+      const updated = [...current.filter((t) => !colTaskIds.has(t.id)), ...reordered]
+      localTasksRef.current = updated
+      setLocalTasksSnapshot(updated)
+    } else {
+      // Cross-column move
+      const updated = current.map((t) =>
+        t.id === activeId ? { ...t, column_id: targetColumnId } : t
+      )
+      localTasksRef.current = updated
+      setLocalTasksSnapshot(updated)
+    }
   }
 
   async function onDragEnd(event: DragEndEvent) {
@@ -122,23 +147,33 @@ export default function KanbanBoard({ taskParams, columns: columnsProp, selectio
     const draggedTask = localTasks.find((t) => t.id === activeId)
     if (!draggedTask) return
 
-    const overTask = localTasks.find((t) => t.id === overId)
-    const overCol = sortedColumns.find((c) => c.id === overId)
-    const targetColumnId = overTask ? overTask.column_id : overCol?.id ?? draggedTask.column_id
+    const targetColumnId = draggedTask.column_id  // already updated by onDragOver for cross-column
+    const isSameColumn = dragSourceColumnId === targetColumnId
 
     const sourceColumn = sortedColumns.find((c) => c.id === dragSourceColumnId)
     const targetColumn = sortedColumns.find((c) => c.id === targetColumnId)
 
-    const colTasks = localTasks
-      .filter((t) => t.column_id === targetColumnId && !t.is_archived)
-      .sort((a, b) => a.sort_order - b.sort_order)
-
     let newSortOrder: number
-    if (overTask && overTask.column_id === targetColumnId) {
-      const overIndex = colTasks.findIndex((t) => t.id === overId)
-      newSortOrder = overIndex + 1
+
+    if (isSameColumn) {
+      // onDragOver already reordered tasks with sort_order 1,2,3…
+      const colTasks = localTasks
+        .filter((t) => t.column_id === targetColumnId && !t.is_archived)
+        .sort((a, b) => a.sort_order - b.sort_order)
+      const finalIndex = colTasks.findIndex((t) => t.id === activeId)
+      newSortOrder = finalIndex >= 0 ? finalIndex + 1 : colTasks.length + 1
     } else {
-      newSortOrder = colTasks.length + 1
+      // Cross-column: use drop target to determine position in new column
+      const overTask = localTasks.find((t) => t.id === overId)
+      const colTasks = localTasks
+        .filter((t) => t.column_id === targetColumnId && t.id !== activeId && !t.is_archived)
+        .sort((a, b) => a.sort_order - b.sort_order)
+      if (overTask && overTask.column_id === targetColumnId) {
+        const overIndex = colTasks.findIndex((t) => t.id === overId)
+        newSortOrder = overIndex + 1
+      } else {
+        newSortOrder = colTasks.length + 1
+      }
     }
 
     try {

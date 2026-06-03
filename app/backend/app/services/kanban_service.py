@@ -652,7 +652,60 @@ class KanbanService:
         if not col.scalar_one_or_none():
             raise NotFoundError("Sütun")
 
+        old_column_id = task.column_id
+        old_sort_order = task.sort_order
         old_col_name = task.column.name if task.column else str(task.column_id)
+
+        if old_column_id == column_id:
+            # Same-column reorder: shift tasks between old and new positions
+            if old_sort_order < sort_order:
+                # Moving down: tasks in (old, new] shift up by -1
+                await self.db.execute(
+                    sa_update(Task)
+                    .where(
+                        Task.column_id == column_id,
+                        Task.id != task_id,
+                        Task.is_archived == False,
+                        Task.sort_order > old_sort_order,
+                        Task.sort_order <= sort_order,
+                    )
+                    .values(sort_order=Task.sort_order - 1)
+                )
+            elif old_sort_order > sort_order:
+                # Moving up: tasks in [new, old) shift down by +1
+                await self.db.execute(
+                    sa_update(Task)
+                    .where(
+                        Task.column_id == column_id,
+                        Task.id != task_id,
+                        Task.is_archived == False,
+                        Task.sort_order >= sort_order,
+                        Task.sort_order < old_sort_order,
+                    )
+                    .values(sort_order=Task.sort_order + 1)
+                )
+        else:
+            # Cross-column: close gap in old column, make room in new column
+            await self.db.execute(
+                sa_update(Task)
+                .where(
+                    Task.column_id == old_column_id,
+                    Task.id != task_id,
+                    Task.is_archived == False,
+                    Task.sort_order > old_sort_order,
+                )
+                .values(sort_order=Task.sort_order - 1)
+            )
+            await self.db.execute(
+                sa_update(Task)
+                .where(
+                    Task.column_id == column_id,
+                    Task.is_archived == False,
+                    Task.sort_order >= sort_order,
+                )
+                .values(sort_order=Task.sort_order + 1)
+            )
+
         task.column_id = column_id
         task.sort_order = sort_order
         await self.db.flush()
