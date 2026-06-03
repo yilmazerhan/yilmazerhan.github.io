@@ -290,6 +290,7 @@
     "module_email_workflows": "Email Workflow",
     "module_jira_config": "Jira Yapılandırması",
     "module_ssl_management": "SSL Yönetimi",
+    "module_inventory": "Envanter",
     "module_branding": "Marka Ayarları",
     "action_view": "Görüntüle",
     "action_create": "Oluştur",
