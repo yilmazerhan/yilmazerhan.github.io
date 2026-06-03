@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useCallback } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -8,7 +8,10 @@ import {
   type DragStartEvent,
   type DragOverEvent,
   type DragEndEvent,
-  closestCorners,
+  pointerWithin,
+  closestCenter,
+  getFirstCollision,
+  type CollisionDetection,
 } from '@dnd-kit/core'
 import { arrayMove } from '@dnd-kit/sortable'
 import { useTranslation } from 'react-i18next'
@@ -66,6 +69,44 @@ export default function KanbanBoard({ taskParams, columns: columnsProp, selectio
     }
     return map
   }, [tasks, sortedColumns])
+
+  // Custom collision detection: prefer task cards over column containers so
+  // same-column reordering works correctly. pointerWithin finds the exact
+  // element under the cursor; closestCenter is used as fallback.
+  const collisionDetection = useCallback<CollisionDetection>(
+    (args) => {
+      const colIds = new Set(sortedColumns.map((c) => c.id))
+
+      // 1. Pointer-within: find the precise draggable under the cursor
+      const withinHits = pointerWithin(args)
+
+      // Prefer task cards (filter out column droppables)
+      const taskHits = withinHits.filter(({ id }) => !colIds.has(String(id)))
+      if (taskHits.length > 0) return taskHits
+
+      // 2. Pointer is over a column container area (empty space / column bg)
+      const firstColHit = getFirstCollision(withinHits, 'id')
+      if (firstColHit != null) {
+        const colId = String(firstColHit)
+        const colTaskIds = (tasksByColumn[colId] ?? []).map((t) => t.id)
+        if (colTaskIds.length > 0) {
+          // Snap to the closest task inside that column
+          return closestCenter({
+            ...args,
+            droppableContainers: args.droppableContainers.filter(({ id }) =>
+              colTaskIds.includes(String(id))
+            ),
+          })
+        }
+        // Empty column — accept the column itself
+        return withinHits
+      }
+
+      // 3. Fallback
+      return closestCenter(args)
+    },
+    [sortedColumns, tasksByColumn]
+  )
 
   function onDragStart(event: DragStartEvent) {
     if (event.active.data.current?.type === 'Task') {
@@ -198,7 +239,7 @@ export default function KanbanBoard({ taskParams, columns: columnsProp, selectio
     <>
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCorners}
+        collisionDetection={collisionDetection}
         onDragStart={onDragStart}
         onDragOver={onDragOver}
         onDragEnd={onDragEnd}
