@@ -8,6 +8,9 @@ import UserFormModal from '@/components/users/UserFormModal'
 import PermissionMatrixModal from '@/components/users/PermissionMatrixModal'
 import BulkPermissionModal from '@/components/users/BulkPermissionModal'
 import SetPasswordModal from '@/components/users/SetPasswordModal'
+import { Pagination } from '@/components/ui/Pagination'
+
+const LIMIT = 50
 
 export default function UsersPage() {
   const { t } = useTranslation()
@@ -15,6 +18,7 @@ export default function UsersPage() {
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
   const [showDeleted, setShowDeleted] = useState(false)
+  const [page, setPage] = useState(0)
   const [createOpen, setCreateOpen] = useState(false)
   const [editUser, setEditUser] = useState<User | null>(null)
   const [permUser, setPermUser] = useState<User | null>(null)
@@ -27,6 +31,8 @@ export default function UsersPage() {
     search: search || undefined,
     role: roleFilter || undefined,
     include_deleted: isSuperAdmin && showDeleted ? true : undefined,
+    skip: page * LIMIT,
+    limit: LIMIT,
   })
   const deleteUser = useDeleteUser()
   const restoreUser = useRestoreUser()
@@ -102,13 +108,13 @@ export default function UsersPage() {
             type="text"
             placeholder={t('common.search')}
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(0) }}
             className="w-full pl-9 pr-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
         <select
           value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
+          onChange={(e) => { setRoleFilter(e.target.value); setPage(0) }}
           className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
         >
           <option value="">{t('users.role')} — {t('users.role_all')}</option>
@@ -121,7 +127,7 @@ export default function UsersPage() {
         {isSuperAdmin && (
           <label className="flex items-center gap-2 cursor-pointer select-none">
             <div
-              onClick={() => setShowDeleted(!showDeleted)}
+              onClick={() => { setShowDeleted(!showDeleted); setPage(0) }}
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
                 showDeleted ? 'bg-red-500' : 'bg-gray-300 dark:bg-gray-600'
               }`}
@@ -288,6 +294,8 @@ export default function UsersPage() {
           </div>
         )}
       </div>
+
+      {data && <Pagination page={page} limit={LIMIT} total={data.total} onPageChange={setPage} />}
 
       {/* Modals */}
       {createOpen && <UserFormModal onClose={() => setCreateOpen(false)} />}

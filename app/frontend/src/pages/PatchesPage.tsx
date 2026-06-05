@@ -6,6 +6,9 @@ import { usePatches, useDeletePatch, type CustomerPatch } from '@/api/patches'
 import { useAuthStore } from '@/store/authStore'
 import PatchModal from '@/components/patches/PatchModal'
 import { JiraTicketLink } from '@/components/JiraTicketLink'
+import { Pagination } from '@/components/ui/Pagination'
+
+const LIMIT = 50
 
 const STATUS_OPTIONS = ['planned', 'applied', 'failed', 'rolled_back'] as const
 const ENV_OPTIONS = ['production', 'staging', 'test', 'dev'] as const
@@ -41,6 +44,7 @@ export default function PatchesPage() {
   const [dateTo, setDateTo] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
   const [editPatch, setEditPatch] = useState<CustomerPatch | null>(null)
+  const [page, setPage] = useState(0)
 
   const { data, isLoading } = usePatches({
     search: search || undefined,
@@ -48,8 +52,11 @@ export default function PatchesPage() {
     environment: envFilter || undefined,
     date_from: dateFrom || undefined,
     date_to: dateTo || undefined,
-    limit: 200,
+    skip: page * LIMIT,
+    limit: LIMIT,
   })
+
+  function resetPage() { setPage(0) }
 
   const deletePatch = useDeletePatch()
 
@@ -81,7 +88,7 @@ export default function PatchesPage() {
           <input
             type="text"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); resetPage() }}
             placeholder={t('patches.search_placeholder')}
             className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 w-64"
           />
@@ -90,7 +97,7 @@ export default function PatchesPage() {
           <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('patches.status')}</label>
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => { setStatusFilter(e.target.value); resetPage() }}
             className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
             <option value="">{t('patches.filter_all_status')}</option>
@@ -103,7 +110,7 @@ export default function PatchesPage() {
           <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('patches.environment')}</label>
           <select
             value={envFilter}
-            onChange={(e) => setEnvFilter(e.target.value)}
+            onChange={(e) => { setEnvFilter(e.target.value); resetPage() }}
             className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
             <option value="">{t('patches.filter_all_env')}</option>
@@ -117,7 +124,7 @@ export default function PatchesPage() {
           <input
             type="date"
             value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
+            onChange={(e) => { setDateFrom(e.target.value); resetPage() }}
             className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
@@ -126,7 +133,7 @@ export default function PatchesPage() {
           <input
             type="date"
             value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
+            onChange={(e) => { setDateTo(e.target.value); resetPage() }}
             className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
@@ -254,6 +261,8 @@ export default function PatchesPage() {
           </table>
         </div>
       </div>
+
+      {data && <Pagination page={page} limit={LIMIT} total={data.total} onPageChange={setPage} />}
 
       {createOpen && <PatchModal onClose={() => setCreateOpen(false)} />}
       {editPatch && <PatchModal patch={editPatch} onClose={() => setEditPatch(null)} />}

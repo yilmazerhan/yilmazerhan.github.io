@@ -10,6 +10,9 @@ import WorkLogModal from '@/components/worklog/WorkLogModal'
 import { resolveName } from '@/utils/i18nName'
 import ExportButton from '@/components/ui/ExportButton'
 import { exportWorklogs } from '@/api/export'
+import { Pagination } from '@/components/ui/Pagination'
+
+const LIMIT = 50
 
 type ViewMode = 'list' | 'calendar'
 
@@ -130,16 +133,23 @@ export default function WorkLogPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [editLog, setEditLog] = useState<WorkLog | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [page, setPage] = useState(0)
 
   const canFilterByUser = user?.role === 'superadmin' || user?.role === 'team_manager'
   const { data: usersData } = useUsers(canFilterByUser ? { limit: 200 } : undefined)
 
-  const { data, isLoading } = useWorkLogs({
-    date_from: dateFrom,
-    date_to: dateTo,
-    user_id: selectedUserId || undefined,
-  })
+  const baseParams = { date_from: dateFrom, date_to: dateTo, user_id: selectedUserId || undefined }
+  const queryParams = viewMode === 'calendar'
+    ? { ...baseParams, limit: 500 }
+    : { ...baseParams, skip: page * LIMIT, limit: LIMIT }
+
+  const { data, isLoading } = useWorkLogs(queryParams)
   const deleteLog = useDeleteWorkLog()
+
+  function resetPage() { setPage(0) }
+  function handleDateFrom(v: string) { setDateFrom(v); resetPage() }
+  function handleDateTo(v: string) { setDateTo(v); resetPage() }
+  function handleUserFilter(v: string) { setSelectedUserId(v); resetPage() }
 
   async function handleDelete(log: WorkLog) {
     if (!confirm(t('common.confirm_delete'))) return
@@ -195,7 +205,7 @@ export default function WorkLogPage() {
           <input
             type="date"
             value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
+            onChange={(e) => handleDateFrom(e.target.value)}
             className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
@@ -204,7 +214,7 @@ export default function WorkLogPage() {
           <input
             type="date"
             value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
+            onChange={(e) => handleDateTo(e.target.value)}
             className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
@@ -213,7 +223,7 @@ export default function WorkLogPage() {
             <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('worklog.person')}</label>
             <select
               value={selectedUserId}
-              onChange={(e) => setSelectedUserId(e.target.value)}
+              onChange={(e) => handleUserFilter(e.target.value)}
               className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               <option value="">{t('worklog.filter_all_users')}</option>
@@ -318,6 +328,10 @@ export default function WorkLogPage() {
           </table>
           </div>
         </div>
+      )}
+
+      {viewMode === 'list' && data && (
+        <Pagination page={page} limit={LIMIT} total={data.total} onPageChange={setPage} />
       )}
 
       {createOpen && <WorkLogModal onClose={() => setCreateOpen(false)} />}
