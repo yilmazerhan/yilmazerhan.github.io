@@ -6,6 +6,9 @@ import os
 import uuid
 from datetime import datetime, timezone
 from urllib.parse import urlparse
+from zoneinfo import ZoneInfo
+
+_ISTANBUL = ZoneInfo("Europe/Istanbul")
 
 from fastapi import HTTPException
 from sqlalchemy import select, delete
@@ -305,30 +308,32 @@ async def run_scheduled_backup_check(db: AsyncSession, now: datetime | None = No
 
     schedule = await get_schedule(db)
     if schedule.get("backup_enabled", "false").lower() != "true":
-        logger.debug("Scheduled backup: disabled — skipping.")
+        logger.info("Scheduled backup: disabled — skipping.")
         return False
 
     if now is None:
         now = datetime.now(timezone.utc)
 
+    # Compare in Istanbul time so users configure hours in their local timezone
+    now_local = now.astimezone(_ISTANBUL)
     backup_hour = int(schedule.get("backup_hour", "2"))
     frequency = schedule.get("backup_frequency", "daily")
 
-    # Only run at the configured UTC hour
-    if now.hour != backup_hour:
-        logger.debug(
-            "Scheduled backup: current hour %d ≠ configured hour %d — skipping.",
-            now.hour, backup_hour,
+    # Only run at the configured Istanbul hour
+    if now_local.hour != backup_hour:
+        logger.info(
+            "Scheduled backup: current Istanbul hour %d ≠ configured hour %d — skipping.",
+            now_local.hour, backup_hour,
         )
         return False
 
-    # For weekly frequency: only run on the configured weekday
+    # For weekly frequency: only run on the configured weekday (Istanbul time)
     if frequency == "weekly":
         backup_dow = int(schedule.get("backup_day_of_week", "0"))
-        if now.weekday() != backup_dow:
-            logger.debug(
-                "Scheduled backup: today weekday %d ≠ configured weekday %d — skipping.",
-                now.weekday(), backup_dow,
+        if now_local.weekday() != backup_dow:
+            logger.info(
+                "Scheduled backup: today Istanbul weekday %d ≠ configured weekday %d — skipping.",
+                now_local.weekday(), backup_dow,
             )
             return False
 
@@ -341,11 +346,11 @@ async def run_scheduled_backup_check(db: AsyncSession, now: datetime | None = No
         .limit(1)
     )
     if result.scalar_one_or_none() is not None:
-        logger.debug("Scheduled backup: already ran within the last 23 h — skipping.")
+        logger.info("Scheduled backup: already ran within the last 23 h — skipping.")
         return False
 
     logger.info(
-        "Running scheduled backup (frequency=%s, hour=%d UTC)…", frequency, backup_hour
+        "Running scheduled backup (frequency=%s, Istanbul hour=%d)…", frequency, backup_hour
     )
     await create_backup(db, backup_type="scheduled", notes="Otomatik zamanlı yedek")
     # NOTE: caller is responsible for committing the session.

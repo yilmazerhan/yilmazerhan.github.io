@@ -13,9 +13,12 @@ All these are fixed in backup_service.run_scheduled_backup_check().
 import pytest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import patch, AsyncMock, MagicMock
+from zoneinfo import ZoneInfo
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+
+_ISTANBUL = ZoneInfo("Europe/Istanbul")
 
 from app.models.user import User
 from app.models.backup_record import BackupRecord
@@ -42,9 +45,9 @@ async def _disable_backup(db: AsyncSession) -> None:
 
 
 def _now_at_hour(hour: int) -> datetime:
-    """Return a timezone-aware datetime for today at the given UTC hour."""
-    now = datetime.now(timezone.utc)
-    return now.replace(hour=hour, minute=0, second=0, microsecond=0)
+    """Return a UTC datetime where Istanbul time is the given hour."""
+    now_ist = datetime.now(_ISTANBUL).replace(hour=hour, minute=0, second=0, microsecond=0)
+    return now_ist.astimezone(timezone.utc)
 
 
 FAKE_SQL = b"-- pg_dump output\nSELECT 1;\n"
@@ -189,10 +192,11 @@ class TestRunScheduledBackupCheck:
 
     async def test_weekly_skips_wrong_weekday(self, db: AsyncSession):
         """Weekly backups must only run on the configured day of week."""
-        now = datetime.now(timezone.utc)
-        # Configure for a weekday that is NOT today
-        wrong_dow = (now.weekday() + 1) % 7
-        await _enable_backup(db, hour=now.hour, frequency="weekly", day_of_week=wrong_dow)
+        now_ist = datetime.now(_ISTANBUL)
+        # Configure for a weekday that is NOT today (Istanbul weekday)
+        wrong_dow = (now_ist.weekday() + 1) % 7
+        now = now_ist.astimezone(timezone.utc)
+        await _enable_backup(db, hour=now_ist.hour, frequency="weekly", day_of_week=wrong_dow)
 
         from app.services.backup_service import run_scheduled_backup_check
         result = await run_scheduled_backup_check(db, now=now)
@@ -200,9 +204,10 @@ class TestRunScheduledBackupCheck:
 
     async def test_weekly_runs_on_correct_weekday(self, db: AsyncSession):
         """Weekly backups run on the correct weekday."""
-        now = datetime.now(timezone.utc)
-        await _enable_backup(db, hour=now.hour, frequency="weekly",
-                              day_of_week=now.weekday())
+        now_ist = datetime.now(_ISTANBUL)
+        now = now_ist.astimezone(timezone.utc)
+        await _enable_backup(db, hour=now_ist.hour, frequency="weekly",
+                              day_of_week=now_ist.weekday())
 
         with patch("app.services.backup_service._run", _fake_run_ok), \
              patch("app.services.backup_service._ensure_backup_dir"), \

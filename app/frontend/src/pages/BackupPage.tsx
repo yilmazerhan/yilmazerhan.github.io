@@ -513,7 +513,7 @@ export default function BackupPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    {t('backup.backup_hour')} (UTC)
+                    {t('backup.backup_hour')} (UTC+3)
                   </label>
                   <select
                     value={schedule.backup_hour}
