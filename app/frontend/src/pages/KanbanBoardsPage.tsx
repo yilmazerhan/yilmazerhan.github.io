@@ -185,6 +185,10 @@ export default function KanbanBoardsPage() {
 
   function BoardCard({ board }: { board: KanbanBoard }) {
     const canManage = canManageBoard(board)
+    // For personal boards belonging to another user, show the owner's name
+    const boardOwner = board.is_personal && board.created_by !== currentUser?.id
+      ? allUsers.find((u) => u.id === board.created_by)
+      : null
 
     return (
       <div
@@ -211,6 +215,11 @@ export default function KanbanBoardsPage() {
                   </span>
                 )}
               </div>
+              {boardOwner && (
+                <p className="mt-1 text-xs text-violet-600 dark:text-violet-400 font-medium">
+                  {boardOwner.full_name}
+                </p>
+              )}
               {board.description && (
                 <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
                   {board.description}
