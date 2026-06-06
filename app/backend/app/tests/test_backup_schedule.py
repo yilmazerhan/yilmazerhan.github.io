@@ -248,6 +248,43 @@ class TestRunScheduledBackupCheck:
         result = await run_scheduled_backup_check(db)
         assert result is False
 
+    async def test_failed_record_does_not_block_retry(self, db: AsyncSession):
+        """A 'failed' scheduled backup record must NOT block a retry.
+
+        Before the fix the deduplication query counted any scheduled record
+        (including failed ones), so a single failure would block all subsequent
+        runs for 23 hours.  After the fix only 'completed' records count.
+        """
+        await _enable_backup(db, hour=8)
+        now = _now_at_hour(8)
+
+        # Insert a recent "failed" record to simulate a previous failure
+        recent_failed = BackupRecord(
+            filename="backup_failed_recent.sql",
+            display_name="Failed Backup",
+            file_size=0,
+            backup_type="scheduled",
+            status="failed",
+        )
+        db.add(recent_failed)
+        await db.flush()
+
+        with patch("app.services.backup_service._run", _fake_run_ok), \
+             patch("app.services.backup_service._ensure_backup_dir"), \
+             patch("builtins.open", MagicMock(
+                 return_value=MagicMock(
+                     __enter__=MagicMock(return_value=MagicMock()),
+                     __exit__=MagicMock(return_value=False),
+                 )
+             )):
+            from app.services.backup_service import run_scheduled_backup_check
+            result = await run_scheduled_backup_check(db, now=now)
+
+        assert result is True, (
+            "A 'failed' record must not block the retry — only 'completed' records "
+            "trigger the 23-hour deduplication window."
+        )
+
 
 # ─── Backup retention / prune ─────────────────────────────────────────────────
 

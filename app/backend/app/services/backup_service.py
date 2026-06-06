@@ -337,16 +337,18 @@ async def run_scheduled_backup_check(db: AsyncSession, now: datetime | None = No
             )
             return False
 
-    # Deduplication: skip if a scheduled backup ran within the past 23 hours
+    # Deduplication: skip if a successful scheduled backup ran within the past 23 hours.
+    # Only count "completed" records — failed records must not block retry attempts.
     cutoff = now - timedelta(hours=23)
     result = await db.execute(
         select(BackupRecord)
         .where(BackupRecord.backup_type == "scheduled")
+        .where(BackupRecord.status == "completed")
         .where(BackupRecord.created_at >= cutoff)
         .limit(1)
     )
     if result.scalar_one_or_none() is not None:
-        logger.info("Scheduled backup: already ran within the last 23 h — skipping.")
+        logger.info("Scheduled backup: already ran successfully within the last 23 h — skipping.")
         return False
 
     logger.info(

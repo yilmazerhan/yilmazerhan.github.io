@@ -369,33 +369,39 @@ async def _evaluate_workflows_async():
         today_istanbul = now_istanbul.date()
 
         for wf in workflows:
-            if wf.trigger_type == "task_due_soon":
-                days_before = (wf.trigger_config or {}).get("days_before", 3)
-                target_date = today_istanbul + timedelta(days=days_before)
-                await _handle_task_due_soon(db, wf, target_date)
+            try:
+                if wf.trigger_type == "task_due_soon":
+                    days_before = (wf.trigger_config or {}).get("days_before", 3)
+                    target_date = today_istanbul + timedelta(days=days_before)
+                    await _handle_task_due_soon(db, wf, target_date)
 
-            elif wf.trigger_type == "task_overdue":
-                await _handle_task_overdue(db, wf, today_istanbul)
+                elif wf.trigger_type == "task_overdue":
+                    await _handle_task_overdue(db, wf, today_istanbul)
 
-            elif wf.trigger_type in ("worklog_reminder", "dashboard_report"):
-                # Use the workflow's own configured timezone for hour-based firing
-                wf_tz = _workflow_tz(wf)
-                now_local = now.astimezone(wf_tz)
-                today_local = now_local.date()
-                hour = (wf.trigger_config or {}).get(
-                    "send_hour", 17 if wf.trigger_type == "worklog_reminder" else 8
+                elif wf.trigger_type in ("worklog_reminder", "dashboard_report"):
+                    # Use the workflow's own configured timezone for hour-based firing
+                    wf_tz = _workflow_tz(wf)
+                    now_local = now.astimezone(wf_tz)
+                    today_local = now_local.date()
+                    hour = (wf.trigger_config or {}).get(
+                        "send_hour", 17 if wf.trigger_type == "worklog_reminder" else 8
+                    )
+
+                    if now_local.hour == hour:
+                        if wf.trigger_type == "worklog_reminder":
+                            await _handle_worklog_reminder(db, wf, today_local)
+                        else:
+                            frequency = (wf.trigger_config or {}).get("frequency", "daily")
+                            day_of_week = (wf.trigger_config or {}).get("day_of_week", 0)
+                            if frequency == "daily" or (frequency == "weekly" and today_local.weekday() == day_of_week):
+                                await _handle_dashboard_report(db, wf, today_local)
+
+                wf.last_run_at = now
+            except Exception as exc:
+                logger.error(
+                    "Workflow %s (%s) raised an error and was skipped: %s",
+                    wf.id, wf.trigger_type, exc, exc_info=True,
                 )
-
-                if now_local.hour == hour:
-                    if wf.trigger_type == "worklog_reminder":
-                        await _handle_worklog_reminder(db, wf, today_local)
-                    else:
-                        frequency = (wf.trigger_config or {}).get("frequency", "daily")
-                        day_of_week = (wf.trigger_config or {}).get("day_of_week", 0)
-                        if frequency == "daily" or (frequency == "weekly" and today_local.weekday() == day_of_week):
-                            await _handle_dashboard_report(db, wf, today_local)
-
-            wf.last_run_at = now
 
         await db.commit()
 

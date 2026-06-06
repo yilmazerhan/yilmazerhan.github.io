@@ -616,6 +616,103 @@ class TestEvaluateWorkflows:
         assert "exec@test.com" in sent_to
         assert "mgr@test.com" in sent_to
 
+    async def test_already_sent_today_blocks_pending(self, db: AsyncSession):
+        """already_sent_today must return True when a 'pending' log exists today.
+
+        Before the fix, only 'sent' status was checked.  If the Celery worker
+        hadn't processed the first dispatch yet, the next evaluation cycle would
+        see status='pending' (not 'sent') and queue a duplicate email.
+        """
+        from app.services.email_service import EmailService
+        from app.models.email_log import EmailLog
+        from app.models.email_workflow import EmailWorkflow
+        from app.models.user import User
+        from app.core.security import hash_password
+
+        tmpl = await self._create_template(db)
+        wf = EmailWorkflow(
+            name="Dedup Pending WF",
+            trigger_type="task_overdue",
+            template_id=tmpl.id,
+            is_active=True,
+            recipient_type="assignee",
+        )
+        db.add(wf)
+        u = User(
+            email="pending_user@test.com",
+            username="pending_user",
+            hashed_password=hash_password("pw"),
+            full_name="Pending",
+            role="user",
+            is_active=True,
+        )
+        db.add(u)
+        await db.flush()
+
+        # Simulate a pending log entry (task queued but not yet sent)
+        log = EmailLog(
+            workflow_id=wf.id,
+            recipient_id=u.id,
+            to_email=u.email,
+            subject="Test",
+            status="pending",
+        )
+        db.add(log)
+        await db.flush()
+
+        svc = EmailService(db)
+        result = await svc.already_sent_today(wf.id, u.id)
+        assert result is True, (
+            "already_sent_today must return True for a 'pending' log to prevent "
+            "duplicate email dispatch while the first task is still in the queue."
+        )
+
+    async def test_already_sent_today_allows_retry_for_failed(self, db: AsyncSession):
+        """already_sent_today must return False when only a 'failed' log exists today."""
+        from app.services.email_service import EmailService
+        from app.models.email_log import EmailLog
+        from app.models.email_workflow import EmailWorkflow
+        from app.models.user import User
+        from app.core.security import hash_password
+
+        tmpl = await self._create_template(db)
+        wf = EmailWorkflow(
+            name="Retry Failed WF",
+            trigger_type="task_due_soon",
+            template_id=tmpl.id,
+            is_active=True,
+            recipient_type="assignee",
+        )
+        db.add(wf)
+        u = User(
+            email="failed_user@test.com",
+            username="failed_user",
+            hashed_password=hash_password("pw"),
+            full_name="Failed",
+            role="user",
+            is_active=True,
+        )
+        db.add(u)
+        await db.flush()
+
+        # Simulate a failed log entry (delivery failed, should be retried)
+        log = EmailLog(
+            workflow_id=wf.id,
+            recipient_id=u.id,
+            to_email=u.email,
+            subject="Failed",
+            status="failed",
+        )
+        db.add(log)
+        await db.flush()
+
+        svc = EmailService(db)
+        result = await svc.already_sent_today(wf.id, u.id)
+        assert result is False, (
+            "already_sent_today must return False for a 'failed' log so the next "
+            "evaluation cycle can retry the delivery."
+        )
+
     async def test_dashboard_report_deduplication(self, db: AsyncSession):
         """Dashboard report sent twice in same day must only send once."""
         from app.tasks.email_tasks import _handle_dashboard_report

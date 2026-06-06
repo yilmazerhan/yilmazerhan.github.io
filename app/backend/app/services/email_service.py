@@ -337,12 +337,15 @@ class EmailService:
     ) -> bool:
         from datetime import date
         today_start = datetime.combine(date.today(), datetime.min.time()).replace(tzinfo=timezone.utc)
+        # Check for both "sent" and "pending" to prevent duplicate dispatch when
+        # the worker hasn't processed the queued task yet.  "failed" is excluded
+        # so the next evaluation cycle can retry a failed delivery.
         result = await self.db.execute(
             select(func.count()).where(
                 EmailLog.workflow_id == workflow_id,
                 EmailLog.recipient_id == recipient_id,
-                EmailLog.status == "sent",
-                EmailLog.sent_at >= today_start,
+                EmailLog.status.in_(["sent", "pending"]),
+                EmailLog.created_at >= today_start,
             )
         )
         return result.scalar_one() > 0
