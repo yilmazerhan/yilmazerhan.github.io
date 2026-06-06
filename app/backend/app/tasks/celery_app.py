@@ -42,7 +42,11 @@ celery_app.conf.beat_schedule = {
     # Celery Beat (single process) to prevent duplicate execution with --workers N.
     "run-backup-check-hourly": {
         "task": "app.tasks.scheduled_tasks.run_backup_check",
-        "schedule": 3600.0,  # 1 hour
+        # crontab fires at the top of every clock hour (:00 min) so the Istanbul
+        # hour check inside run_scheduled_backup_check is evaluated at a predictable
+        # time. A plain 3600 s interval drifts relative to container startup and can
+        # land anywhere within the hour, making timing harder to reason about.
+        "schedule": crontab(minute=0),
     },
     "run-inventory-email-check-hourly": {
         "task": "app.tasks.scheduled_tasks.run_inventory_email_check",

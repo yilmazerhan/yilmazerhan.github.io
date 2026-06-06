@@ -278,7 +278,9 @@ async def get_schedule(db: AsyncSession) -> dict:
         select(AppSetting).where(AppSetting.key.in_(SCHEDULE_KEYS.keys()))
     )
     rows = {r.key: r.value for r in result.scalars().all()}
-    return {k: rows.get(k, v) for k, v in SCHEDULE_KEYS.items()}
+    # Prefer the stored value when it is a non-empty string; fall back to the
+    # module default if the DB row is missing OR if its value is NULL / empty.
+    return {k: (rows.get(k) or v) for k, v in SCHEDULE_KEYS.items()}
 
 
 async def save_schedule(db: AsyncSession, data: dict) -> dict:

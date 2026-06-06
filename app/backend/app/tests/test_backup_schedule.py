@@ -367,6 +367,43 @@ class TestBackupRetention:
         assert len(remaining) == 5  # all kept (5 < 10)
 
 
+# ─── get_schedule NULL value guard ────────────────────────────────────────────
+
+class TestGetScheduleNullGuard:
+    """get_schedule must not return None for any key even when DB stores NULL."""
+
+    async def test_null_backup_enabled_falls_back_to_default(self, db: AsyncSession):
+        """If backup_enabled is stored as NULL in DB, get_schedule must return 'false'."""
+        from app.models.app_setting import AppSetting
+        from app.services.backup_service import get_schedule
+        db.add(AppSetting(key="backup_enabled", value=None))
+        await db.flush()
+        schedule = await get_schedule(db)
+        assert schedule["backup_enabled"] == "false", (
+            "NULL backup_enabled must fall back to 'false', not return None "
+            "(None.lower() would raise AttributeError in run_scheduled_backup_check)"
+        )
+
+    async def test_null_backup_hour_falls_back_to_default(self, db: AsyncSession):
+        """NULL backup_hour must fall back to default '2'."""
+        from app.models.app_setting import AppSetting
+        from app.services.backup_service import get_schedule
+        db.add(AppSetting(key="backup_hour", value=None))
+        await db.flush()
+        schedule = await get_schedule(db)
+        assert schedule["backup_hour"] == "2"
+
+    async def test_backup_hour_zero_preserved(self, db: AsyncSession):
+        """backup_hour='0' (midnight) must not be replaced by the default '2'."""
+        from app.services.backup_service import save_schedule, get_schedule
+        await save_schedule(db, {"backup_hour": "0"})
+        schedule = await get_schedule(db)
+        assert schedule["backup_hour"] == "0", (
+            "Hour 0 (midnight) is a legitimate value and must not be lost "
+            "due to an overzealous falsy check"
+        )
+
+
 # ─── Backup API full flow ─────────────────────────────────────────────────────
 
 class TestBackupAPIFlow:
