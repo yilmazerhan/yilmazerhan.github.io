@@ -94,7 +94,7 @@ class EmailWorkflowCreate(BaseModel):
     @field_validator("recipient_type")
     @classmethod
     def validate_recipient(cls, v: str) -> str:
-        allowed = {"assignee", "team_manager", "all_managers", "specific_users", "creator", "specific_emails"}
+        allowed = {"assignee", "team_manager", "all_managers", "specific_users", "creator", "specific_emails", "all_users"}
         if v not in allowed:
             raise ValueError(f"Geçersiz alıcı tipi.")
         return v

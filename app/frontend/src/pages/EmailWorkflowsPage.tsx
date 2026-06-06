@@ -99,6 +99,7 @@ export default function EmailWorkflowsPage() {
     { value: 'assignee', label: t('email.recipient_assignee') },
     { value: 'team_manager', label: t('email.recipient_team_manager') },
     { value: 'all_managers', label: t('email.recipient_all_managers') },
+    { value: 'all_users', label: t('email.recipient_all_users') },
     { value: 'creator', label: t('email.recipient_creator') },
     { value: 'specific_emails', label: t('email.recipient_specific_emails') },
   ]

@@ -41,6 +41,7 @@ class EmailWorkflow(Base):
             "specific_users",
             "creator",
             "specific_emails",
+            "all_users",
             name="recipient_type",
         ),
         nullable=False,

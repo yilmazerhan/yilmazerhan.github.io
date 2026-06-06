@@ -533,6 +533,7 @@
     "recipient_creator": "Oluşturan",
     "trigger_dashboard_report": "Dashboard Raporu",
     "recipient_specific_emails": "Belirli E-posta Adresleri",
+    "recipient_all_users": "Tüm Kullanıcılar",
     "recipient_emails_label": "E-posta Adresleri (virgülle ayırın)",
     "send_hour": "Gönderim Saati",
     "send_timezone": "Saat Dilimi",

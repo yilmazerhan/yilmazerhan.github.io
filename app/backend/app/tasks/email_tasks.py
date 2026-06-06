@@ -576,10 +576,16 @@ async def _handle_dashboard_report(db, workflow, today: date):
 
     svc = EmailService(db)
 
-    # Get recipient emails from recipient_users list (stored as email strings for dashboard_report)
+    # Build recipient email list based on recipient_type
     recipient_emails = []
     if workflow.recipient_type == "specific_emails" and workflow.recipient_users:
         recipient_emails = [e for e in workflow.recipient_users if isinstance(e, str) and "@" in e]
+    elif workflow.recipient_type == "all_users":
+        from app.models.user import User as _User
+        all_result = await db.execute(
+            select(_User).where(_User.is_active == True, _User.is_deleted == False)
+        )
+        recipient_emails = [u.email for u in all_result.scalars().all()]
 
     if not recipient_emails:
         return

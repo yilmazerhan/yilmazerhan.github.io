@@ -533,6 +533,7 @@
     "recipient_creator": "Creator",
     "trigger_dashboard_report": "Dashboard Report",
     "recipient_specific_emails": "Specific Email Addresses",
+    "recipient_all_users": "All Users",
     "recipient_emails_label": "Email Addresses (comma separated)",
     "send_hour": "Send Hour",
     "send_timezone": "Timezone",

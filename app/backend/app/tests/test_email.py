@@ -259,6 +259,43 @@ class TestEmailWorkflows:
         })
         assert resp.status_code == 403
 
+    async def test_create_workflow_all_users_recipient(self, client: AsyncClient, superadmin_user: User, db: AsyncSession):
+        """all_users recipient type must be accepted on create."""
+        tmpl = await create_template(db, slug="wf-all-users-create")
+        headers = await get_auth_headers(client, superadmin_user.email, "Admin123!")
+        resp = await client.post("/api/v1/email/workflows", headers=headers, json={
+            "name": "Tüm Kullanıcılar Workflow",
+            "trigger_type": "worklog_reminder",
+            "template_id": str(tmpl.id),
+            "recipient_type": "all_users",
+            "trigger_config": {"send_hour": 17, "timezone": "Europe/Istanbul"},
+        })
+        assert resp.status_code == 201, resp.text
+        assert resp.json()["recipient_type"] == "all_users"
+
+    async def test_update_workflow_to_all_users_recipient(self, client: AsyncClient, superadmin_user: User, db: AsyncSession):
+        """Updating recipient_type to all_users must succeed and persist."""
+        tmpl, wf = await self._create_wf(db, "upd-all-users", "worklog_reminder",
+                                          {"send_hour": 17, "timezone": "Europe/Istanbul"})
+        headers = await get_auth_headers(client, superadmin_user.email, "Admin123!")
+        resp = await client.patch(f"/api/v1/email/workflows/{wf.id}", headers=headers, json={
+            "recipient_type": "all_users",
+        })
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["recipient_type"] == "all_users"
+
+    async def test_create_workflow_invalid_recipient_type(self, client: AsyncClient, superadmin_user: User, db: AsyncSession):
+        """Unknown recipient type must be rejected with 422."""
+        tmpl = await create_template(db, slug="wf-bad-recipient")
+        headers = await get_auth_headers(client, superadmin_user.email, "Admin123!")
+        resp = await client.post("/api/v1/email/workflows", headers=headers, json={
+            "name": "Geçersiz Alıcı",
+            "trigger_type": "worklog_reminder",
+            "template_id": str(tmpl.id),
+            "recipient_type": "nonexistent_type",
+        })
+        assert resp.status_code == 422
+
 
 class TestEmailLogs:
     async def test_list_logs_manager(self, client: AsyncClient, manager_user: User, db: AsyncSession):
