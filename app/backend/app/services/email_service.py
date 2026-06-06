@@ -82,6 +82,7 @@ class EmailService:
         if from_name is not None: cfg.from_name = from_name
         if is_active is not None: cfg.is_active = is_active
         await self.db.flush()
+        await self.db.refresh(cfg)
         return cfg
 
     async def test_smtp_config(self, config_id: uuid.UUID, to_email: str) -> dict:
@@ -196,6 +197,7 @@ class EmailService:
         if html_body is not None: tmpl.html_body = html_body
         if available_vars is not None: tmpl.available_vars = available_vars
         await self.db.flush()
+        await self.db.refresh(tmpl)
         return tmpl
 
     async def delete_template(self, template_id: uuid.UUID) -> None:
@@ -278,10 +280,14 @@ class EmailService:
         if template_id is not None: wf.template_id = template_id
         if recipient_type is not None: wf.recipient_type = recipient_type
         if recipient_users is not None: wf.recipient_users = recipient_users
-        if send_teams is not None: wf.send_teams = send_teams
+        if send_teams is not None:
+            wf.send_teams = send_teams
+            if not send_teams:
+                wf.teams_webhook_id = None
         if teams_webhook_id is not None: wf.teams_webhook_id = teams_webhook_id
         if is_active is not None: wf.is_active = is_active
         await self.db.flush()
+        await self.db.refresh(wf)
         return wf
 
     async def delete_workflow(self, workflow_id: uuid.UUID) -> None:
