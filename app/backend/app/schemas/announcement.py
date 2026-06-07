@@ -1,17 +1,17 @@
 import uuid
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 
 class AnnouncementCreate(BaseModel):
-    title: str
-    title_en: Optional[str] = None
-    message: str
-    message_en: Optional[str] = None
+    title: str = Field(..., min_length=1, max_length=500)
+    title_en: Optional[str] = Field(None, max_length=500)
+    message: str = Field(..., min_length=1, max_length=10000)
+    message_en: Optional[str] = Field(None, max_length=10000)
     type: str = "info"
     target_type: str = "all"
-    target_ids: Optional[list] = None
+    target_ids: Optional[list[uuid.UUID]] = None
     starts_at: datetime
     ends_at: Optional[datetime] = None
     is_active: bool = True
@@ -34,13 +34,13 @@ class AnnouncementCreate(BaseModel):
 
 
 class AnnouncementUpdate(BaseModel):
-    title: Optional[str] = None
-    title_en: Optional[str] = None
-    message: Optional[str] = None
-    message_en: Optional[str] = None
+    title: Optional[str] = Field(None, min_length=1, max_length=500)
+    title_en: Optional[str] = Field(None, max_length=500)
+    message: Optional[str] = Field(None, min_length=1, max_length=10000)
+    message_en: Optional[str] = Field(None, max_length=10000)
     type: Optional[str] = None
     target_type: Optional[str] = None
-    target_ids: Optional[list] = None
+    target_ids: Optional[list[uuid.UUID]] = None
     starts_at: Optional[datetime] = None
     ends_at: Optional[datetime] = None
     is_active: Optional[bool] = None

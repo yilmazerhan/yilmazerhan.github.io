@@ -1,29 +1,29 @@
 import uuid
 from datetime import datetime
 from typing import Optional, Any
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class SmtpConfigCreate(BaseModel):
-    host: str
-    port: int = 587
-    username: str
-    password: str
+    host: str = Field(..., max_length=255)
+    port: int = Field(default=587, ge=1, le=65535)
+    username: str = Field(..., max_length=255)
+    password: str = Field(..., max_length=4096)
     use_tls: bool = True
     use_ssl: bool = False
-    from_email: str
-    from_name: str = "Team App"
+    from_email: EmailStr
+    from_name: str = Field(default="Team App", max_length=100)
 
 
 class SmtpConfigUpdate(BaseModel):
-    host: Optional[str] = None
-    port: Optional[int] = None
-    username: Optional[str] = None
-    password: Optional[str] = None
+    host: Optional[str] = Field(None, max_length=255)
+    port: Optional[int] = Field(None, ge=1, le=65535)
+    username: Optional[str] = Field(None, max_length=255)
+    password: Optional[str] = Field(None, max_length=4096)
     use_tls: Optional[bool] = None
     use_ssl: Optional[bool] = None
-    from_email: Optional[str] = None
-    from_name: Optional[str] = None
+    from_email: Optional[EmailStr] = None
+    from_name: Optional[str] = Field(None, max_length=100)
     is_active: Optional[bool] = None
 
 
@@ -41,17 +41,17 @@ class SmtpConfigResponse(BaseModel):
 
 
 class EmailTemplateCreate(BaseModel):
-    name: str
-    slug: str
-    subject: str
-    html_body: str
+    name: str = Field(..., min_length=1, max_length=100)
+    slug: str = Field(..., min_length=1, max_length=100)
+    subject: str = Field(..., min_length=1, max_length=500)
+    html_body: str = Field(..., min_length=1, max_length=200000)
     available_vars: Optional[dict] = None
 
 
 class EmailTemplateUpdate(BaseModel):
-    name: Optional[str] = None
-    subject: Optional[str] = None
-    html_body: Optional[str] = None
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    subject: Optional[str] = Field(None, min_length=1, max_length=500)
+    html_body: Optional[str] = Field(None, min_length=1, max_length=200000)
     available_vars: Optional[dict] = None
 
 
@@ -73,13 +73,13 @@ class EmailTemplatePreviewRequest(BaseModel):
 
 
 class EmailWorkflowCreate(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1, max_length=100)
     trigger_type: str
     template_id: uuid.UUID
     recipient_type: str
     trigger_config: Optional[dict] = None
     condition_config: Optional[dict] = None
-    recipient_users: Optional[list] = None
+    recipient_users: Optional[list[uuid.UUID]] = None
     send_teams: bool = False
     teams_webhook_id: Optional[uuid.UUID] = None
 
@@ -101,12 +101,12 @@ class EmailWorkflowCreate(BaseModel):
 
 
 class EmailWorkflowUpdate(BaseModel):
-    name: Optional[str] = None
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
     trigger_config: Optional[dict] = None
     condition_config: Optional[dict] = None
     template_id: Optional[uuid.UUID] = None
     recipient_type: Optional[str] = None
-    recipient_users: Optional[list] = None
+    recipient_users: Optional[list[uuid.UUID]] = None
     send_teams: Optional[bool] = None
     teams_webhook_id: Optional[uuid.UUID] = None
     is_active: Optional[bool] = None
@@ -152,8 +152,8 @@ class EmailLogListResponse(BaseModel):
 
 
 class TeamsWebhookCreate(BaseModel):
-    name: str
-    webhook_url: str
+    name: str = Field(..., min_length=1, max_length=100)
+    webhook_url: str = Field(..., max_length=2000)
 
     @field_validator("webhook_url")
     @classmethod
@@ -164,8 +164,8 @@ class TeamsWebhookCreate(BaseModel):
 
 
 class TeamsWebhookUpdate(BaseModel):
-    name: Optional[str] = None
-    webhook_url: Optional[str] = None
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    webhook_url: Optional[str] = Field(None, max_length=2000)
     is_active: Optional[bool] = None
 
 

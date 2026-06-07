@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class SslCertificateResponse(BaseModel):
@@ -22,9 +22,16 @@ class BrandingResponse(BaseModel):
 
 
 class BrandingUpdate(BaseModel):
-    company_name: Optional[str] = None
-    primary_color: Optional[str] = None
-    jira_base_url: Optional[str] = None
+    company_name: Optional[str] = Field(None, min_length=1, max_length=255)
+    primary_color: Optional[str] = Field(None, max_length=7)
+    jira_base_url: Optional[str] = Field(None, max_length=500)
+
+    @field_validator("primary_color")
+    @classmethod
+    def validate_color(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and (not v.startswith("#") or len(v) not in (4, 7)):
+            raise ValueError("Renk geçerli bir HEX değeri olmalıdır (örn: #3b82f6).")
+        return v
 
 
 class AuditLogResponse(BaseModel):

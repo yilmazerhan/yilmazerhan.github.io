@@ -61,6 +61,8 @@ class ChangePasswordRequest(BaseModel):
     def validate_password(cls, v: str) -> str:
         if len(v) < 8:
             raise ValueError("Şifre en az 8 karakter olmalıdır.")
+        if len(v) > 4096:
+            raise ValueError("Şifre en fazla 4096 karakter olabilir.")
         if not re.search(r"[A-Z]", v):
             raise ValueError("Şifre en az bir büyük harf içermelidir.")
         if not re.search(r"[a-z]", v):
@@ -78,6 +80,8 @@ class AdminSetPasswordRequest(BaseModel):
     def validate_password(cls, v: str) -> str:
         if len(v) < 8:
             raise ValueError("Şifre en az 8 karakter olmalıdır.")
+        if len(v) > 4096:
+            raise ValueError("Şifre en fazla 4096 karakter olabilir.")
         if not re.search(r"[A-Z]", v):
             raise ValueError("Şifre en az bir büyük harf içermelidir.")
         if not re.search(r"[a-z]", v):

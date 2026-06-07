@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, EmailStr, field_validator, model_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator
 import re
 
 
@@ -16,6 +16,8 @@ class RegisterRequest(BaseModel):
     def validate_password(cls, v: str) -> str:
         if len(v) < 8:
             raise ValueError("Şifre en az 8 karakter olmalıdır.")
+        if len(v) > 4096:
+            raise ValueError("Şifre en fazla 4096 karakter olabilir.")
         if not re.search(r"[A-Z]", v):
             raise ValueError("Şifre en az bir büyük harf içermelidir.")
         if not re.search(r"[a-z]", v):
@@ -41,8 +43,8 @@ class RegisterRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    username: str
-    password: str
+    username: str = Field(..., max_length=255)
+    password: str = Field(..., max_length=4096)
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -58,6 +60,8 @@ class ResetPasswordRequest(BaseModel):
     def validate_password(cls, v: str) -> str:
         if len(v) < 8:
             raise ValueError("Şifre en az 8 karakter olmalıdır.")
+        if len(v) > 4096:
+            raise ValueError("Şifre en fazla 4096 karakter olabilir.")
         if not re.search(r"[A-Z]", v):
             raise ValueError("Şifre en az bir büyük harf içermelidir.")
         if not re.search(r"[a-z]", v):

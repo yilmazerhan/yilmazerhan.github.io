@@ -14,14 +14,14 @@ VALID_GROUP_TYPES = ["replication", "cluster", "ha", "load_balanced", "related",
 
 class InventoryGroupCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
-    description: Optional[str] = None
+    description: Optional[str] = Field(None, max_length=2000)
     group_type: str = Field("related")
     color: str = Field("#6366f1")
 
 
 class InventoryGroupUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=100)
-    description: Optional[str] = None
+    description: Optional[str] = Field(None, max_length=2000)
     group_type: Optional[str] = None
     color: Optional[str] = None
 
@@ -55,8 +55,8 @@ class InventoryGroupAssign(BaseModel):
 class InventoryItemCreate(BaseModel):
     item_type: Literal["server", "database", "email_account", "cloud_account", "generic"]
     display_name: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = None
-    notes: Optional[str] = None
+    description: Optional[str] = Field(None, max_length=5000)
+    notes: Optional[str] = Field(None, max_length=5000)
     tags: list[str] = Field(default_factory=list)
     is_active: bool = True
 
@@ -116,8 +116,8 @@ class InventoryItemCreate(BaseModel):
 
 class InventoryItemUpdate(BaseModel):
     display_name: Optional[str] = Field(None, min_length=1, max_length=255)
-    description: Optional[str] = None
-    notes: Optional[str] = None
+    description: Optional[str] = Field(None, max_length=5000)
+    notes: Optional[str] = Field(None, max_length=5000)
     tags: Optional[list[str]] = None
     is_active: Optional[bool] = None
 
