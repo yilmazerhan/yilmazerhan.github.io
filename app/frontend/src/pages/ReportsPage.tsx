@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format, startOfMonth } from 'date-fns'
-import { Clock, Users, FileText, TrendingUp, CalendarClock, Plus, Trash2, Play, Pencil } from 'lucide-react'
+import { Clock, Users, FileText, TrendingUp, CalendarClock, Plus, Trash2, Play, Pencil, Trophy } from 'lucide-react'
 import { useWorkLogs } from '@/api/worklog'
 import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
@@ -37,6 +37,100 @@ interface ScheduleForm {
 function emptyForm(): ScheduleForm {
   return { name: '', frequency: 'weekly', day_of_week: 0, day_of_month: null, hour: 8, recipient_emails: '', date_range_days: 7, is_active: true }
 }
+
+// ── SVG Donut Chart ────────────────────────────────────────────────────────────
+
+function DonutChart({ data, hourAbbr }: { data: Array<{ name: string; color: string; hours: number }>; hourAbbr: string }) {
+  const total = data.reduce((s, d) => s + d.hours, 0) || 1
+  const R = 52, r = 32, cx = 60, cy = 60
+
+  if (data.length === 0) return null
+
+  if (data.length === 1) {
+    return (
+      <div className="flex flex-col items-center gap-3">
+        <svg viewBox="0 0 120 120" className="w-full max-w-[120px]">
+          <circle cx={cx} cy={cy} r={R} fill={data[0].color} />
+          <circle cx={cx} cy={cy} r={r} className="fill-white dark:fill-gray-900" />
+          <text x={cx} y={cy - 4} textAnchor="middle" fontSize="12" fontWeight="bold" className="fill-gray-700 dark:fill-gray-200">{total.toFixed(0)}</text>
+          <text x={cx} y={cy + 10} textAnchor="middle" fontSize="9" className="fill-gray-400 dark:fill-gray-500">{hourAbbr}</text>
+        </svg>
+        <div className="flex items-center gap-1.5 text-xs w-full">
+          <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: data[0].color }} />
+          <span className="flex-1 truncate text-gray-600 dark:text-gray-400">{data[0].name}</span>
+          <span className="font-medium text-gray-700 dark:text-gray-300">100%</span>
+        </div>
+      </div>
+    )
+  }
+
+  let cumAngle = -Math.PI / 2
+  const slices = data.map(d => {
+    const angle = (d.hours / total) * 2 * Math.PI
+    const startAngle = cumAngle
+    cumAngle += angle
+    return { ...d, startAngle, endAngle: cumAngle }
+  })
+
+  function arc(startAngle: number, endAngle: number) {
+    const x1 = cx + R * Math.cos(startAngle), y1 = cy + R * Math.sin(startAngle)
+    const x2 = cx + R * Math.cos(endAngle),   y2 = cy + R * Math.sin(endAngle)
+    const ix1 = cx + r * Math.cos(endAngle),   iy1 = cy + r * Math.sin(endAngle)
+    const ix2 = cx + r * Math.cos(startAngle), iy2 = cy + r * Math.sin(startAngle)
+    const large = endAngle - startAngle > Math.PI ? 1 : 0
+    return `M${x1},${y1} A${R},${R},0,${large},1,${x2},${y2} L${ix1},${iy1} A${r},${r},0,${large},0,${ix2},${iy2} Z`
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <svg viewBox="0 0 120 120" className="w-full max-w-[120px]">
+        {slices.map((s, i) => (
+          <path key={i} d={arc(s.startAngle, s.endAngle)} fill={s.color} className="hover:opacity-80 transition-opacity cursor-default">
+            <title>{s.name}: {s.hours.toFixed(1)}{hourAbbr} ({((s.hours / total) * 100).toFixed(1)}%)</title>
+          </path>
+        ))}
+        <circle cx={cx} cy={cy} r={r} className="fill-white dark:fill-gray-900" />
+        <text x={cx} y={cy - 4} textAnchor="middle" fontSize="12" fontWeight="bold" className="fill-gray-700 dark:fill-gray-200">{total.toFixed(0)}</text>
+        <text x={cx} y={cy + 10} textAnchor="middle" fontSize="9" className="fill-gray-400 dark:fill-gray-500">{hourAbbr}</text>
+      </svg>
+      <div className="space-y-1.5 w-full">
+        {data.slice(0, 7).map((d, i) => (
+          <div key={i} className="flex items-center gap-1.5 text-xs">
+            <span className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: d.color }} />
+            <span className="flex-1 truncate text-gray-600 dark:text-gray-400">{d.name}</span>
+            <span className="font-medium text-gray-700 dark:text-gray-300">{((d.hours / total) * 100).toFixed(0)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Mini Sparkline ─────────────────────────────────────────────────────────────
+
+function MiniSparkline({ dailyData }: { dailyData: Array<[string, number]> }) {
+  if (dailyData.length < 2) return null
+  const maxV = Math.max(...dailyData.map(([, v]) => v), 0.1)
+  const W = 64, H = 20, pad = 2
+  const toX = (i: number) => pad + (i / (dailyData.length - 1)) * (W - pad * 2)
+  const toY = (v: number) => pad + (1 - v / maxV) * (H - pad * 2)
+  const points = dailyData.map(([, v], i) => `${toX(i)},${toY(v)}`).join(' ')
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: 64, height: 20, display: 'block' }}>
+      <polyline
+        points={points}
+        fill="none"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="stroke-indigo-400 dark:stroke-indigo-500"
+      />
+    </svg>
+  )
+}
+
+// ── Schedule Section ──────────────────────────────────────────────────────────
 
 function ReportScheduleSection({ t }: { t: (k: string) => string }) {
   const { data: schedules = [] } = useReportSchedules()
@@ -182,6 +276,8 @@ function ReportScheduleSection({ t }: { t: (k: string) => string }) {
   )
 }
 
+// ── Main Page ─────────────────────────────────────────────────────────────────
+
 export default function ReportsPage() {
   const { t } = useTranslation()
   const user = useAuthStore((s) => s.user)
@@ -206,6 +302,7 @@ export default function ReportsPage() {
   })
 
   const logs = data?.items ?? []
+  const hourAbbr = t('worklog.hours_abbr')
 
   // Build pivot: user → workType → hours
   const pivot = useMemo(() => {
@@ -225,11 +322,9 @@ export default function ReportsPage() {
       }
     }
 
-    // Sort users by total hours desc
     const sortedUsers = Object.entries(users).sort((a, b) => b[1].total - a[1].total)
     const typeList = Object.entries(types)
 
-    // Grand total per type and overall
     const typeTotals: Record<string, number> = {}
     let grandTotal = 0
     for (const [, uData] of sortedUsers) {
@@ -248,8 +343,37 @@ export default function ReportsPage() {
     return { totalHours, uniqueUsers, entries: logs.length }
   }, [logs])
 
-  // Bar chart data: hours per user
+  // Per-user daily sparkline data
+  const userSparklines = useMemo(() => {
+    const byUser: Record<string, Record<string, number>> = {}
+    for (const log of logs) {
+      if (!byUser[log.user_id]) byUser[log.user_id] = {}
+      byUser[log.user_id][log.log_date] = (byUser[log.user_id][log.log_date] ?? 0) + log.duration_hours
+    }
+    return Object.fromEntries(
+      Object.entries(byUser).map(([uid, days]) => [
+        uid,
+        Object.entries(days).sort(([a], [b]) => a < b ? -1 : 1),
+      ])
+    )
+  }, [logs])
+
+  // Donut data: type → total hours, sorted desc
+  const donutData = useMemo(() => {
+    if (!pivot) return []
+    return pivot.typeList
+      .map(([typeId, type]) => ({
+        name: resolveName(t, type.name, type.name_key),
+        color: type.color,
+        hours: pivot.typeTotals[typeId] ?? 0,
+      }))
+      .sort((a, b) => b.hours - a.hours)
+  }, [pivot, t])
+
   const maxUserHours = pivot ? Math.max(...pivot.sortedUsers.map(([, u]) => u.total), 1) : 1
+  const multipleUsers = (pivot?.sortedUsers.length ?? 0) > 1
+  const maxTotal = pivot?.sortedUsers[0]?.[1].total ?? 0
+  const minTotal = pivot?.sortedUsers[pivot.sortedUsers.length - 1]?.[1].total ?? 0
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -348,27 +472,44 @@ export default function ReportsPage() {
         <div className="text-center py-12 text-gray-400">{t('reports.no_data')}</div>
       ) : (
         <>
-          {/* Hours per user bar chart */}
-          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <TrendingUp className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-              <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">{t('dashboard.hours_by_person')}</h2>
+          {/* Hours per user bar chart + Donut chart */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <TrendingUp className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">{t('dashboard.hours_by_person')}</h2>
+              </div>
+              <div className="space-y-2">
+                {pivot.sortedUsers.map(([uid, uData]) => {
+                  const isMax = multipleUsers && uData.total === maxTotal && maxTotal > 0
+                  return (
+                    <div key={uid} className="flex items-center gap-3">
+                      <div className="flex items-center gap-1 w-36 flex-shrink-0">
+                        {isMax && <Trophy className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />}
+                        <span className="text-sm text-gray-600 dark:text-gray-400 truncate">{uData.name}</span>
+                      </div>
+                      <div className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full h-5 relative">
+                        <div
+                          className={`h-5 rounded-full transition-all ${isMax ? 'bg-amber-400' : 'bg-primary-400'}`}
+                          style={{ width: `${(uData.total / maxUserHours) * 100}%` }}
+                        />
+                      </div>
+                      <span className="w-14 text-sm font-medium text-gray-700 dark:text-gray-300 text-right">
+                        {uData.total.toFixed(1)}{hourAbbr}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-            <div className="space-y-2">
-              {pivot.sortedUsers.map(([uid, uData]) => (
-                <div key={uid} className="flex items-center gap-3">
-                  <span className="w-36 text-sm text-gray-600 dark:text-gray-400 truncate flex-shrink-0">{uData.name}</span>
-                  <div className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full h-5 relative">
-                    <div
-                      className="h-5 rounded-full bg-primary-400"
-                      style={{ width: `${(uData.total / maxUserHours) * 100}%` }}
-                    />
-                  </div>
-                  <span className="w-14 text-sm font-medium text-gray-700 dark:text-gray-300 text-right">
-                    {uData.total.toFixed(1)}h
-                  </span>
-                </div>
-              ))}
+
+            {/* Donut chart */}
+            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <TrendingUp className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">{t('dashboard.hours_by_type')}</h2>
+              </div>
+              <DonutChart data={donutData} hourAbbr={hourAbbr} />
             </div>
           </div>
 
@@ -390,34 +531,55 @@ export default function ReportsPage() {
                         </span>
                       </th>
                     ))}
+                    <th className="text-center px-4 py-3 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">{t('reports.trend_col', { defaultValue: 'Trend' })}</th>
                     <th className="text-right px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">{t('reports.total_col')}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {pivot.sortedUsers.map(([uid, uData]) => (
-                    <tr key={uid} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30">
-                      <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">{uData.name}</td>
-                      {pivot.typeList.map(([typeId]) => (
-                        <td key={typeId} className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">
-                          {uData.byType[typeId] ? `${uData.byType[typeId].toFixed(1)}h` : '—'}
+                  {pivot.sortedUsers.map(([uid, uData]) => {
+                    const isMax = multipleUsers && uData.total === maxTotal && maxTotal > 0
+                    const isMin = multipleUsers && uData.total === minTotal && minTotal < maxTotal
+                    return (
+                      <tr
+                        key={uid}
+                        className={`border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30 transition-colors ${
+                          isMax ? 'bg-amber-50 dark:bg-amber-900/10' : isMin ? 'bg-red-50/40 dark:bg-red-900/5' : ''
+                        }`}
+                      >
+                        <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">
+                          <span className="flex items-center gap-1.5">
+                            {isMax && <Trophy className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />}
+                            {uData.name}
+                          </span>
                         </td>
-                      ))}
-                      <td className="px-4 py-3 text-right font-semibold text-gray-800 dark:text-gray-200">
-                        {uData.total.toFixed(1)}h
-                      </td>
-                    </tr>
-                  ))}
+                        {pivot.typeList.map(([typeId]) => (
+                          <td key={typeId} className="px-4 py-3 text-right text-gray-600 dark:text-gray-400">
+                            {uData.byType[typeId] ? `${uData.byType[typeId].toFixed(1)}${hourAbbr}` : '—'}
+                          </td>
+                        ))}
+                        <td className="px-4 py-3 text-center">
+                          <div className="flex justify-center">
+                            <MiniSparkline dailyData={userSparklines[uid] ?? []} />
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-right font-semibold text-gray-800 dark:text-gray-200">
+                          {uData.total.toFixed(1)}{hourAbbr}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
                 <tfoot>
                   <tr className="bg-gray-50 dark:bg-gray-800/50 border-t-2 border-gray-300 dark:border-gray-600">
                     <td className="px-4 py-3 font-semibold text-gray-700 dark:text-gray-300">{t('reports.grand_total')}</td>
                     {pivot.typeList.map(([typeId]) => (
                       <td key={typeId} className="px-4 py-3 text-right font-semibold text-gray-700 dark:text-gray-300">
-                        {pivot.typeTotals[typeId] ? `${pivot.typeTotals[typeId].toFixed(1)}h` : '—'}
+                        {pivot.typeTotals[typeId] ? `${pivot.typeTotals[typeId].toFixed(1)}${hourAbbr}` : '—'}
                       </td>
                     ))}
+                    <td className="px-4 py-3" />
                     <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white">
-                      {pivot.grandTotal.toFixed(1)}h
+                      {pivot.grandTotal.toFixed(1)}{hourAbbr}
                     </td>
                   </tr>
                 </tfoot>

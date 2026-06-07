@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format, parseISO } from 'date-fns'
 import { tr, enUS } from 'date-fns/locale'
-import { Shield, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Shield, ChevronLeft, ChevronRight, Plus, Pencil, Trash2, LogIn, LogOut } from 'lucide-react'
 import { useAuditLogs } from '@/api/admin'
 
 const ACTION_COLORS: Record<string, string> = {
@@ -11,6 +11,30 @@ const ACTION_COLORS: Record<string, string> = {
   delete: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
   login: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
   logout: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+}
+
+const ACTION_ICON_BG: Record<string, string> = {
+  create: 'bg-green-100 dark:bg-green-900/30',
+  update: 'bg-blue-100 dark:bg-blue-900/30',
+  delete: 'bg-red-100 dark:bg-red-900/30',
+  login:  'bg-purple-100 dark:bg-purple-900/30',
+  logout: 'bg-gray-100 dark:bg-gray-800',
+}
+
+const ACTION_ICON_CLS: Record<string, string> = {
+  create: 'text-green-600 dark:text-green-400',
+  update: 'text-blue-600 dark:text-blue-400',
+  delete: 'text-red-600 dark:text-red-400',
+  login:  'text-purple-600 dark:text-purple-400',
+  logout: 'text-gray-500 dark:text-gray-400',
+}
+
+const ACTION_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  create: Plus,
+  update: Pencil,
+  delete: Trash2,
+  login:  LogIn,
+  logout: LogOut,
 }
 
 const LIMIT = 50
@@ -109,66 +133,52 @@ export default function AuditLogsPage() {
         </div>
       </div>
 
-      {/* Table */}
+      {/* Timeline feed */}
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-                <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('worklog.date')}</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('audit.action_label')}</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('audit.table')}</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('audit.record_id')}</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('audit.user')}</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('audit.ip')}</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">{t('common.loading')}</td>
-                </tr>
-              ) : !data?.items.length ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400">{t('audit.no_records')}</td>
-                </tr>
-              ) : (
-                data.items.map((log) => {
-                  const color = ACTION_COLORS[log.action] ?? 'bg-gray-100 text-gray-600'
-                  const label = ACTION_LABELS[log.action] ?? log.action
-                  return (
-                    <tr key={log.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/40">
-                      <td className="px-4 py-2.5 whitespace-nowrap text-gray-600 dark:text-gray-400">
-                        {format(parseISO(log.created_at), 'dd MMM yyyy HH:mm:ss', { locale })}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${color}`}>
-                          {label}
+        {isLoading ? (
+          <div className="px-4 py-8 text-center text-gray-400">{t('common.loading')}</div>
+        ) : !data?.items.length ? (
+          <div className="px-4 py-8 text-center text-gray-400">{t('audit.no_records')}</div>
+        ) : (
+          <div className="divide-y divide-gray-100 dark:divide-gray-800">
+            {data.items.map((log) => {
+              const iconBg  = ACTION_ICON_BG[log.action]  ?? 'bg-gray-100 dark:bg-gray-800'
+              const iconCls = ACTION_ICON_CLS[log.action] ?? 'text-gray-500'
+              const badgeCls = ACTION_COLORS[log.action]  ?? 'bg-gray-100 text-gray-600'
+              const label = ACTION_LABELS[log.action] ?? log.action
+              const Icon = ACTION_ICONS[log.action] ?? Shield
+
+              return (
+                <div key={log.id} className="flex items-start gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors">
+                  {/* Action icon */}
+                  <div className={`mt-0.5 flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center ${iconBg}`}>
+                    <Icon className={`h-3.5 w-3.5 ${iconCls}`} />
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-800 dark:text-gray-200 flex flex-wrap items-center gap-1.5">
+                      <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${badgeCls}`}>{label}</span>
+                      <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-400 font-mono">{log.table_name}</code>
+                      {log.username && (
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          by <span className="font-medium text-gray-700 dark:text-gray-300">{log.username}</span>
                         </span>
-                      </td>
-                      <td className="px-4 py-2.5 font-mono text-xs text-gray-700 dark:text-gray-300">
-                        {log.table_name}
-                      </td>
-                      <td className="px-4 py-2.5 font-mono text-xs text-gray-500 dark:text-gray-400 max-w-[140px] truncate">
-                        {log.record_id || '—'}
-                      </td>
-                      <td className="px-4 py-2.5 text-xs text-gray-700 dark:text-gray-300 max-w-[140px] truncate">
-                        {log.username
-                          ? <span className="font-medium">{log.username}</span>
-                          : log.user_id
-                            ? <span className="font-mono text-gray-400 dark:text-gray-500 text-[11px]">{log.user_id.slice(0, 8)}…</span>
-                            : '—'}
-                      </td>
-                      <td className="px-4 py-2.5 text-xs text-gray-500 dark:text-gray-400">
-                        {log.ip_address || '—'}
-                      </td>
-                    </tr>
-                  )
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                      )}
+                    </p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 flex flex-wrap items-center gap-2">
+                      <span>{format(parseISO(log.created_at), 'dd MMM yyyy HH:mm:ss', { locale })}</span>
+                      {log.ip_address && <span>· {log.ip_address}</span>}
+                      {log.record_id && (
+                        <span className="font-mono">· {log.record_id.slice(0, 8)}…</span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
 
         {/* Pagination */}
         {data && data.total > LIMIT && (

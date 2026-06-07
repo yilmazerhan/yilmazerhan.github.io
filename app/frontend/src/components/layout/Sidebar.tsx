@@ -77,10 +77,10 @@ export default function Sidebar({ open, onShortcutsOpen }: SidebarProps) {
               to={to}
               end={to === '/'}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors border-l-[3px] ${
                   isActive
-                    ? 'bg-primary-50 dark:bg-primary-100 text-primary-700 dark:text-primary-600'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
+                    : 'border-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`
               }
             >
@@ -96,10 +96,10 @@ export default function Sidebar({ open, onShortcutsOpen }: SidebarProps) {
         <NavLink
           to="/profile"
           className={({ isActive }) =>
-            `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+            `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors border-l-[3px] ${
               isActive
-                ? 'bg-primary-50 dark:bg-primary-100 text-primary-700 dark:text-primary-600'
-                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300'
+                : 'border-transparent text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
             }`
           }
         >

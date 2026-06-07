@@ -16,18 +16,30 @@ const LIMIT = 50
 
 type ViewMode = 'list' | 'calendar'
 
+function heatClass(hours: number): string {
+  if (hours === 0) return ''
+  if (hours < 1.5) return 'bg-indigo-50 dark:bg-indigo-900/20'
+  if (hours < 3)   return 'bg-indigo-100 dark:bg-indigo-900/30'
+  if (hours < 5)   return 'bg-indigo-200 dark:bg-indigo-900/40'
+  if (hours < 7)   return 'bg-indigo-300 dark:bg-indigo-900/50'
+  return 'bg-indigo-400/80 dark:bg-indigo-800/50'
+}
+
 function CalendarView({ logs, locale }: { logs: WorkLog[]; locale: Locale }) {
   const [calMonth, setCalMonth] = useState(new Date())
 
   const dayMap = useMemo(() => {
-    const map: Record<string, { hours: number; count: number; colors: string[] }> = {}
+    const map: Record<string, { hours: number; count: number; byType: Array<{ name: string; color: string; hours: number }> }> = {}
     for (const log of logs) {
       const key = log.log_date
-      if (!map[key]) map[key] = { hours: 0, count: 0, colors: [] }
+      if (!map[key]) map[key] = { hours: 0, count: 0, byType: [] }
       map[key].hours += log.duration_hours
       map[key].count += 1
-      if (!map[key].colors.includes(log.work_type.color)) {
-        map[key].colors.push(log.work_type.color)
+      const bt = map[key].byType.find(t => t.color === log.work_type.color)
+      if (bt) {
+        bt.hours += log.duration_hours
+      } else {
+        map[key].byType.push({ name: log.work_type.name, color: log.work_type.color, hours: log.duration_hours })
       }
     }
     return map
@@ -63,6 +75,15 @@ function CalendarView({ logs, locale }: { logs: WorkLog[]; locale: Locale }) {
         </button>
       </div>
 
+      {/* Legend */}
+      <div className="flex items-center gap-3 px-6 py-2 border-b border-gray-100 dark:border-gray-800/50 text-xs text-gray-400 dark:text-gray-500">
+        <span>0h</span>
+        {['bg-indigo-50','bg-indigo-100','bg-indigo-200','bg-indigo-300','bg-indigo-400/80'].map((cls, i) => (
+          <span key={i} className={`w-4 h-4 rounded ${cls} border border-gray-200 dark:border-gray-700`} />
+        ))}
+        <span>8h+</span>
+      </div>
+
       {/* Day-of-week headers */}
       <div className="grid grid-cols-7 border-b border-gray-200 dark:border-gray-800">
         {DOW.map((d) => (
@@ -82,27 +103,37 @@ function CalendarView({ logs, locale }: { logs: WorkLog[]; locale: Locale }) {
           const entry = dayMap[key]
           const isToday = key === format(new Date(), 'yyyy-MM-dd')
           const inView = isSameMonth(day, calMonth)
+          const tooltip = entry
+            ? `${entry.hours.toFixed(1)}h · ${entry.count}×\n${entry.byType.map(wt => `${wt.name}: ${wt.hours.toFixed(1)}h`).join('\n')}`
+            : undefined
           return (
             <div
               key={key}
-              className={`h-20 border-b border-r border-gray-100 dark:border-gray-800/50 p-1.5 ${
-                !inView ? 'opacity-30' : ''
-              } ${isToday ? 'bg-primary-50 dark:bg-primary-900/10' : ''}`}
+              className={`h-20 border-b border-r border-gray-100 dark:border-gray-800/50 p-1.5 transition-colors${
+                !inView ? ' opacity-30' : ''
+              }${isToday ? ' ring-1 ring-inset ring-primary-400 dark:ring-primary-500' : ''}${
+                entry ? ` ${heatClass(entry.hours)}` : ''
+              }`}
+              title={tooltip}
             >
               <div className={`text-xs font-medium mb-1 ${isToday ? 'text-primary-600 dark:text-primary-400' : 'text-gray-500 dark:text-gray-400'}`}>
                 {format(day, 'd')}
               </div>
               {entry && (
-                <div className="space-y-0.5">
-                  <div className="flex flex-wrap gap-0.5">
-                    {entry.colors.slice(0, 4).map((c, ci) => (
-                      <span key={ci} className="w-2 h-2 rounded-full" style={{ backgroundColor: c }} />
-                    ))}
-                  </div>
-                  <div className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                <div className="space-y-1">
+                  <div className={`text-xs font-semibold ${isToday ? 'text-primary-700 dark:text-primary-300' : 'text-gray-700 dark:text-gray-200'}`}>
                     {entry.hours.toFixed(1)}h
                   </div>
-                  <div className="text-xs text-gray-400">{entry.count}×</div>
+                  {/* Segmented bar by work type */}
+                  <div className="flex h-1.5 rounded overflow-hidden">
+                    {entry.byType.map((wt, i) => (
+                      <div
+                        key={i}
+                        style={{ width: `${(wt.hours / entry.hours) * 100}%`, backgroundColor: wt.color }}
+                        title={`${wt.name}: ${wt.hours.toFixed(1)}h`}
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

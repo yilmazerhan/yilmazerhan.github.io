@@ -15,6 +15,13 @@ const PRIORITY_CONFIG = {
   critical: { label: 'priority_critical', cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' },
 }
 
+const PRIORITY_STRIPE: Record<string, string> = {
+  low: '#9ca3af',
+  medium: '#3b82f6',
+  high: '#f59e0b',
+  critical: '#ef4444',
+}
+
 interface Props {
   task: Task
   onClick: (task: Task) => void
@@ -31,6 +38,7 @@ export default function TaskCard({ task, onClick, isDragOverlay = false, selecti
   const { data: subtasks = [] } = useTaskSubtasks(isDragOverlay ? null : task.id)
   const subtasksTotal = subtasks.length
   const subtasksDone = subtasks.filter((s) => s.is_completed).length
+  const allSubtasksDone = subtasksTotal > 0 && subtasksDone === subtasksTotal
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
@@ -43,20 +51,26 @@ export default function TaskCard({ task, onClick, isDragOverlay = false, selecti
   }
 
   const priority = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.medium
+  const stripeColor = PRIORITY_STRIPE[task.priority] ?? PRIORITY_STRIPE.low
 
-  let dueDateStatus: 'overdue' | 'today' | 'upcoming' | null = null
+  let dueDateStatus: 'overdue' | 'today' | 'soon' | 'upcoming' | null = null
   if (task.due_date) {
     const d = parseISO(task.due_date)
     if (isPast(d) && !isToday(d)) dueDateStatus = 'overdue'
     else if (isToday(d)) dueDateStatus = 'today'
-    else dueDateStatus = 'upcoming'
+    else {
+      const daysLeft = Math.ceil((d.getTime() - Date.now()) / 86400000)
+      dueDateStatus = daysLeft <= 2 ? 'soon' : 'upcoming'
+    }
   }
 
-  const dueDateCls =
+  const dueDateBadgeCls =
     dueDateStatus === 'overdue'
-      ? 'text-red-600 dark:text-red-400'
+      ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 px-1.5 py-0.5 rounded font-medium'
       : dueDateStatus === 'today'
-      ? 'text-amber-600 dark:text-amber-400'
+      ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 px-1.5 py-0.5 rounded font-medium'
+      : dueDateStatus === 'soon'
+      ? 'bg-orange-50 text-orange-600 dark:bg-orange-900/20 dark:text-orange-400 px-1.5 py-0.5 rounded font-medium'
       : 'text-gray-500 dark:text-gray-400'
 
   return (
@@ -65,7 +79,7 @@ export default function TaskCard({ task, onClick, isDragOverlay = false, selecti
       style={style}
       {...attributes}
       {...listeners}
-      className={`relative bg-white dark:bg-gray-800 rounded-lg border p-3 shadow-sm select-none
+      className={`relative bg-white dark:bg-gray-800 rounded-lg border overflow-hidden shadow-sm select-none
         ${isDragging ? 'opacity-40' : ''}
         ${isDragOverlay ? 'shadow-xl rotate-1 opacity-95 cursor-grabbing' : 'cursor-grab active:cursor-grabbing'}
         ${isSelected
@@ -81,6 +95,9 @@ export default function TaskCard({ task, onClick, isDragOverlay = false, selecti
         }
       }}
     >
+      {/* Priority stripe */}
+      <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: stripeColor }} />
+
       {/* Selection checkbox */}
       {selectionMode && (
         <div className="absolute top-2 right-2 z-10">
@@ -90,7 +107,7 @@ export default function TaskCard({ task, onClick, isDragOverlay = false, selecti
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className="pl-4 pr-3 pt-3 pb-3 space-y-2">
         {/* Labels */}
         {task.labels && task.labels.length > 0 && (
           <div className="flex flex-wrap gap-1">
@@ -112,7 +129,7 @@ export default function TaskCard({ task, onClick, isDragOverlay = false, selecti
           </span>
 
           {task.due_date && (
-            <span className={`inline-flex items-center gap-0.5 text-xs ${dueDateCls}`}>
+            <span className={`inline-flex items-center gap-0.5 text-xs ${dueDateBadgeCls}`}>
               <Clock className="h-3 w-3" />
               {dueDateStatus === 'overdue'
                 ? t('kanban.overdue')
@@ -147,14 +164,16 @@ export default function TaskCard({ task, onClick, isDragOverlay = false, selecti
         {/* Subtasks progress */}
         {subtasksTotal > 0 && (
           <div className="flex items-center gap-1.5">
-            <ListChecks className="h-3.5 w-3.5 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+            <ListChecks className={`h-3.5 w-3.5 flex-shrink-0 ${allSubtasksDone ? 'text-green-500' : 'text-gray-400 dark:text-gray-500'}`} />
             <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
               <div
-                className="bg-primary-500 h-1.5 rounded-full transition-all"
+                className={`h-1.5 rounded-full transition-all ${allSubtasksDone ? 'bg-green-500' : 'bg-primary-500'}`}
                 style={{ width: `${Math.round((subtasksDone / subtasksTotal) * 100)}%` }}
               />
             </div>
-            <span className="text-xs text-gray-500 dark:text-gray-400">{subtasksDone}/{subtasksTotal}</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+              {subtasksDone}/{subtasksTotal}{allSubtasksDone ? ' ✓' : ''}
+            </span>
           </div>
         )}
 
