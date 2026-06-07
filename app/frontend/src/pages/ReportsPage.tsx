@@ -488,11 +488,26 @@ export default function ReportsPage() {
                         {isMax && <Trophy className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />}
                         <span className="text-sm text-gray-600 dark:text-gray-400 truncate">{uData.name}</span>
                       </div>
-                      <div className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full h-5 relative">
+                      <div className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full h-5 overflow-hidden">
                         <div
-                          className={`h-5 rounded-full transition-all ${isMax ? 'bg-amber-400' : 'bg-primary-400'}`}
+                          className="flex h-full"
                           style={{ width: `${(uData.total / maxUserHours) * 100}%` }}
-                        />
+                        >
+                          {pivot.typeList
+                            .filter(([typeId]) => (uData.byType[typeId] ?? 0) > 0)
+                            .map(([typeId, type]) => (
+                              <div
+                                key={typeId}
+                                className="h-full flex-shrink-0"
+                                title={`${resolveName(t, type.name, type.name_key)}: ${(uData.byType[typeId] ?? 0).toFixed(1)}${hourAbbr}`}
+                                style={{
+                                  width: `${((uData.byType[typeId] ?? 0) / uData.total) * 100}%`,
+                                  backgroundColor: type.color,
+                                }}
+                              />
+                            ))
+                          }
+                        </div>
                       </div>
                       <span className="w-14 text-sm font-medium text-gray-700 dark:text-gray-300 text-right">
                         {uData.total.toFixed(1)}{hourAbbr}
