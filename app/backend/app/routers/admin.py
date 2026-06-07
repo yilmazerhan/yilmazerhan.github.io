@@ -206,6 +206,8 @@ async def list_audit_logs(
             "action": log.action,
             "table_name": log.table_name,
             "record_id": log.record_id,
+            "old_data": log.old_data,
+            "new_data": log.new_data,
             "ip_address": log.ip_address,
             "user_agent": log.user_agent,
             "created_at": log.created_at,
