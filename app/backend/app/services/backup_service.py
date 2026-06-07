@@ -5,7 +5,7 @@ import logging
 import os
 import uuid
 from datetime import datetime, timezone
-from urllib.parse import urlparse
+from urllib.parse import urlparse, unquote
 from zoneinfo import ZoneInfo
 
 _ISTANBUL = ZoneInfo("Europe/Istanbul")
@@ -29,11 +29,14 @@ _BACKUP_TYPE_SCHEDULED = "scheduled"
 def _parse_db_url():
     raw = settings.DATABASE_URL.replace("+asyncpg", "")
     p = urlparse(raw)
+    # urlparse does NOT percent-decode username/password — apply unquote so that
+    # passwords containing URL-special characters (e.g. %40 → @) are passed
+    # correctly to PGPASSWORD and pg_dump connects successfully.
     return {
         "host": p.hostname or "localhost",
         "port": str(p.port or 5432),
-        "user": p.username or "postgres",
-        "password": p.password or "",
+        "user": unquote(p.username) if p.username else "postgres",
+        "password": unquote(p.password) if p.password else "",
         "dbname": (p.path or "").lstrip("/"),
     }
 
@@ -107,7 +110,9 @@ async def create_backup(
         raise HTTPException(status_code=501, detail="pg_dump binary not found in this environment.")
 
     if rc != 0:
-        logger.error("pg_dump failed (rc=%d) — details omitted for security", rc)
+        # Log stderr internally so operators can diagnose failures (not exposed to API).
+        err_preview = stderr.decode("utf-8", errors="replace")[:500]
+        logger.error("pg_dump failed (rc=%d): %s", rc, err_preview)
         raise HTTPException(status_code=500, detail="Veritabanı yedeği alınamadı.")
 
     # Write to disk

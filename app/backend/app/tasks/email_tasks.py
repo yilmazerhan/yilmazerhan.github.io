@@ -132,60 +132,63 @@ def send_email_task(
 
 
 async def _send_email_async(to_email: str, subject: str, html_body: str, log_id: Optional[str]):
-    from app.database import engine, AsyncSessionLocal
+    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+    from sqlalchemy.pool import NullPool
     from app.services.email_service import EmailService
     from app.core.security import decrypt_field
     from app.config import settings
-    # Discard pool connections from the previous event loop before acquiring new ones.
-    await engine.dispose()
-
-    async with AsyncSessionLocal() as db:
-        svc = EmailService(db)
-        smtp_cfg = await svc.get_smtp_config()
-        if not smtp_cfg:
-            if log_id:
-                await _mark_log_failed(db, log_id, "SMTP yapılandırması yok.")
-                await db.commit()
-            return
-
-        password = decrypt_field(smtp_cfg.password_encrypted, settings.SMTP_ENCRYPTION_KEY)
-
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"] = f"{smtp_cfg.from_name} <{smtp_cfg.from_email}>"
-        msg["To"] = to_email
-        msg.attach(MIMEText(html_body, "html", "utf-8"))
-
-        try:
-            context = ssl_lib.create_default_context()
-            if getattr(smtp_cfg, 'use_ssl', False):
-                with smtplib.SMTP_SSL(smtp_cfg.host, smtp_cfg.port, context=context, timeout=15) as server:
-                    server.login(smtp_cfg.username, password)
-                    server.sendmail(smtp_cfg.from_email, [to_email], msg.as_string())
-            elif smtp_cfg.use_tls:
-                with smtplib.SMTP(smtp_cfg.host, smtp_cfg.port, timeout=15) as server:
-                    server.ehlo()
-                    server.starttls(context=context)
-                    server.ehlo()
-                    server.login(smtp_cfg.username, password)
-                    server.sendmail(smtp_cfg.from_email, [to_email], msg.as_string())
-            else:
-                with smtplib.SMTP(smtp_cfg.host, smtp_cfg.port, timeout=15) as server:
-                    server.ehlo()
-                    server.login(smtp_cfg.username, password)
-                    server.sendmail(smtp_cfg.from_email, [to_email], msg.as_string())
-
-            if log_id:
-                await _mark_log_sent(db, log_id)
-            await db.commit()
-        except Exception as e:
-            if log_id:
-                await _mark_log_failed(db, log_id, str(e))
-                try:
+    engine = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
+    Session = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with Session() as db:
+            svc = EmailService(db)
+            smtp_cfg = await svc.get_smtp_config()
+            if not smtp_cfg:
+                if log_id:
+                    await _mark_log_failed(db, log_id, "SMTP yapılandırması yok.")
                     await db.commit()
-                except Exception:
-                    pass
-            raise
+                return
+
+            password = decrypt_field(smtp_cfg.password_encrypted, settings.SMTP_ENCRYPTION_KEY)
+
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = subject
+            msg["From"] = f"{smtp_cfg.from_name} <{smtp_cfg.from_email}>"
+            msg["To"] = to_email
+            msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+            try:
+                context = ssl_lib.create_default_context()
+                if getattr(smtp_cfg, 'use_ssl', False):
+                    with smtplib.SMTP_SSL(smtp_cfg.host, smtp_cfg.port, context=context, timeout=15) as server:
+                        server.login(smtp_cfg.username, password)
+                        server.sendmail(smtp_cfg.from_email, [to_email], msg.as_string())
+                elif smtp_cfg.use_tls:
+                    with smtplib.SMTP(smtp_cfg.host, smtp_cfg.port, timeout=15) as server:
+                        server.ehlo()
+                        server.starttls(context=context)
+                        server.ehlo()
+                        server.login(smtp_cfg.username, password)
+                        server.sendmail(smtp_cfg.from_email, [to_email], msg.as_string())
+                else:
+                    with smtplib.SMTP(smtp_cfg.host, smtp_cfg.port, timeout=15) as server:
+                        server.ehlo()
+                        server.login(smtp_cfg.username, password)
+                        server.sendmail(smtp_cfg.from_email, [to_email], msg.as_string())
+
+                if log_id:
+                    await _mark_log_sent(db, log_id)
+                await db.commit()
+            except Exception as e:
+                if log_id:
+                    await _mark_log_failed(db, log_id, str(e))
+                    try:
+                        await db.commit()
+                    except Exception:
+                        pass
+                raise
+    finally:
+        await engine.dispose()
 
 
 async def _mark_log_sent(db, log_id: str):
@@ -270,40 +273,44 @@ def _get_setting(attr: str, default):
 
 
 async def _send_auth_email_async(to_email: str, template_slug: str, variables: dict):
-    from app.database import engine, AsyncSessionLocal
+    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+    from sqlalchemy.pool import NullPool
     from app.services.email_service import EmailService
     from app.models.app_setting import AppSetting
     from app.config import settings
     from sqlalchemy import select
-    # Discard pool connections from the previous event loop before acquiring new ones.
-    await engine.dispose()
+    engine = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
+    Session = async_sessionmaker(engine, expire_on_commit=False)
+    subject = html_body = log_id = None
+    try:
+        async with Session() as db:
+            svc = EmailService(db)
+            template = await svc.get_template_by_slug(template_slug)
+            if not template:
+                return
 
-    async with AsyncSessionLocal() as db:
-        svc = EmailService(db)
-        template = await svc.get_template_by_slug(template_slug)
-        if not template:
-            return
+            setting_result = await db.execute(
+                select(AppSetting).where(AppSetting.key == "company_name")
+            )
+            name_row = setting_result.scalar_one_or_none()
+            app_name = name_row.value if name_row and name_row.value else ""
+            app_url = settings.FRONTEND_URL.rstrip("/")
+            merged_vars = {"app_name": app_name, "app_url": app_url, **variables}
 
-        # Inject app branding so any template can use {{ app_name }} / {{ app_url }}
-        setting_result = await db.execute(
-            select(AppSetting).where(AppSetting.key == "company_name")
-        )
-        name_row = setting_result.scalar_one_or_none()
-        app_name = name_row.value if name_row and name_row.value else ""
-        app_url = settings.FRONTEND_URL.rstrip("/")
+            subject, html_body = svc.render_template(template, merged_vars)
+            log = await svc.create_log_entry(
+                to_email=to_email,
+                subject=subject,
+                template_id=template.id,
+            )
+            log_id = str(log.id)
+            await db.commit()
+    finally:
+        await engine.dispose()
 
-        merged_vars = {"app_name": app_name, "app_url": app_url, **variables}
-
-        subject, html_body = svc.render_template(template, merged_vars)
-        log = await svc.create_log_entry(
-            to_email=to_email,
-            subject=subject,
-            template_id=template.id,
-        )
-        await db.commit()
-
-    # Delegate actual SMTP delivery to the generic send task
-    send_email_task.delay(to_email=to_email, subject=subject, html_body=html_body, log_id=str(log.id))
+    # Delegate actual SMTP delivery to the generic send task (outside the session)
+    if subject and html_body and log_id:
+        send_email_task.delay(to_email=to_email, subject=subject, html_body=html_body, log_id=log_id)
 
 
 @celery_app.task(bind=True, max_retries=2)
@@ -322,14 +329,19 @@ def send_teams_message_task(
 
 async def _send_teams_async(webhook_id: str, title: str, body: str, action_url: Optional[str]):
     import uuid
-    from app.database import engine, AsyncSessionLocal
+    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+    from sqlalchemy.pool import NullPool
     from app.services.teams_service import TeamsService
-    # Discard pool connections from the previous event loop before acquiring new ones.
-    await engine.dispose()
-    async with AsyncSessionLocal() as db:
-        svc = TeamsService(db)
-        await svc.send_message(uuid.UUID(webhook_id), title, body, action_url)
-        await db.commit()
+    from app.config import settings
+    engine = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
+    Session = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with Session() as db:
+            svc = TeamsService(db)
+            await svc.send_message(uuid.UUID(webhook_id), title, body, action_url)
+            await db.commit()
+    finally:
+        await engine.dispose()
 
 
 @celery_app.task
@@ -349,61 +361,62 @@ def _workflow_tz(wf):
 
 async def _evaluate_workflows_async():
     from zoneinfo import ZoneInfo
-    from app.database import engine, AsyncSessionLocal
+    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+    from sqlalchemy.pool import NullPool
     from sqlalchemy import select
     from app.models.email_workflow import EmailWorkflow
-    # Discard pool connections from the previous event loop before acquiring new ones.
-    await engine.dispose()
-
+    from app.config import settings
+    engine = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
+    Session = async_sessionmaker(engine, expire_on_commit=False)
     _ISTANBUL = ZoneInfo("Europe/Istanbul")
+    try:
+        async with Session() as db:
+            result = await db.execute(
+                select(EmailWorkflow).where(EmailWorkflow.is_active == True)
+            )
+            workflows = result.scalars().all()
 
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(
-            select(EmailWorkflow).where(EmailWorkflow.is_active == True)
-        )
-        workflows = result.scalars().all()
+            now = datetime.now(timezone.utc)
+            now_istanbul = now.astimezone(_ISTANBUL)
+            today_istanbul = now_istanbul.date()
 
-        now = datetime.now(timezone.utc)
-        # Use Istanbul for date-only comparisons (task due/overdue)
-        now_istanbul = now.astimezone(_ISTANBUL)
-        today_istanbul = now_istanbul.date()
+            for wf in workflows:
+                try:
+                    if wf.trigger_type == "task_due_soon":
+                        days_before = (wf.trigger_config or {}).get("days_before", 3)
+                        target_date = today_istanbul + timedelta(days=days_before)
+                        await _handle_task_due_soon(db, wf, target_date)
 
-        for wf in workflows:
-            try:
-                if wf.trigger_type == "task_due_soon":
-                    days_before = (wf.trigger_config or {}).get("days_before", 3)
-                    target_date = today_istanbul + timedelta(days=days_before)
-                    await _handle_task_due_soon(db, wf, target_date)
+                    elif wf.trigger_type == "task_overdue":
+                        await _handle_task_overdue(db, wf, today_istanbul)
 
-                elif wf.trigger_type == "task_overdue":
-                    await _handle_task_overdue(db, wf, today_istanbul)
+                    elif wf.trigger_type in ("worklog_reminder", "dashboard_report"):
+                        wf_tz = _workflow_tz(wf)
+                        now_local = now.astimezone(wf_tz)
+                        today_local = now_local.date()
+                        hour = (wf.trigger_config or {}).get(
+                            "send_hour", 17 if wf.trigger_type == "worklog_reminder" else 8
+                        )
 
-                elif wf.trigger_type in ("worklog_reminder", "dashboard_report"):
-                    # Use the workflow's own configured timezone for hour-based firing
-                    wf_tz = _workflow_tz(wf)
-                    now_local = now.astimezone(wf_tz)
-                    today_local = now_local.date()
-                    hour = (wf.trigger_config or {}).get(
-                        "send_hour", 17 if wf.trigger_type == "worklog_reminder" else 8
+                        if now_local.hour == hour:
+                            if wf.trigger_type == "worklog_reminder":
+                                await _handle_worklog_reminder(db, wf, today_local)
+                            else:
+                                frequency = (wf.trigger_config or {}).get("frequency", "daily")
+                                day_of_week = (wf.trigger_config or {}).get("day_of_week", 0)
+                                if frequency == "daily" or (frequency == "weekly" and today_local.weekday() == day_of_week):
+                                    await _handle_dashboard_report(db, wf, today_local)
+
+                    wf.last_run_at = now
+                except Exception as exc:
+                    logger.error(
+                        "Workflow %s (%s) raised an error and was skipped: %s",
+                        wf.id, wf.trigger_type, exc, exc_info=True,
                     )
 
-                    if now_local.hour == hour:
-                        if wf.trigger_type == "worklog_reminder":
-                            await _handle_worklog_reminder(db, wf, today_local)
-                        else:
-                            frequency = (wf.trigger_config or {}).get("frequency", "daily")
-                            day_of_week = (wf.trigger_config or {}).get("day_of_week", 0)
-                            if frequency == "daily" or (frequency == "weekly" and today_local.weekday() == day_of_week):
-                                await _handle_dashboard_report(db, wf, today_local)
-
-                wf.last_run_at = now
-            except Exception as exc:
-                logger.error(
-                    "Workflow %s (%s) raised an error and was skipped: %s",
-                    wf.id, wf.trigger_type, exc, exc_info=True,
-                )
-
-        await db.commit()
+            await db.commit()
+    finally:
+        await engine.dispose()
 
 
 async def _handle_task_due_soon(db, workflow, target_date: date):
@@ -659,14 +672,19 @@ def refresh_jira_statuses():
 
 
 async def _refresh_jira_async():
-    from app.database import engine, AsyncSessionLocal
+    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+    from sqlalchemy.pool import NullPool
     from app.services.jira_service import JiraService
-    # Discard pool connections from the previous event loop before acquiring new ones.
-    await engine.dispose()
-    async with AsyncSessionLocal() as db:
-        svc = JiraService(db)
-        await svc.bulk_refresh_jira_statuses()
-        await db.commit()
+    from app.config import settings
+    engine = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
+    Session = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with Session() as db:
+            svc = JiraService(db)
+            await svc.bulk_refresh_jira_statuses()
+            await db.commit()
+    finally:
+        await engine.dispose()
 
 
 @celery_app.task(name="app.tasks.email_tasks.send_worklog_reminders")
@@ -677,77 +695,82 @@ def send_worklog_reminders():
 async def _send_worklog_reminders_async():
     from datetime import date, datetime, timezone
     from sqlalchemy import select, func
-    from app.database import engine, AsyncSessionLocal
+    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+    from sqlalchemy.pool import NullPool
     from app.models.user import User
     from app.models.worklog import WorkLog
     from app.models.email_log import EmailLog
     from app.services.email_service import EmailService
-    # Discard pool connections from the previous event loop before acquiring new ones.
-    await engine.dispose()
+    from app.config import settings
 
     today = date.today()
     if today.weekday() >= 5:  # Saturday=5, Sunday=6
         logger.info("send_worklog_reminders: skipping — today is a weekend")
         return
 
-    async with AsyncSessionLocal() as db:
-        svc = EmailService(db)
+    engine = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
+    Session = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with Session() as db:
+            svc = EmailService(db)
 
-        smtp_cfg = await svc.get_smtp_config()
-        if not smtp_cfg:
-            logger.warning("send_worklog_reminders: SMTP not configured — skipping")
-            return
+            smtp_cfg = await svc.get_smtp_config()
+            if not smtp_cfg:
+                logger.warning("send_worklog_reminders: SMTP not configured — skipping")
+                return
 
-        template = await svc.get_template_by_slug("worklog_reminder")
-        if not template:
-            logger.error("send_worklog_reminders: 'worklog_reminder' template not found in DB")
-            return
+            template = await svc.get_template_by_slug("worklog_reminder")
+            if not template:
+                logger.error("send_worklog_reminders: 'worklog_reminder' template not found in DB")
+                return
 
-        active_users = (await db.execute(
-            select(User).where(User.is_active == True, User.is_deleted == False)
-        )).scalars().all()
+            active_users = (await db.execute(
+                select(User).where(User.is_active == True, User.is_deleted == False)
+            )).scalars().all()
 
-        logged_today = (await db.execute(
-            select(WorkLog.user_id).where(WorkLog.log_date == today).distinct()
-        )).scalars().all()
-        logged_ids = set(logged_today)
+            logged_today = (await db.execute(
+                select(WorkLog.user_id).where(WorkLog.log_date == today).distinct()
+            )).scalars().all()
+            logged_ids = set(logged_today)
 
-        today_start = datetime.combine(today, datetime.min.time()).replace(tzinfo=timezone.utc)
+            today_start = datetime.combine(today, datetime.min.time()).replace(tzinfo=timezone.utc)
 
-        for user in active_users:
-            if user.id in logged_ids:
-                continue
+            for user in active_users:
+                if user.id in logged_ids:
+                    continue
 
-            already_sent = (await db.execute(
-                select(func.count(EmailLog.id)).where(
-                    EmailLog.template_id == template.id,
-                    EmailLog.recipient_id == user.id,
-                    EmailLog.created_at >= today_start,
+                already_sent = (await db.execute(
+                    select(func.count(EmailLog.id)).where(
+                        EmailLog.template_id == template.id,
+                        EmailLog.recipient_id == user.id,
+                        EmailLog.created_at >= today_start,
+                    )
+                )).scalar_one()
+                if already_sent > 0:
+                    continue
+
+                subject, html = svc.render_template(template, {
+                    "user_name": user.full_name,
+                    "date": str(today),
+                })
+
+                log = await svc.create_log_entry(
+                    to_email=user.email,
+                    subject=subject,
+                    template_id=template.id,
+                    recipient_id=user.id,
                 )
-            )).scalar_one()
-            if already_sent > 0:
-                continue
+                await db.flush()
 
-            subject, html = svc.render_template(template, {
-                "user_name": user.full_name,
-                "date": str(today),
-            })
+                send_email_task.delay(
+                    to_email=user.email,
+                    subject=subject,
+                    html_body=html,
+                    log_id=str(log.id),
+                )
+                logger.info("send_worklog_reminders: queued reminder for %s", user.email)
 
-            log = await svc.create_log_entry(
-                to_email=user.email,
-                subject=subject,
-                template_id=template.id,
-                recipient_id=user.id,
-            )
-            await db.flush()
-
-            send_email_task.delay(
-                to_email=user.email,
-                subject=subject,
-                html_body=html,
-                log_id=str(log.id),
-            )
-            logger.info("send_worklog_reminders: queued reminder for %s", user.email)
-
-        await db.commit()
-        logger.info("send_worklog_reminders: done for %s", today)
+            await db.commit()
+            logger.info("send_worklog_reminders: done for %s", today)
+    finally:
+        await engine.dispose()
