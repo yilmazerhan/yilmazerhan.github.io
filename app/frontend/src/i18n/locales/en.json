@@ -698,7 +698,12 @@
     "countdown_disabled": "Automatic backups are disabled. Enable the toggle below to activate.",
     "countdown_last_attempt": "Last attempt",
     "countdown_never": "No scheduled backup has run yet",
-    "countdown_error_detail": "Error:"
+    "countdown_error_detail": "Error:",
+    "log_title": "Backup Check Logs",
+    "log_empty": "No checks logged yet. Logs appear here when the scheduled check runs at the configured time. If empty after the configured time has passed, verify that Celery Beat is running.",
+    "log_result_success": "Backup Created",
+    "log_result_skipped": "Skipped",
+    "log_result_error": "Error"
   },
   "audit": {
     "action_create": "Create",

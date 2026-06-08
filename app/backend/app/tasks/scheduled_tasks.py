@@ -44,13 +44,24 @@ async def _run_backup_check_async():
         async with SessionLocal.begin() as db:
             await run_scheduled_backup_check(db)
     except Exception as exc:
+        error_str = str(exc)
         logger.error("Scheduled backup check failed: %s", exc, exc_info=True)
-        # Persist a "failed" record in a fresh session so it's visible in the UI.
-        # The outer transaction was rolled back on exception, so we need a new session.
-        await _save_failed_backup_record(SessionLocal, error_msg=str(exc))
+        # Both helpers open fresh sessions — the main transaction was rolled back.
+        await _save_failed_backup_record(SessionLocal, error_msg=error_str)
+        await _save_check_log_error(SessionLocal, error_str)
         raise
     finally:
         await engine.dispose()
+
+
+async def _save_check_log_error(session_factory, error_msg: str) -> None:
+    """Write an 'error' entry to the backup check log in a fresh session."""
+    from app.services.backup_service import _append_check_log
+    try:
+        async with session_factory.begin() as db:
+            await _append_check_log(db, "error", detail=f"Hata: {error_msg[:300]}")
+    except Exception as save_exc:
+        logger.warning("Could not write check log error entry: %s", save_exc)
 
 
 async def _save_failed_backup_record(SessionLocal, error_msg: str = "") -> None:

@@ -168,3 +168,11 @@ async def get_next_run(
     _: Any = Depends(require_superadmin),
 ) -> dict:
     return await backup_service.get_next_run_info(db)
+
+
+@router.get("/check-log")
+async def get_check_log(
+    db: AsyncSession = Depends(get_db),
+    _: Any = Depends(require_superadmin),
+) -> list:
+    return await backup_service.get_check_log(db)

@@ -698,7 +698,12 @@
     "countdown_disabled": "Otomatik yedekleme devre dışı. Etkinleştirmek için aşağıdaki seçeneği açın.",
     "countdown_last_attempt": "Son deneme",
     "countdown_never": "Henüz zamanlanmış yedek çalışmadı",
-    "countdown_error_detail": "Hata:"
+    "countdown_error_detail": "Hata:",
+    "log_title": "Yedek Kontrol Logları",
+    "log_empty": "Henüz log kaydedilmedi. Loglar yapılandırılan saatte kontrol çalıştığında burada görünür. Yapılandırılan saatten sonra hâlâ boşsa Celery Beat'in çalıştığını doğrulayın.",
+    "log_result_success": "Yedek Oluşturuldu",
+    "log_result_skipped": "Atlandı",
+    "log_result_error": "Hata"
   },
   "audit": {
     "action_create": "Oluşturma",

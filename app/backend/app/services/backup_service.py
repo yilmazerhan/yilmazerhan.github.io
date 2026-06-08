@@ -23,6 +23,9 @@ BACKUP_DIR = "/app/backups"
 _BACKUP_TYPE_MANUAL = "manual"
 _BACKUP_TYPE_SCHEDULED = "scheduled"
 
+_CHECK_LOG_KEY = "backup_check_log"
+_CHECK_LOG_MAX = 30  # keep at most 30 entries
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -87,6 +90,50 @@ _UPLOAD_MIN_BYTES = 50                   # trivially empty files rejected
 
 # Core tables that every valid app dump must reference.
 _EXPECTED_TABLES = ["users", "teams", "tasks", "work_logs"]
+
+
+async def _append_check_log(
+    db: AsyncSession,
+    result: str,
+    reason: str | None = None,
+    detail: str | None = None,
+) -> None:
+    """Persist a backup check result to the rolling app_setting log (max 30 entries)."""
+    import json
+    from app.models.app_setting import AppSetting
+
+    entry: dict = {"ts": datetime.now(timezone.utc).isoformat(), "result": result}
+    if reason:
+        entry["reason"] = reason
+    if detail:
+        entry["detail"] = detail
+
+    row_result = await db.execute(select(AppSetting).where(AppSetting.key == _CHECK_LOG_KEY))
+    row = row_result.scalar_one_or_none()
+    if row:
+        try:
+            log_list = json.loads(row.value or "[]")
+        except Exception:
+            log_list = []
+        log_list.insert(0, entry)
+        row.value = json.dumps(log_list[:_CHECK_LOG_MAX], ensure_ascii=False)
+    else:
+        db.add(AppSetting(key=_CHECK_LOG_KEY, value=json.dumps([entry], ensure_ascii=False)))
+
+
+async def get_check_log(db: AsyncSession) -> list:
+    """Return the stored backup check log entries (newest first)."""
+    import json
+    from app.models.app_setting import AppSetting
+
+    row_result = await db.execute(select(AppSetting).where(AppSetting.key == _CHECK_LOG_KEY))
+    row = row_result.scalar_one_or_none()
+    if not row or not row.value:
+        return []
+    try:
+        return json.loads(row.value)
+    except Exception:
+        return []
 
 
 def validate_sql_backup(content: bytes) -> dict:
@@ -492,18 +539,26 @@ async def run_scheduled_backup_check(db: AsyncSession, now: datetime | None = No
         )
         return False
 
-    # For weekly frequency: only run on the configured weekday (Istanbul time)
+    # ── At configured run time: evaluate and log the outcome ─────────────────
+    # Logging only happens at the configured hour:minute so the log stays clean.
+
+    _DOW_TR = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
+
     if frequency == "weekly":
         backup_dow = int(schedule.get("backup_day_of_week", "0"))
         if now_local.weekday() != backup_dow:
+            detail = (
+                f"Bugün {_DOW_TR[now_local.weekday()]}, "
+                f"yapılandırılan gün: {_DOW_TR[backup_dow]}"
+            )
             logger.info(
                 "Scheduled backup: today Istanbul weekday %d ≠ configured weekday %d — skipping.",
                 now_local.weekday(), backup_dow,
             )
+            await _append_check_log(db, "skipped", reason="day_mismatch", detail=detail)
             return False
 
     # Deduplication: skip if a successful scheduled backup ran within the past 23 hours.
-    # Only count "completed" records — failed records must not block retry attempts.
     cutoff = now - timedelta(hours=23)
     result = await db.execute(
         select(BackupRecord)
@@ -514,12 +569,23 @@ async def run_scheduled_backup_check(db: AsyncSession, now: datetime | None = No
     )
     if result.scalar_one_or_none() is not None:
         logger.info("Scheduled backup: already ran successfully within the last 23 h — skipping.")
+        await _append_check_log(
+            db, "skipped", reason="dedup",
+            detail="Son 23 saat içinde başarılı zamanlanmış yedek zaten mevcut."
+        )
         return False
 
     logger.info(
         "Running scheduled backup (frequency=%s, Istanbul hour=%d)…", frequency, backup_hour
     )
-    await create_backup(db, backup_type="scheduled", notes="Otomatik zamanlı yedek")
-    # NOTE: caller is responsible for committing the session.
-    # In production this is done by AsyncSessionLocal.begin() in main.py.
+    record = await create_backup(db, backup_type="scheduled", notes="Otomatik zamanlı yedek")
+    size_str = (
+        f"{record.file_size / (1024 * 1024):.1f} MB"
+        if record.file_size >= 1024 * 1024
+        else f"{record.file_size / 1024:.0f} KB"
+    )
+    await _append_check_log(
+        db, "success",
+        detail=f"Yedek başarıyla oluşturuldu ({size_str})."
+    )
     return True

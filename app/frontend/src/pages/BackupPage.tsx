@@ -37,6 +37,13 @@ interface NextRunInfo {
   last_backup_notes: string | null
 }
 
+interface CheckLogEntry {
+  ts: string
+  result: 'success' | 'skipped' | 'error'
+  reason?: string
+  detail?: string
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatBytes(bytes: number): string {
@@ -134,6 +141,10 @@ export default function BackupPage() {
   const [nextRunInfo, setNextRunInfo] = useState<NextRunInfo | null>(null)
   const [countdownSec, setCountdownSec] = useState<number | null>(null)
 
+  // Check log state
+  const [checkLog, setCheckLog] = useState<CheckLogEntry[]>([])
+  const [loadingLog, setLoadingLog] = useState(false)
+
   // Upload state
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -181,11 +192,32 @@ export default function BackupPage() {
     }
   }, [])
 
+  const loadCheckLog = useCallback(async () => {
+    setLoadingLog(true)
+    try {
+      const { data } = await apiClient.get<CheckLogEntry[]>('/backup/check-log')
+      setCheckLog(data)
+    } catch {
+      // silent
+    } finally {
+      setLoadingLog(false)
+    }
+  }, [])
+
   useEffect(() => {
     loadBackups()
     loadSchedule()
     loadNextRunInfo()
-  }, [loadBackups, loadSchedule, loadNextRunInfo])
+    loadCheckLog()
+  }, [loadBackups, loadSchedule, loadNextRunInfo, loadCheckLog])
+
+  // Reload log when user switches to the schedule tab
+  useEffect(() => {
+    if (activeTab === 'schedule') {
+      loadCheckLog()
+      loadNextRunInfo()
+    }
+  }, [activeTab, loadCheckLog, loadNextRunInfo])
 
   // Re-fetch next-run info every 60 s so the displayed target time stays fresh
   useEffect(() => {
@@ -284,6 +316,8 @@ export default function BackupPage() {
       setSchedule(data)
       setScheduleSuccess(true)
       setTimeout(() => setScheduleSuccess(false), 3000)
+      // Refresh countdown since configured time may have changed
+      loadNextRunInfo()
     } catch {
       setScheduleError(t('backup.error_schedule'))
     } finally {
@@ -862,6 +896,61 @@ export default function BackupPage() {
               </button>
             </div>
           )}
+
+          {/* ── Check log section ─────────────────────────────────────────── */}
+          <div className="space-y-3 pt-2 border-t border-gray-100 dark:border-gray-800">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {t('backup.log_title')}
+              </h3>
+              <button
+                onClick={loadCheckLog}
+                className="text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 flex items-center gap-1"
+              >
+                <RefreshCw className={`h-3 w-3 ${loadingLog ? 'animate-spin' : ''}`} />
+                {t('common.refresh')}
+              </button>
+            </div>
+
+            {checkLog.length === 0 ? (
+              <div className="py-5 text-center text-xs text-gray-400 dark:text-gray-600 border border-dashed border-gray-200 dark:border-gray-700 rounded-lg">
+                {t('backup.log_empty')}
+              </div>
+            ) : (
+              <div className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+                {checkLog.map((entry, i) => (
+                  <div key={i} className="flex items-start gap-2.5 text-xs px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                    <span className={`flex-shrink-0 font-bold mt-0.5 ${
+                      entry.result === 'success' ? 'text-green-500' :
+                      entry.result === 'error'   ? 'text-red-500' :
+                      'text-gray-400 dark:text-gray-600'
+                    }`}>
+                      {entry.result === 'success' ? '✓' : entry.result === 'error' ? '✗' : '⏭'}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-gray-400 dark:text-gray-500 whitespace-nowrap">
+                          {formatDate(entry.ts)}
+                        </span>
+                        <span className={`font-medium ${
+                          entry.result === 'success' ? 'text-green-600 dark:text-green-400' :
+                          entry.result === 'error'   ? 'text-red-600 dark:text-red-400' :
+                          'text-gray-500 dark:text-gray-400'
+                        }`}>
+                          {t(`backup.log_result_${entry.result}`)}
+                        </span>
+                      </div>
+                      {entry.detail && (
+                        <p className="mt-0.5 text-gray-500 dark:text-gray-400 break-words leading-relaxed">
+                          {entry.detail}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
