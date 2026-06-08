@@ -555,8 +555,6 @@ async def run_scheduled_backup_check(db: AsyncSession, now: datetime | None = No
     Returns True when a backup was created, False when skipped.
     The caller is responsible for committing the session afterwards.
     """
-    from datetime import timedelta
-
     schedule = await get_schedule(db)
     if schedule.get("backup_enabled", "false").lower() != "true":
         logger.info("Scheduled backup: disabled — skipping.")
@@ -591,17 +589,19 @@ async def run_scheduled_backup_check(db: AsyncSession, now: datetime | None = No
             )
             return False
 
-    # Deduplication: skip if a successful scheduled backup ran within the past 23 hours.
-    cutoff = now - timedelta(hours=23)
+    # Deduplication: skip only if a scheduled backup was already created today at or after
+    # today's configured run time. This allows the scheduled run to proceed even when a
+    # manual backup was taken earlier the same day.
+    today_run_utc = today_run.astimezone(timezone.utc)
     result = await db.execute(
         select(BackupRecord)
         .where(BackupRecord.backup_type == "scheduled")
         .where(BackupRecord.status == "completed")
-        .where(BackupRecord.created_at >= cutoff)
+        .where(BackupRecord.created_at >= today_run_utc)
         .limit(1)
     )
     if result.scalar_one_or_none() is not None:
-        logger.info("Scheduled backup: already ran successfully within the last 23 h — skipping.")
+        logger.info("Scheduled backup: already ran today at or after the configured time — skipping.")
         return False
 
     logger.info(
