@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -211,13 +211,23 @@ async def delete_workflow(
 @router.post("/workflows/{workflow_id}/test-run", response_model=MessageResponse)
 async def test_run_workflow(
     workflow_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
     _: Annotated[User, Depends(require_superadmin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    from app.tasks.email_tasks import evaluate_scheduled_workflows
-    from app.core.task_utils import fire_and_forget
-    fire_and_forget(evaluate_scheduled_workflows)
-    return {"message": "İş akışı kuyruğa alındı."}
+    """Trigger scheduled workflow evaluation directly (no Celery required).
+
+    Uses a sync wrapper so Starlette runs it in a thread pool, which lets
+    asyncio.run() create its own event loop — the same pattern Celery tasks use.
+    """
+    import asyncio
+    from app.tasks.email_tasks import _evaluate_workflows_async
+
+    def _run():
+        asyncio.run(_evaluate_workflows_async())
+
+    background_tasks.add_task(_run)
+    return {"message": "İş akışı değerlendirme başlatıldı."}
 
 
 # ─── Logs ─────────────────────────────────────────────────────────────────────

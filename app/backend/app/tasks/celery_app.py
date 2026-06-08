@@ -18,14 +18,16 @@ celery_app.conf.update(
     task_acks_late=True,
     task_reject_on_worker_lost=True,
     worker_prefetch_multiplier=1,
-    # Broker connection timeouts — fail fast when Redis is not available
-    # so the API doesn't block waiting for broker connection
-    broker_connection_timeout=2,           # seconds to wait for initial connect
-    broker_connection_retry_on_startup=False,
+    # Broker connection settings.
+    # retry_on_startup=True: if Redis is briefly unavailable when the worker
+    # starts, Celery retries rather than exiting (important after container
+    # restarts where Redis may not be fully ready yet).
+    broker_connection_timeout=3,
+    broker_connection_retry_on_startup=True,
     broker_transport_options={
-        "socket_connect_timeout": 2,
-        "socket_timeout": 2,
-        "retry_on_timeout": False,
+        "socket_connect_timeout": 3,
+        "socket_timeout": 120,   # allow blocking BRPOP to wait up to 120 s
+        "retry_on_timeout": True,
     },
 )
 
