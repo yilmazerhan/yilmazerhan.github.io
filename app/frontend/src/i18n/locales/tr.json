@@ -664,6 +664,7 @@
     "daily": "Günlük",
     "weekly": "Haftalık",
     "backup_hour": "Yedekleme Saati",
+    "backup_minute": "Yedekleme Dakikası",
     "day_of_week": "Haftanın Günü",
     "monday": "Pazartesi",
     "tuesday": "Salı",

@@ -23,6 +23,7 @@ interface BackupSchedule {
   backup_enabled: string        // 'true' | 'false'
   backup_frequency: string      // 'daily' | 'weekly'
   backup_hour: string           // '0'-'23'
+  backup_minute: string         // '0'-'59'
   backup_day_of_week: string    // '0'-'6'
   backup_retention_count: string
 }
@@ -103,6 +104,7 @@ export default function BackupPage() {
     backup_enabled: 'false',
     backup_frequency: 'daily',
     backup_hour: '2',
+    backup_minute: '0',
     backup_day_of_week: '0',
     backup_retention_count: '10',
   })
@@ -496,7 +498,7 @@ export default function BackupPage() {
               </div>
 
               {/* Frequency */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     {t('backup.frequency')}
@@ -522,7 +524,24 @@ export default function BackupPage() {
                   >
                     {Array.from({ length: 24 }, (_, i) => (
                       <option key={i} value={String(i)}>
-                        {String(i).padStart(2, '0')}:00
+                        {String(i).padStart(2, '0')}:xx
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    {t('backup.backup_minute')} (UTC+3)
+                  </label>
+                  <select
+                    value={schedule.backup_minute}
+                    onChange={e => setSchedule(s => ({ ...s, backup_minute: e.target.value }))}
+                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
+                  >
+                    {Array.from({ length: 60 }, (_, i) => (
+                      <option key={i} value={String(i)}>
+                        :{String(i).padStart(2, '0')}
                       </option>
                     ))}
                   </select>

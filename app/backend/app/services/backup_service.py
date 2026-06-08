@@ -272,6 +272,7 @@ SCHEDULE_KEYS = {
     "backup_enabled": "false",
     "backup_frequency": "daily",   # daily | weekly
     "backup_hour": "2",            # 0-23
+    "backup_minute": "0",          # 0-59
     "backup_day_of_week": "0",     # 0=Mon … 6=Sun (for weekly)
     "backup_retention_count": "10",
 }
@@ -324,13 +325,14 @@ async def run_scheduled_backup_check(db: AsyncSession, now: datetime | None = No
     # Compare in Istanbul time so users configure hours in their local timezone
     now_local = now.astimezone(_ISTANBUL)
     backup_hour = int(schedule.get("backup_hour", "2"))
+    backup_minute = int(schedule.get("backup_minute", "0"))
     frequency = schedule.get("backup_frequency", "daily")
 
-    # Only run at the configured Istanbul hour
-    if now_local.hour != backup_hour:
+    # Only run at the configured Istanbul hour and minute
+    if now_local.hour != backup_hour or now_local.minute != backup_minute:
         logger.info(
-            "Scheduled backup: current Istanbul hour %d ≠ configured hour %d — skipping.",
-            now_local.hour, backup_hour,
+            "Scheduled backup: current Istanbul time %02d:%02d ≠ configured %02d:%02d — skipping.",
+            now_local.hour, now_local.minute, backup_hour, backup_minute,
         )
         return False
 
