@@ -703,7 +703,14 @@
     "log_empty": "Henüz log kaydedilmedi. Loglar yapılandırılan saatte kontrol çalıştığında burada görünür. Yapılandırılan saatten sonra hâlâ boşsa Celery Beat'in çalıştığını doğrulayın.",
     "log_result_success": "Yedek Oluşturuldu",
     "log_result_skipped": "Atlandı",
-    "log_result_error": "Hata"
+    "log_result_error": "Hata",
+    "celery_last_seen": "Celery son görüldü",
+    "celery_ago": "önce",
+    "celery_never_seen": "Celery hiç görülmedi — Celery worker ve Beat container'larının çalıştığını doğrulayın",
+    "celery_stale_warning": "çalışmıyor olabilir",
+    "force_run": "Şimdi Çalıştır",
+    "force_running": "Çalışıyor...",
+    "force_run_hint": "Zamanlanmış yedek mantığını test etmek için hemen yedek oluşturur (zaman ve tekrar kontrollerini atlar)"
   },
   "audit": {
     "action_create": "Oluşturma",

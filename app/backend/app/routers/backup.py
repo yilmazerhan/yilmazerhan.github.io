@@ -176,3 +176,13 @@ async def get_check_log(
     _: Any = Depends(require_superadmin),
 ) -> list:
     return await backup_service.get_check_log(db)
+
+
+@router.post("/force-check")
+async def force_check(
+    db: AsyncSession = Depends(get_db),
+    _: Any = Depends(require_superadmin),
+) -> dict:
+    """Immediately run the scheduled backup logic from the API process (bypasses time/dedup).
+    Used to verify that pg_dump, DB access, and backup logic all work independently of Celery."""
+    return await backup_service.force_backup_now(db)

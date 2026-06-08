@@ -703,7 +703,14 @@
     "log_empty": "No checks logged yet. Logs appear here when the scheduled check runs at the configured time. If empty after the configured time has passed, verify that Celery Beat is running.",
     "log_result_success": "Backup Created",
     "log_result_skipped": "Skipped",
-    "log_result_error": "Error"
+    "log_result_error": "Error",
+    "celery_last_seen": "Celery last seen",
+    "celery_ago": "ago",
+    "celery_never_seen": "Celery has never been seen — verify the Celery worker and Beat containers are running",
+    "celery_stale_warning": "may not be running",
+    "force_run": "Run Now",
+    "force_running": "Running...",
+    "force_run_hint": "Immediately create a scheduled backup to verify the backup logic works (bypasses time and dedup checks)"
   },
   "audit": {
     "action_create": "Create",

@@ -36,10 +36,19 @@ def run_backup_check():
 
 async def _run_backup_check_async():
     from sqlalchemy.ext.asyncio import async_sessionmaker
-    from app.services.backup_service import run_scheduled_backup_check
+    from app.services.backup_service import run_scheduled_backup_check, update_heartbeat
 
     engine = _make_engine()
     SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+
+    # Write heartbeat first so the UI can confirm Celery is alive, even if
+    # the backup check itself fails later.
+    try:
+        async with SessionLocal.begin() as db:
+            await update_heartbeat(db)
+    except Exception as hb_exc:
+        logger.warning("Could not update Celery heartbeat: %s", hb_exc)
+
     try:
         async with SessionLocal.begin() as db:
             await run_scheduled_backup_check(db)

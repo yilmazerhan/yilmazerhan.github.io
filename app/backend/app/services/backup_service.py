@@ -25,6 +25,7 @@ _BACKUP_TYPE_SCHEDULED = "scheduled"
 
 _CHECK_LOG_KEY = "backup_check_log"
 _CHECK_LOG_MAX = 30  # keep at most 30 entries
+_HEARTBEAT_KEY = "backup_celery_heartbeat"
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -134,6 +135,39 @@ async def get_check_log(db: AsyncSession) -> list:
         return json.loads(row.value)
     except Exception:
         return []
+
+
+async def update_heartbeat(db: AsyncSession) -> None:
+    """Record that the Celery backup check task just ran."""
+    from app.models.app_setting import AppSetting
+    ts = datetime.now(timezone.utc).isoformat()
+    row_result = await db.execute(select(AppSetting).where(AppSetting.key == _HEARTBEAT_KEY))
+    row = row_result.scalar_one_or_none()
+    if row:
+        row.value = ts
+    else:
+        db.add(AppSetting(key=_HEARTBEAT_KEY, value=ts))
+
+
+async def force_backup_now(db: AsyncSession) -> dict:
+    """Immediately create a scheduled backup, bypassing the time/dedup check.
+    Used from the UI to test that backup logic works independently of Celery.
+    """
+    schedule = await get_schedule(db)
+    if schedule.get("backup_enabled", "false").lower() != "true":
+        return {"result": "disabled", "message": "Otomatik yedekleme devre dışı. Önce etkinleştirin."}
+
+    record = await create_backup(db, backup_type="scheduled", notes="Manuel tetikleme ile oluşturulan zamanlanmış yedek")
+    size_str = (
+        f"{record.file_size / (1024 * 1024):.1f} MB"
+        if record.file_size >= 1024 * 1024
+        else f"{record.file_size / 1024:.0f} KB"
+    )
+    await _append_check_log(
+        db, "success",
+        detail=f"Manuel tetikleme: Yedek oluşturuldu ({size_str})."
+    )
+    return {"result": "success", "message": f"Yedek oluşturuldu ({size_str})."}
 
 
 def validate_sql_backup(content: bytes) -> dict:
@@ -482,6 +516,11 @@ async def get_next_run_info(db: AsyncSession) -> dict:
     )
     last = result.scalar_one_or_none()
 
+    # Celery heartbeat — tells the UI if the Celery worker is alive
+    from app.models.app_setting import AppSetting
+    hb_result = await db.execute(select(AppSetting).where(AppSetting.key == _HEARTBEAT_KEY))
+    hb_row = hb_result.scalar_one_or_none()
+
     return {
         "is_enabled": is_enabled,
         "next_run_at": next_run_local.isoformat() if is_enabled else None,
@@ -489,6 +528,7 @@ async def get_next_run_info(db: AsyncSession) -> dict:
         "last_backup_at": last.created_at.isoformat() if last else None,
         "last_backup_status": last.status if last else None,
         "last_backup_notes": last.notes if last else None,
+        "last_celery_heartbeat": hb_row.value if hb_row else None,
     }
 
 

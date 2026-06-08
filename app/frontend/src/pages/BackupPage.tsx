@@ -35,6 +35,7 @@ interface NextRunInfo {
   last_backup_at: string | null
   last_backup_status: 'completed' | 'failed' | null
   last_backup_notes: string | null
+  last_celery_heartbeat: string | null
 }
 
 interface CheckLogEntry {
@@ -144,6 +145,10 @@ export default function BackupPage() {
   // Check log state
   const [checkLog, setCheckLog] = useState<CheckLogEntry[]>([])
   const [loadingLog, setLoadingLog] = useState(false)
+
+  // Force-run state
+  const [forceRunning, setForceRunning] = useState(false)
+  const [forceResult, setForceResult] = useState<{ ok: boolean; message: string } | null>(null)
 
   // Upload state
   const [uploadFile, setUploadFile] = useState<File | null>(null)
@@ -304,6 +309,24 @@ export default function BackupPage() {
     } finally {
       setDeletingId(null)
       setConfirmDeleteId(null)
+    }
+  }
+
+  async function handleForceRun() {
+    setForceRunning(true)
+    setForceResult(null)
+    try {
+      const { data } = await apiClient.post<{ result: string; message: string }>('/backup/force-check')
+      setForceResult({ ok: data.result === 'success', message: data.message })
+      if (data.result === 'success') {
+        await loadBackups()
+        await loadCheckLog()
+      }
+    } catch (err: any) {
+      const detail = err.response?.data?.detail || t('backup.error_create')
+      setForceResult({ ok: false, message: detail })
+    } finally {
+      setForceRunning(false)
     }
   }
 
@@ -754,9 +777,47 @@ export default function BackupPage() {
                     {t('backup.countdown_disabled')}
                   </p>
                 )}
+
+                {/* Celery heartbeat indicator */}
+                {(() => {
+                  const hb = nextRunInfo?.last_celery_heartbeat
+                  if (!hb) return (
+                    <div className="mt-3 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                      <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                      {t('backup.celery_never_seen')}
+                    </div>
+                  )
+                  const ageSec = Math.floor((Date.now() - new Date(hb).getTime()) / 1000)
+                  const isStale = ageSec > 180  // > 3 minutes = likely stopped
+                  return (
+                    <div className={`mt-3 flex items-center gap-1.5 text-xs ${isStale ? 'text-amber-600 dark:text-amber-400' : 'text-gray-400 dark:text-gray-500'}`}>
+                      <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${isStale ? 'bg-amber-400' : 'bg-green-400'}`} />
+                      {t('backup.celery_last_seen')}: {ageSec < 60
+                        ? `${ageSec}s`
+                        : ageSec < 3600
+                          ? `${Math.floor(ageSec / 60)}m`
+                          : `${Math.floor(ageSec / 3600)}h`} {t('backup.celery_ago')}
+                      {isStale && ` — ${t('backup.celery_stale_warning')}`}
+                    </div>
+                  )
+                })()}
               </div>
             </div>
           </div>
+
+          {/* Force run result feedback */}
+          {forceResult && (
+            <div className={`flex items-start gap-2 px-4 py-3 rounded-lg text-sm ${
+              forceResult.ok
+                ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400'
+                : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'
+            }`}>
+              {forceResult.ok
+                ? <CheckCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                : <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />}
+              <p>{forceResult.message}</p>
+            </div>
+          )}
 
           {loadingSchedule ? (
             <div className="flex items-center gap-2 text-gray-400 dark:text-gray-600 text-sm">
@@ -887,13 +948,24 @@ export default function BackupPage() {
                 </div>
               )}
 
-              <button
-                onClick={handleSaveSchedule}
-                disabled={savingSchedule}
-                className="px-5 py-2.5 bg-primary-500 hover:bg-primary-600 disabled:opacity-60 text-white rounded-lg text-sm font-medium"
-              >
-                {savingSchedule ? t('common.saving') : t('common.save')}
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleSaveSchedule}
+                  disabled={savingSchedule}
+                  className="px-5 py-2.5 bg-primary-500 hover:bg-primary-600 disabled:opacity-60 text-white rounded-lg text-sm font-medium"
+                >
+                  {savingSchedule ? t('common.saving') : t('common.save')}
+                </button>
+                <button
+                  onClick={handleForceRun}
+                  disabled={forceRunning}
+                  title={t('backup.force_run_hint')}
+                  className="flex items-center gap-1.5 px-4 py-2.5 border border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 disabled:opacity-60 rounded-lg text-sm font-medium"
+                >
+                  <RefreshCw className={`h-4 w-4 ${forceRunning ? 'animate-spin' : ''}`} />
+                  {forceRunning ? t('backup.force_running') : t('backup.force_run')}
+                </button>
+              </div>
             </div>
           )}
 
