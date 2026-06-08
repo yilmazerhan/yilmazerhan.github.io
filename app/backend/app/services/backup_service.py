@@ -157,7 +157,7 @@ async def force_backup_now(db: AsyncSession) -> dict:
     if schedule.get("backup_enabled", "false").lower() != "true":
         return {"result": "disabled", "message": "Otomatik yedekleme devre dışı. Önce etkinleştirin."}
 
-    record = await create_backup(db, backup_type="scheduled", notes="Manuel tetikleme ile oluşturulan zamanlanmış yedek")
+    record = await create_backup(db, backup_type="manual", notes="Manuel tetikleme ile oluşturulan yedek")
     size_str = (
         f"{record.file_size / (1024 * 1024):.1f} MB"
         if record.file_size >= 1024 * 1024
@@ -571,31 +571,24 @@ async def run_scheduled_backup_check(db: AsyncSession, now: datetime | None = No
     backup_minute = int(schedule.get("backup_minute", "0"))
     frequency = schedule.get("backup_frequency", "daily")
 
-    # Only run at the configured Istanbul hour and minute
-    if now_local.hour != backup_hour or now_local.minute != backup_minute:
+    # Run if the scheduled time has already passed today (catch-up: handles API restarts after configured time)
+    today_run = now_local.replace(hour=backup_hour, minute=backup_minute, second=0, microsecond=0)
+    if now_local < today_run:
         logger.info(
-            "Scheduled backup: current Istanbul time %02d:%02d ≠ configured %02d:%02d — skipping.",
-            now_local.hour, now_local.minute, backup_hour, backup_minute,
+            "Scheduled backup: configured time %02d:%02d not yet reached (Istanbul time %02d:%02d) — skipping.",
+            backup_hour, backup_minute, now_local.hour, now_local.minute,
         )
         return False
-
-    # ── At configured run time: evaluate and log the outcome ─────────────────
-    # Logging only happens at the configured hour:minute so the log stays clean.
 
     _DOW_TR = ["Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi", "Pazar"]
 
     if frequency == "weekly":
         backup_dow = int(schedule.get("backup_day_of_week", "0"))
         if now_local.weekday() != backup_dow:
-            detail = (
-                f"Bugün {_DOW_TR[now_local.weekday()]}, "
-                f"yapılandırılan gün: {_DOW_TR[backup_dow]}"
-            )
             logger.info(
                 "Scheduled backup: today Istanbul weekday %d ≠ configured weekday %d — skipping.",
                 now_local.weekday(), backup_dow,
             )
-            await _append_check_log(db, "skipped", reason="day_mismatch", detail=detail)
             return False
 
     # Deduplication: skip if a successful scheduled backup ran within the past 23 hours.
@@ -609,10 +602,6 @@ async def run_scheduled_backup_check(db: AsyncSession, now: datetime | None = No
     )
     if result.scalar_one_or_none() is not None:
         logger.info("Scheduled backup: already ran successfully within the last 23 h — skipping.")
-        await _append_check_log(
-            db, "skipped", reason="dedup",
-            detail="Son 23 saat içinde başarılı zamanlanmış yedek zaten mevcut."
-        )
         return False
 
     logger.info(
