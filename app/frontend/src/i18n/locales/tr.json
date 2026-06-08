@@ -711,10 +711,10 @@
     "log_result_success": "Yedek Oluşturuldu",
     "log_result_skipped": "Atlandı",
     "log_result_error": "Hata",
-    "celery_last_seen": "Celery son görüldü",
+    "celery_last_seen": "Yedekleme zamanlayıcısı son görüldü",
     "celery_ago": "önce",
-    "celery_never_seen": "Celery hiç görülmedi — Celery worker ve Beat container'larının çalıştığını doğrulayın",
-    "celery_stale_warning": "çalışmıyor olabilir",
+    "celery_never_seen": "Yedekleme zamanlayıcısı henüz çalışmadı — API başladıktan 30 saniye içinde ilk kontrol çalışır",
+    "celery_stale_warning": "zamanlayıcı çalışmıyor olabilir",
     "force_run": "Şimdi Çalıştır",
     "force_running": "Çalışıyor...",
     "force_run_hint": "Zamanlanmış yedek mantığını test etmek için hemen yedek oluşturur (zaman ve tekrar kontrollerini atlar)"

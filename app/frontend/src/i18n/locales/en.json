@@ -711,10 +711,10 @@
     "log_result_success": "Backup Created",
     "log_result_skipped": "Skipped",
     "log_result_error": "Error",
-    "celery_last_seen": "Celery last seen",
+    "celery_last_seen": "Backup scheduler last seen",
     "celery_ago": "ago",
-    "celery_never_seen": "Celery has never been seen — verify the Celery worker and Beat containers are running",
-    "celery_stale_warning": "may not be running",
+    "celery_never_seen": "Backup scheduler has not run yet — first check runs within 30 seconds of API startup",
+    "celery_stale_warning": "scheduler may not be running",
     "force_run": "Run Now",
     "force_running": "Running...",
     "force_run_hint": "Immediately create a scheduled backup to verify the backup logic works (bypasses time and dedup checks)"

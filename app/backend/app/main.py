@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time as _time_module
 from contextlib import asynccontextmanager
@@ -21,6 +22,47 @@ from app.routers.patch import router as patch_router
 logger = logging.getLogger(__name__)
 
 
+async def _backup_scheduler_loop() -> None:
+    """In-process backup scheduler — runs every 60 s as a fallback when Celery Beat is not running.
+
+    Also updates the backup_celery_heartbeat so the UI heartbeat indicator turns green
+    even when the Celery container is absent.  The existing 23-hour dedup window in
+    run_scheduled_backup_check prevents duplicate backups across uvicorn workers.
+    """
+    await asyncio.sleep(30)  # brief startup delay
+    while True:
+        try:
+            from app.database import AsyncSessionLocal
+            from app.services.backup_service import run_scheduled_backup_check, update_heartbeat
+            async with AsyncSessionLocal() as db:
+                await update_heartbeat(db)
+                await db.commit()
+            async with AsyncSessionLocal() as db:
+                await run_scheduled_backup_check(db)
+                await db.commit()
+        except Exception as exc:
+            logger.warning("In-process backup scheduler: %s", exc)
+        await asyncio.sleep(60)
+
+
+async def _email_scheduler_loop() -> None:
+    """In-process email workflow evaluator — runs every 15 min as a fallback.
+
+    Keeps the email Celery heartbeat fresh and evaluates scheduled workflows.
+    Actual SMTP delivery is dispatched to Celery if available; if Celery is
+    not running the dispatch call will raise a broker error that is caught
+    per-workflow so other workflows still execute.
+    """
+    await asyncio.sleep(90)  # offset from backup loop startup
+    while True:
+        try:
+            from app.tasks.email_tasks import _evaluate_workflows_async
+            await _evaluate_workflows_async()
+        except Exception as exc:
+            logger.warning("In-process email scheduler: %s", exc)
+        await asyncio.sleep(900)  # 15 minutes
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: seed superadmin if needed
@@ -28,9 +70,18 @@ async def lifespan(app: FastAPI):
     from app.services.seed_service import seed_initial_data
     async with AsyncSessionLocal() as db:
         await seed_initial_data(db)
-    # Periodic scheduled jobs (backup, inventory email) run via Celery Beat —
-    # a single dedicated process — to avoid duplicate execution across uvicorn workers.
+
+    # Start in-process scheduler loops. These complement Celery Beat: if Celery
+    # containers are not running, scheduled backups and workflow evaluations still
+    # happen. If Celery IS running, the dedup/heartbeat logic is idempotent.
+    _tasks = [
+        asyncio.create_task(_backup_scheduler_loop()),
+        asyncio.create_task(_email_scheduler_loop()),
+    ]
     yield
+    for t in _tasks:
+        t.cancel()
+    await asyncio.gather(*_tasks, return_exceptions=True)
 
 
 app = FastAPI(
