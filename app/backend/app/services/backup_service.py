@@ -394,6 +394,57 @@ async def get_schedule(db: AsyncSession) -> dict:
     return {k: (rows.get(k) or v) for k, v in SCHEDULE_KEYS.items()}
 
 
+async def get_next_run_info(db: AsyncSession) -> dict:
+    """Return countdown to next scheduled backup and last attempt details."""
+    from datetime import timedelta
+
+    schedule = await get_schedule(db)
+    is_enabled = schedule.get("backup_enabled", "false").lower() == "true"
+
+    now = datetime.now(timezone.utc)
+    now_local = now.astimezone(_ISTANBUL)
+
+    backup_hour = int(schedule.get("backup_hour", "2"))
+    backup_minute = int(schedule.get("backup_minute", "0"))
+    frequency = schedule.get("backup_frequency", "daily")
+
+    today_run = now_local.replace(hour=backup_hour, minute=backup_minute, second=0, microsecond=0)
+    if today_run > now_local:
+        next_run_local = today_run
+    else:
+        next_run_local = today_run + timedelta(days=1)
+
+    if frequency == "weekly":
+        backup_dow = int(schedule.get("backup_day_of_week", "0"))
+        days_ahead = (backup_dow - now_local.weekday()) % 7
+        candidate = now_local.replace(hour=backup_hour, minute=backup_minute, second=0, microsecond=0)
+        if days_ahead == 0:
+            next_run_local = candidate if candidate > now_local else candidate + timedelta(days=7)
+        else:
+            next_run_local = (now_local + timedelta(days=days_ahead)).replace(
+                hour=backup_hour, minute=backup_minute, second=0, microsecond=0
+            )
+
+    seconds_until = max(0, int((next_run_local - now_local).total_seconds()))
+
+    result = await db.execute(
+        select(BackupRecord)
+        .where(BackupRecord.backup_type == "scheduled")
+        .order_by(BackupRecord.created_at.desc())
+        .limit(1)
+    )
+    last = result.scalar_one_or_none()
+
+    return {
+        "is_enabled": is_enabled,
+        "next_run_at": next_run_local.isoformat() if is_enabled else None,
+        "seconds_until_next": seconds_until if is_enabled else None,
+        "last_backup_at": last.created_at.isoformat() if last else None,
+        "last_backup_status": last.status if last else None,
+        "last_backup_notes": last.notes if last else None,
+    }
+
+
 async def save_schedule(db: AsyncSession, data: dict) -> dict:
     from app.models.app_setting import AppSetting
     allowed = set(SCHEDULE_KEYS.keys())

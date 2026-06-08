@@ -47,25 +47,28 @@ async def _run_backup_check_async():
         logger.error("Scheduled backup check failed: %s", exc, exc_info=True)
         # Persist a "failed" record in a fresh session so it's visible in the UI.
         # The outer transaction was rolled back on exception, so we need a new session.
-        await _save_failed_backup_record(SessionLocal)
+        await _save_failed_backup_record(SessionLocal, error_msg=str(exc))
         raise
     finally:
         await engine.dispose()
 
 
-async def _save_failed_backup_record(SessionLocal) -> None:
+async def _save_failed_backup_record(SessionLocal, error_msg: str = "") -> None:
     from datetime import datetime, timezone
     from app.models.backup_record import BackupRecord
     ts = datetime.now(timezone.utc)
     try:
         async with SessionLocal.begin() as db:
+            notes = "Zamanlanmış yedekleme başarısız oldu."
+            if error_msg:
+                notes += f" Hata: {error_msg[:400]}"
             db.add(BackupRecord(
                 filename=f"failed_{ts.strftime('%Y%m%d_%H%M%S')}.sql",
                 display_name=f"backup_{ts.strftime('%Y-%m-%d %H:%M')} (scheduled)",
                 file_size=0,
                 backup_type="scheduled",
                 status="failed",
-                notes="Zamanlanmış yedekleme başarısız oldu.",
+                notes=notes,
             ))
     except Exception as save_exc:
         logger.warning("Could not save failed backup record: %s", save_exc)

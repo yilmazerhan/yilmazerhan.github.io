@@ -158,3 +158,13 @@ async def save_schedule(
     _: Any = Depends(require_superadmin),
 ) -> dict:
     return await backup_service.save_schedule(db, data)
+
+
+# ── Next scheduled run info ───────────────────────────────────────────────────
+
+@router.get("/next-run")
+async def get_next_run(
+    db: AsyncSession = Depends(get_db),
+    _: Any = Depends(require_superadmin),
+) -> dict:
+    return await backup_service.get_next_run_info(db)

@@ -693,7 +693,12 @@
     "upload_validation_failed": "Doğrulama başarısız",
     "error_upload": "Yükleme başarısız oldu. Lütfen tekrar deneyin.",
     "error_upload_too_large": "Dosya 500 MB yükleme sınırını aşıyor.",
-    "upload_constraints": "Kabul edilen: pg_dump --format=plain (.sql) dosyaları, maks. 500 MB"
+    "upload_constraints": "Kabul edilen: pg_dump --format=plain (.sql) dosyaları, maks. 500 MB",
+    "countdown_title": "Sonraki Otomatik Yedek",
+    "countdown_disabled": "Otomatik yedekleme devre dışı. Etkinleştirmek için aşağıdaki seçeneği açın.",
+    "countdown_last_attempt": "Son deneme",
+    "countdown_never": "Henüz zamanlanmış yedek çalışmadı",
+    "countdown_error_detail": "Hata:"
   },
   "audit": {
     "action_create": "Oluşturma",

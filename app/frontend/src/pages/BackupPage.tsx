@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Database, Download, RotateCcw, Trash2, Plus, Clock, AlertCircle, CheckCircle, RefreshCw, Settings, Upload,
+  Database, Download, RotateCcw, Trash2, Plus, Clock, AlertCircle, CheckCircle, RefreshCw, Settings, Upload, Timer,
 } from 'lucide-react'
 import apiClient from '@/api/client'
 
@@ -28,6 +28,15 @@ interface BackupSchedule {
   backup_retention_count: string
 }
 
+interface NextRunInfo {
+  is_enabled: boolean
+  next_run_at: string | null
+  seconds_until_next: number | null
+  last_backup_at: string | null
+  last_backup_status: 'completed' | 'failed' | null
+  last_backup_notes: string | null
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatBytes(bytes: number): string {
@@ -38,6 +47,13 @@ function formatBytes(bytes: number): string {
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString()
+}
+
+function formatCountdown(seconds: number): string {
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  const s = seconds % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -114,6 +130,10 @@ export default function BackupPage() {
   const [scheduleSuccess, setScheduleSuccess] = useState(false)
   const [scheduleError, setScheduleError] = useState('')
 
+  // Next run / countdown state
+  const [nextRunInfo, setNextRunInfo] = useState<NextRunInfo | null>(null)
+  const [countdownSec, setCountdownSec] = useState<number | null>(null)
+
   // Upload state
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
@@ -152,10 +172,42 @@ export default function BackupPage() {
     }
   }, [])
 
+  const loadNextRunInfo = useCallback(async () => {
+    try {
+      const { data } = await apiClient.get<NextRunInfo>('/backup/next-run')
+      setNextRunInfo(data)
+    } catch {
+      // silent — countdown card just stays empty
+    }
+  }, [])
+
   useEffect(() => {
     loadBackups()
     loadSchedule()
-  }, [loadBackups, loadSchedule])
+    loadNextRunInfo()
+  }, [loadBackups, loadSchedule, loadNextRunInfo])
+
+  // Re-fetch next-run info every 60 s so the displayed target time stays fresh
+  useEffect(() => {
+    const id = setInterval(loadNextRunInfo, 60_000)
+    return () => clearInterval(id)
+  }, [loadNextRunInfo])
+
+  // Countdown ticker — restarts whenever the target ISO timestamp changes
+  const nextRunAt = nextRunInfo?.next_run_at ?? null
+  useEffect(() => {
+    if (!nextRunAt) {
+      setCountdownSec(null)
+      return
+    }
+    const tick = () => {
+      const diff = Math.max(0, Math.floor((new Date(nextRunAt).getTime() - Date.now()) / 1000))
+      setCountdownSec(diff)
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [nextRunAt])
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
@@ -619,6 +671,56 @@ export default function BackupPage() {
             <div>
               <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">{t('backup.schedule_title')}</h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('backup.schedule_description')}</p>
+            </div>
+          </div>
+
+          {/* ── Countdown card ─────────────────────────────────────────────── */}
+          <div className={`rounded-xl border p-4 ${
+            nextRunInfo?.is_enabled
+              ? 'border-purple-200 dark:border-purple-700 bg-purple-50 dark:bg-purple-900/10'
+              : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/30'
+          }`}>
+            <div className="flex items-start gap-3">
+              <Timer className="h-5 w-5 text-purple-500 dark:text-purple-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                {nextRunInfo?.is_enabled ? (
+                  <>
+                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                      {t('backup.countdown_title')}
+                    </p>
+                    <p className="text-3xl font-mono font-bold text-purple-600 dark:text-purple-400 mt-1 leading-none">
+                      {countdownSec !== null ? formatCountdown(countdownSec) : '--:--:--'}
+                    </p>
+                    <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                      {nextRunInfo.last_backup_at ? (
+                        <>
+                          <span>{t('backup.countdown_last_attempt')}: {formatDate(nextRunInfo.last_backup_at)}</span>
+                          <span className="mx-1">·</span>
+                          <span className={nextRunInfo.last_backup_status === 'completed'
+                            ? 'text-green-600 dark:text-green-400'
+                            : 'text-red-600 dark:text-red-400'}>
+                            {nextRunInfo.last_backup_status === 'completed'
+                              ? `✓ ${t('backup.status_ok')}`
+                              : `✗ ${t('backup.status_failed')}`}
+                          </span>
+                          {nextRunInfo.last_backup_status === 'failed' && nextRunInfo.last_backup_notes && (
+                            <div className="mt-1.5 px-2 py-1.5 rounded bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-xs break-words">
+                              <span className="font-medium">{t('backup.countdown_error_detail')}</span>{' '}
+                              {nextRunInfo.last_backup_notes}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <span>{t('backup.countdown_never')}</span>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                    {t('backup.countdown_disabled')}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 

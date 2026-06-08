@@ -693,7 +693,12 @@
     "upload_validation_failed": "Validation failed",
     "error_upload": "Upload failed. Please try again.",
     "error_upload_too_large": "File exceeds the 500 MB upload limit.",
-    "upload_constraints": "Accepted: pg_dump --format=plain (.sql) files, max 500 MB"
+    "upload_constraints": "Accepted: pg_dump --format=plain (.sql) files, max 500 MB",
+    "countdown_title": "Next Scheduled Backup",
+    "countdown_disabled": "Automatic backups are disabled. Enable the toggle below to activate.",
+    "countdown_last_attempt": "Last attempt",
+    "countdown_never": "No scheduled backup has run yet",
+    "countdown_error_detail": "Error:"
   },
   "audit": {
     "action_create": "Create",
