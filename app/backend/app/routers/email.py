@@ -230,6 +230,43 @@ async def test_run_workflow(
     return {"message": "İş akışı değerlendirme başlatıldı."}
 
 
+@router.get("/workflows/{workflow_id}/logs", response_model=list[EmailLogResponse])
+async def get_workflow_logs(
+    workflow_id: uuid.UUID,
+    _: Annotated[User, Depends(require_superadmin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    limit: int = Query(20, ge=1, le=100),
+):
+    svc = EmailService(db)
+    return await svc.list_workflow_logs(workflow_id, limit=limit)
+
+
+@router.post("/evaluate-now", response_model=MessageResponse)
+async def evaluate_workflows_now(
+    background_tasks: BackgroundTasks,
+    _: Annotated[User, Depends(require_superadmin)],
+):
+    import asyncio
+    from app.tasks.email_tasks import _evaluate_workflows_async
+
+    def _run():
+        asyncio.run(_evaluate_workflows_async())
+
+    background_tasks.add_task(_run)
+    return {"message": "E-posta workflow değerlendirmesi başlatıldı."}
+
+
+@router.get("/celery-heartbeat")
+async def get_email_celery_heartbeat(
+    _: Annotated[User, Depends(require_superadmin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    from sqlalchemy import select
+    from app.models.app_setting import AppSetting
+    row = (await db.execute(select(AppSetting).where(AppSetting.key == "email_celery_heartbeat"))).scalar_one_or_none()
+    return {"last_heartbeat": row.value if row else None}
+
+
 # ─── Logs ─────────────────────────────────────────────────────────────────────
 
 @router.get("/logs", response_model=EmailLogListResponse)

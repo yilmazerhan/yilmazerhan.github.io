@@ -75,7 +75,9 @@ const emailKeys = {
   templates: () => [...emailKeys.all, 'templates'] as const,
   workflows: () => [...emailKeys.all, 'workflows'] as const,
   logs: (params?: object) => [...emailKeys.all, 'logs', params] as const,
+  workflowLogs: (id: string) => [...emailKeys.all, 'workflow-logs', id] as const,
   teamsWebhooks: () => [...emailKeys.all, 'teams-webhooks'] as const,
+  heartbeat: () => [...emailKeys.all, 'celery-heartbeat'] as const,
 }
 
 // ─── SMTP ────────────────────────────────────────────────────────────────────
@@ -202,6 +204,30 @@ export function useEmailLogs(params?: { status?: string; skip?: number; limit?: 
   return useQuery({
     queryKey: emailKeys.logs(params),
     queryFn: () => apiClient.get<EmailLogListResponse>('/email/logs', { params }).then((r) => r.data),
+  })
+}
+
+export function useWorkflowEmailLogs(workflowId: string | null) {
+  return useQuery({
+    queryKey: emailKeys.workflowLogs(workflowId ?? ''),
+    queryFn: () => apiClient.get<EmailLog[]>(`/email/workflows/${workflowId}/logs`).then((r) => r.data),
+    enabled: !!workflowId,
+  })
+}
+
+export function useEmailCeleryHeartbeat() {
+  return useQuery({
+    queryKey: emailKeys.heartbeat(),
+    queryFn: () => apiClient.get<{ last_heartbeat: string | null }>('/email/celery-heartbeat').then((r) => r.data),
+    refetchInterval: 30_000,
+  })
+}
+
+export function useEvaluateEmailsNow() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => apiClient.post<{ message: string }>('/email/evaluate-now').then((r) => r.data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: emailKeys.all }),
   })
 }
 

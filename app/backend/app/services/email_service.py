@@ -338,6 +338,15 @@ class EmailService:
         await self.db.flush()
         return log
 
+    async def list_workflow_logs(self, workflow_id: uuid.UUID, limit: int = 20) -> list[EmailLog]:
+        result = await self.db.execute(
+            select(EmailLog)
+            .where(EmailLog.workflow_id == workflow_id)
+            .order_by(EmailLog.created_at.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
     async def already_sent_today(
         self, workflow_id: uuid.UUID, recipient_id: uuid.UUID
     ) -> bool:

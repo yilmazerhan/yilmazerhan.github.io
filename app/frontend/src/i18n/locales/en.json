@@ -568,7 +568,14 @@
     "frequency": "Frequency",
     "frequency_daily": "Daily",
     "frequency_weekly": "Weekly",
-    "day_of_week": "Day of Week"
+    "day_of_week": "Day of Week",
+    "evaluate_now": "Evaluate Now",
+    "evaluate_now_title": "Run workflow evaluation immediately (bypasses Celery)",
+    "celery_heartbeat_label": "Email Celery Worker",
+    "celery_heartbeat_stale": "(stale — worker may not be running)",
+    "celery_heartbeat_never": "Never — email Celery worker has not run",
+    "show_logs": "Show send history",
+    "no_workflow_logs": "No send history for this workflow."
   },
   "reports": {
     "title": "Reports",

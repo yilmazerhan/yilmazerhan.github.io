@@ -344,6 +344,21 @@ async def _send_teams_async(webhook_id: str, title: str, body: str, action_url: 
         await engine.dispose()
 
 
+_EMAIL_HEARTBEAT_KEY = "email_celery_heartbeat"
+
+
+async def _write_email_heartbeat(db) -> None:
+    from datetime import datetime, timezone
+    from sqlalchemy import select
+    from app.models.app_setting import AppSetting
+    ts = datetime.now(timezone.utc).isoformat()
+    row = (await db.execute(select(AppSetting).where(AppSetting.key == _EMAIL_HEARTBEAT_KEY))).scalar_one_or_none()
+    if row:
+        row.value = ts
+    else:
+        db.add(AppSetting(key=_EMAIL_HEARTBEAT_KEY, value=ts))
+
+
 @celery_app.task
 def evaluate_scheduled_workflows():
     asyncio.run(_evaluate_workflows_async())
@@ -369,6 +384,14 @@ async def _evaluate_workflows_async():
     engine = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
     Session = async_sessionmaker(engine, expire_on_commit=False)
     _ISTANBUL = ZoneInfo("Europe/Istanbul")
+
+    try:
+        async with Session() as hb_db:
+            await _write_email_heartbeat(hb_db)
+            await hb_db.commit()
+    except Exception as hb_exc:
+        logger.warning("Could not update email Celery heartbeat: %s", hb_exc)
+
     try:
         async with Session() as db:
             result = await db.execute(

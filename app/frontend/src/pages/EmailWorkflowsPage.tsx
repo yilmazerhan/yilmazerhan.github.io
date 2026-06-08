@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Clock } from 'lucide-react'
+import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Clock, Play, ChevronDown, ChevronUp } from 'lucide-react'
 import {
   useEmailWorkflows,
   useEmailTemplates,
@@ -9,7 +9,11 @@ import {
   useToggleEmailWorkflow,
   useDeleteEmailWorkflow,
   useTeamsWebhooks,
+  useEmailCeleryHeartbeat,
+  useEvaluateEmailsNow,
+  useWorkflowEmailLogs,
   type EmailWorkflow,
+  type EmailLog,
 } from '@/api/email'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -79,6 +83,41 @@ function scheduleSummary(wf: EmailWorkflow, lang: string): string | null {
   return null
 }
 
+// ─── WorkflowLogs sub-component ──────────────────────────────────────────────
+
+function WorkflowLogs({ workflowId }: { workflowId: string }) {
+  const { t } = useTranslation()
+  const { data: logs = [], isLoading } = useWorkflowEmailLogs(workflowId)
+
+  if (isLoading) return <p className="text-xs text-gray-400 p-2">{t('common.loading')}</p>
+  if (logs.length === 0) return <p className="text-xs text-gray-400 p-2">{t('email.no_workflow_logs')}</p>
+
+  const statusStyle = (status: EmailLog['status']) => {
+    if (status === 'sent') return 'text-green-600 dark:text-green-400'
+    if (status === 'failed') return 'text-red-600 dark:text-red-400'
+    return 'text-yellow-600 dark:text-yellow-400'
+  }
+
+  return (
+    <div className="mt-3 border-t border-gray-100 dark:border-gray-800 pt-3 space-y-1.5 max-h-52 overflow-y-auto">
+      {logs.map((log) => (
+        <div key={log.id} className="flex items-start gap-2 text-xs">
+          <span className={`font-semibold whitespace-nowrap mt-0.5 ${statusStyle(log.status)}`}>
+            {t(`email.status_${log.status}`)}
+          </span>
+          <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap">
+            {new Date(log.created_at).toLocaleString()}
+          </span>
+          <span className="text-gray-700 dark:text-gray-300 truncate">{log.to_email}</span>
+          {log.error_message && (
+            <span className="text-red-500 truncate" title={log.error_message}>— {log.error_message}</span>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function EmailWorkflowsPage() {
@@ -107,12 +146,15 @@ export default function EmailWorkflowsPage() {
   const { data: workflows = [], isLoading } = useEmailWorkflows()
   const { data: templates = [] } = useEmailTemplates()
   const { data: teamsWebhooks = [] } = useTeamsWebhooks()
+  const { data: heartbeatData } = useEmailCeleryHeartbeat()
   const createWorkflow = useCreateEmailWorkflow()
   const updateWorkflow = useUpdateEmailWorkflow()
   const toggleWorkflow = useToggleEmailWorkflow()
   const deleteWorkflow = useDeleteEmailWorkflow()
+  const evaluateNow = useEvaluateEmailsNow()
 
   const [showForm, setShowForm] = useState(false)
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null)
   const [editing, setEditing] = useState<EmailWorkflow | null>(null)
 
   const [name, setName] = useState('')
@@ -222,13 +264,62 @@ export default function EmailWorkflowsPage() {
   const inputCls = 'w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500'
   const labelCls = 'block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1'
 
+  const heartbeatAge = (() => {
+    if (!heartbeatData?.last_heartbeat) return null
+    return (Date.now() - new Date(heartbeatData.last_heartbeat).getTime()) / 1000
+  })()
+  const heartbeatOk = heartbeatAge !== null && heartbeatAge < 1200 // 20 minutes (email evaluator runs every 15min)
+  const heartbeatWarn = heartbeatAge !== null && heartbeatAge >= 1200 && heartbeatAge < 3600
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('email.workflows_title')}</h1>
-        <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm font-medium">
-          <Plus className="h-4 w-4" /> {t('email.add_workflow')}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => evaluateNow.mutate()}
+            disabled={evaluateNow.isPending}
+            className="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium disabled:opacity-50"
+            title={t('email.evaluate_now_title')}
+          >
+            <Play className="h-4 w-4" />
+            {evaluateNow.isPending ? t('common.loading') : t('email.evaluate_now')}
+          </button>
+          <button onClick={openCreate} className="flex items-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-lg text-sm font-medium">
+            <Plus className="h-4 w-4" /> {t('email.add_workflow')}
+          </button>
+        </div>
+      </div>
+
+      {/* Celery heartbeat indicator */}
+      <div className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-sm ${
+        heartbeatData === undefined
+          ? 'border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50'
+          : heartbeatOk
+            ? 'border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-900/20'
+            : heartbeatWarn
+              ? 'border-yellow-200 dark:border-yellow-900 bg-yellow-50 dark:bg-yellow-900/20'
+              : 'border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-900/20'
+      }`}>
+        <span className={`h-2.5 w-2.5 rounded-full flex-shrink-0 ${
+          heartbeatData === undefined ? 'bg-gray-400'
+            : heartbeatOk ? 'bg-green-500'
+              : heartbeatWarn ? 'bg-yellow-500'
+                : 'bg-red-500'
+        }`} />
+        <div>
+          <span className="font-medium text-gray-700 dark:text-gray-300">{t('email.celery_heartbeat_label')}</span>
+          {heartbeatData === undefined ? (
+            <span className="text-gray-400 ml-2">{t('common.loading')}</span>
+          ) : heartbeatData.last_heartbeat ? (
+            <span className={`ml-2 ${heartbeatOk ? 'text-green-700 dark:text-green-300' : heartbeatWarn ? 'text-yellow-700 dark:text-yellow-300' : 'text-red-700 dark:text-red-300'}`}>
+              {new Date(heartbeatData.last_heartbeat).toLocaleString()}
+              {!heartbeatOk && <span className="ml-2 font-medium">{t('email.celery_heartbeat_stale')}</span>}
+            </span>
+          ) : (
+            <span className="text-red-600 dark:text-red-400 ml-2">{t('email.celery_heartbeat_never')}</span>
+          )}
+        </div>
       </div>
 
       {isLoading ? (
@@ -241,6 +332,7 @@ export default function EmailWorkflowsPage() {
         <div className="space-y-3">
           {workflows.map((wf) => {
             const summary = scheduleSummary(wf, i18n.language)
+            const logsExpanded = expandedLogId === wf.id
             return (
               <div key={wf.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4">
                 <div className="flex items-start justify-between gap-4">
@@ -268,6 +360,13 @@ export default function EmailWorkflowsPage() {
                   </div>
                   <div className="flex items-center gap-1">
                     <button
+                      onClick={() => setExpandedLogId(logsExpanded ? null : wf.id)}
+                      className="p-1.5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                      title={t('email.show_logs')}
+                    >
+                      {logsExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </button>
+                    <button
                       onClick={() => toggleWorkflow.mutate(wf.id)}
                       className="p-1.5 rounded text-gray-400 hover:text-primary-500"
                       title={wf.is_active ? t('email.deactivate') : t('email.activate')}
@@ -285,6 +384,7 @@ export default function EmailWorkflowsPage() {
                     </button>
                   </div>
                 </div>
+                {logsExpanded && <WorkflowLogs workflowId={wf.id} />}
               </div>
             )
           })}

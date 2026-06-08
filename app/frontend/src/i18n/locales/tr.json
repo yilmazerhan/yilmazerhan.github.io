@@ -568,7 +568,14 @@
     "frequency": "Sıklık",
     "frequency_daily": "Günlük",
     "frequency_weekly": "Haftalık",
-    "day_of_week": "Haftanın Günü"
+    "day_of_week": "Haftanın Günü",
+    "evaluate_now": "Şimdi Değerlendir",
+    "evaluate_now_title": "Workflow değerlendirmesini hemen çalıştır (Celery'yi atlar)",
+    "celery_heartbeat_label": "E-posta Celery Worker",
+    "celery_heartbeat_stale": "(eski — worker çalışmıyor olabilir)",
+    "celery_heartbeat_never": "Hiç çalışmadı — e-posta Celery worker başlatılmamış",
+    "show_logs": "Gönderim geçmişini göster",
+    "no_workflow_logs": "Bu workflow için gönderim geçmişi yok."
   },
   "reports": {
     "title": "Raporlar",
