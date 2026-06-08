@@ -680,7 +680,20 @@
     "status_ok": "Tamam",
     "status_failed": "Başarısız",
     "type_scheduled": "Zamanlanmış",
-    "type_manual": "Manuel"
+    "type_manual": "Manuel",
+    "type_uploaded": "Yüklendi",
+    "tab_upload": "Yedek Yükle",
+    "upload_title": "Harici Yedek Yükle",
+    "upload_description": "Başka bir sunucu veya ortamdan alınmış PostgreSQL plain-SQL yedek dosyasını (.sql) yükleyin. Geri yüklenmeden önce dosya doğrulanacaktır.",
+    "upload_drop_label": ".sql dosyası seçmek için tıklayın veya buraya sürükleyip bırakın",
+    "upload_selected": "Seçilen dosya",
+    "upload_btn": "Yükle & Doğrula",
+    "uploading": "Yükleniyor...",
+    "upload_success": "Yedek başarıyla yüklendi ve doğrulandı. Yedekler listesinden geri yükleyebilirsiniz.",
+    "upload_validation_failed": "Doğrulama başarısız",
+    "error_upload": "Yükleme başarısız oldu. Lütfen tekrar deneyin.",
+    "error_upload_too_large": "Dosya 500 MB yükleme sınırını aşıyor.",
+    "upload_constraints": "Kabul edilen: pg_dump --format=plain (.sql) dosyaları, maks. 500 MB"
   },
   "audit": {
     "action_create": "Oluşturma",

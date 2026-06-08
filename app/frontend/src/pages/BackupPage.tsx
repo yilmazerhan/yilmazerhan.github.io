@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Database, Download, RotateCcw, Trash2, Plus, Clock, AlertCircle, CheckCircle, RefreshCw, Settings,
+  Database, Download, RotateCcw, Trash2, Plus, Clock, AlertCircle, CheckCircle, RefreshCw, Settings, Upload,
 } from 'lucide-react'
 import apiClient from '@/api/client'
 
@@ -12,7 +12,7 @@ interface BackupRecord {
   filename: string
   display_name: string
   file_size: number
-  backup_type: 'manual' | 'scheduled'
+  backup_type: 'manual' | 'scheduled' | 'uploaded'
   status: 'completed' | 'failed'
   notes: string | null
   created_at: string
@@ -58,16 +58,17 @@ function StatusBadge({ status }: { status: 'completed' | 'failed' }) {
   )
 }
 
-function TypeBadge({ type }: { type: 'manual' | 'scheduled' }) {
+function TypeBadge({ type }: { type: 'manual' | 'scheduled' | 'uploaded' }) {
   const { t } = useTranslation()
+  const cfg = type === 'scheduled'
+    ? { cls: 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400', icon: <Clock className="h-3 w-3" />, label: t('backup.type_scheduled') }
+    : type === 'uploaded'
+    ? { cls: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400', icon: <Upload className="h-3 w-3" />, label: t('backup.type_uploaded') }
+    : { cls: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400', icon: <Database className="h-3 w-3" />, label: t('backup.type_manual') }
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
-      type === 'scheduled'
-        ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400'
-        : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
-    }`}>
-      {type === 'scheduled' ? <Clock className="h-3 w-3" /> : <Database className="h-3 w-3" />}
-      {type === 'scheduled' ? t('backup.type_scheduled') : t('backup.type_manual')}
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${cfg.cls}`}>
+      {cfg.icon}
+      {cfg.label}
     </span>
   )
 }
@@ -113,8 +114,16 @@ export default function BackupPage() {
   const [scheduleSuccess, setScheduleSuccess] = useState(false)
   const [scheduleError, setScheduleError] = useState('')
 
+  // Upload state
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadSuccess, setUploadSuccess] = useState(false)
+  const [uploadError, setUploadError] = useState('')
+  const [dragOver, setDragOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   // Active tab
-  const [activeTab, setActiveTab] = useState<'backups' | 'schedule'>('backups')
+  const [activeTab, setActiveTab] = useState<'backups' | 'schedule' | 'upload'>('backups')
 
   // ── Load data ──────────────────────────────────────────────────────────────
 
@@ -230,6 +239,46 @@ export default function BackupPage() {
     }
   }
 
+  async function handleUpload() {
+    if (!uploadFile) return
+    setUploading(true)
+    setUploadError('')
+    setUploadSuccess(false)
+    const form = new FormData()
+    form.append('file', uploadFile)
+    try {
+      await apiClient.post('/backup/upload', form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      setUploadSuccess(true)
+      setUploadFile(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      await loadBackups()
+    } catch (err: any) {
+      const detail = err.response?.data?.detail
+      if (err.response?.status === 413) {
+        setUploadError(t('backup.error_upload_too_large'))
+      } else if (err.response?.status === 422 && detail) {
+        setUploadError(`${t('backup.upload_validation_failed')}: ${detail}`)
+      } else {
+        setUploadError(t('backup.error_upload'))
+      }
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  function handleFileDrop(e: React.DragEvent<HTMLDivElement>) {
+    e.preventDefault()
+    setDragOver(false)
+    const f = e.dataTransfer.files[0]
+    if (f) {
+      setUploadFile(f)
+      setUploadError('')
+      setUploadSuccess(false)
+    }
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -258,6 +307,17 @@ export default function BackupPage() {
           >
             <Settings className="h-4 w-4 inline mr-1.5" />
             {t('backup.tab_schedule')}
+          </button>
+          <button
+            onClick={() => setActiveTab('upload')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === 'upload'
+                ? 'bg-primary-500 text-white'
+                : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+            }`}
+          >
+            <Upload className="h-4 w-4 inline mr-1.5" />
+            {t('backup.tab_upload')}
           </button>
         </div>
       </div>
@@ -455,6 +515,97 @@ export default function BackupPage() {
             <li>{t('backup.note_includes')}</li>
             <li>{t('backup.note_restore_warning')}</li>
           </ul>
+        </div>
+      )}
+
+      {/* ── Upload Tab ─────────────────────────────────────────────────────── */}
+      {activeTab === 'upload' && (
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6 space-y-6">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-xl bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center flex-shrink-0">
+              <Upload className="h-6 w-6 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">{t('backup.upload_title')}</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('backup.upload_description')}</p>
+            </div>
+          </div>
+
+          {/* Drop zone */}
+          <div
+            onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleFileDrop}
+            onClick={() => fileInputRef.current?.click()}
+            className={`flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed cursor-pointer transition-colors py-12 px-6 ${
+              dragOver
+                ? 'border-primary-400 bg-primary-50 dark:bg-primary-900/10'
+                : 'border-gray-300 dark:border-gray-700 hover:border-primary-400 hover:bg-gray-50 dark:hover:bg-gray-800/50'
+            }`}
+          >
+            <Upload className="h-8 w-8 text-gray-400 dark:text-gray-600" />
+            <span className="text-sm text-gray-500 dark:text-gray-400 text-center">{t('backup.upload_drop_label')}</span>
+            <span className="text-xs text-gray-400 dark:text-gray-600">{t('backup.upload_constraints')}</span>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".sql,text/plain,application/sql,application/octet-stream"
+              className="hidden"
+              onChange={e => {
+                const f = e.target.files?.[0] ?? null
+                setUploadFile(f)
+                setUploadError('')
+                setUploadSuccess(false)
+              }}
+            />
+          </div>
+
+          {/* Selected file info */}
+          {uploadFile && (
+            <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-gray-50 dark:bg-gray-800 text-sm">
+              <Database className="h-4 w-4 text-gray-400 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="font-medium text-gray-800 dark:text-gray-200 truncate">{uploadFile.name}</div>
+                <div className="text-xs text-gray-400 dark:text-gray-600">{formatBytes(uploadFile.size)}</div>
+              </div>
+              <button
+                onClick={e => { e.stopPropagation(); setUploadFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {/* Success / Error feedback */}
+          {uploadSuccess && (
+            <div className="flex items-start gap-2 px-4 py-3 rounded-lg bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 text-sm">
+              <CheckCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+              <div>
+                <p>{t('backup.upload_success')}</p>
+                <button
+                  onClick={() => setActiveTab('backups')}
+                  className="mt-1 underline text-green-600 dark:text-green-400 hover:no-underline text-xs"
+                >
+                  {t('backup.tab_backups')} →
+                </button>
+              </div>
+            </div>
+          )}
+          {uploadError && (
+            <div className="flex items-start gap-2 px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-sm">
+              <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+              <p>{uploadError}</p>
+            </div>
+          )}
+
+          <button
+            onClick={handleUpload}
+            disabled={!uploadFile || uploading}
+            className="px-5 py-2.5 bg-primary-500 hover:bg-primary-600 disabled:opacity-60 text-white rounded-lg text-sm font-medium"
+          >
+            {uploading ? t('backup.uploading') : t('backup.upload_btn')}
+          </button>
         </div>
       )}
 

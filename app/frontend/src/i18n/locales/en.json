@@ -680,7 +680,20 @@
     "status_ok": "OK",
     "status_failed": "Failed",
     "type_scheduled": "Scheduled",
-    "type_manual": "Manual"
+    "type_manual": "Manual",
+    "type_uploaded": "Uploaded",
+    "tab_upload": "Upload Backup",
+    "upload_title": "Upload External Backup",
+    "upload_description": "Upload a PostgreSQL plain-SQL backup file (.sql) from another server or environment. The file will be validated before it can be restored.",
+    "upload_drop_label": "Click to select a .sql file, or drag and drop here",
+    "upload_selected": "Selected file",
+    "upload_btn": "Upload & Validate",
+    "uploading": "Uploading...",
+    "upload_success": "Backup uploaded and validated successfully. You can now restore it from the backup list.",
+    "upload_validation_failed": "Validation failed",
+    "error_upload": "Upload failed. Please try again.",
+    "error_upload_too_large": "File exceeds the 500 MB upload limit.",
+    "upload_constraints": "Accepted: pg_dump --format=plain (.sql) files, max 500 MB"
   },
   "audit": {
     "action_create": "Create",

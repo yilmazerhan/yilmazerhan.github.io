@@ -82,6 +82,111 @@ def _file_path(filename: str) -> str:
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
+_UPLOAD_MAX_BYTES = 500 * 1024 * 1024   # 500 MB hard ceiling
+_UPLOAD_MIN_BYTES = 50                   # trivially empty files rejected
+
+# Core tables that every valid app dump must reference.
+_EXPECTED_TABLES = ["users", "teams", "tasks", "work_logs"]
+
+
+def validate_sql_backup(content: bytes) -> dict:
+    """
+    Inspect raw bytes to confirm they are a valid PostgreSQL plain-SQL dump
+    that matches this application's schema.
+
+    Returns {"valid": True} on success or {"valid": False, "error": "<reason>"}.
+    All checks are defensive reads — the file is never executed.
+    """
+    if len(content) < _UPLOAD_MIN_BYTES:
+        return {"valid": False, "error": "Dosya boş veya çok küçük."}
+
+    if len(content) > _UPLOAD_MAX_BYTES:
+        return {
+            "valid": False,
+            "error": f"Dosya boyutu {_UPLOAD_MAX_BYTES // (1024 * 1024)} MB sınırını aşıyor.",
+        }
+
+    # pg_dump --format=custom starts with the magic bytes "PGDMP"
+    if content[:5] == b"PGDMP":
+        return {
+            "valid": False,
+            "error": (
+                "Binary (custom) pg_dump formatı desteklenmiyor. "
+                "Lütfen pg_dump --format=plain ile üretilmiş .sql dosyası yükleyin."
+            ),
+        }
+
+    # Plain-SQL dumps are UTF-8 text — reject binary blobs early
+    try:
+        # Inspect only the first 8 KB for the header check
+        header = content[:8192].decode("utf-8", errors="strict")
+    except UnicodeDecodeError:
+        return {"valid": False, "error": "Dosya UTF-8 metin formatında değil; geçerli bir SQL dosyası olmalıdır."}
+
+    # pg_dump always writes this comment in the first few lines
+    if "PostgreSQL database dump" not in header:
+        return {
+            "valid": False,
+            "error": (
+                "Geçerli bir pg_dump çıktısı değil. "
+                "Dosya başlığında 'PostgreSQL database dump' ifadesi bulunamadı."
+            ),
+        }
+
+    # Scan a broader portion of the file for application-specific table names.
+    # Use lowercase comparison; pg_dump quotes identifiers so we search both forms.
+    scan = content[:200_000].decode("utf-8", errors="replace").lower()
+    missing = [t for t in _EXPECTED_TABLES if t not in scan]
+    if missing:
+        return {
+            "valid": False,
+            "error": (
+                f"Uygulama şemasıyla uyumsuz: şu tablolar bulunamadı: "
+                f"{', '.join(missing)}. "
+                f"Bu uygulama yedeği değil ya da farklı bir sürüme ait."
+            ),
+        }
+
+    return {"valid": True}
+
+
+async def save_uploaded_backup(
+    db: AsyncSession,
+    content: bytes,
+    original_filename: str,
+) -> BackupRecord:
+    """Persist an already-validated upload to disk and create a BackupRecord."""
+    _ensure_backup_dir()
+
+    record_id = str(uuid.uuid4())
+    filename = _safe_filename(record_id, "upload")
+    file_path = os.path.join(BACKUP_DIR, filename)
+
+    # Sanitise original filename for the display name (no path components)
+    safe_orig = os.path.basename(original_filename)[:80]
+    display_name = (
+        f"upload_{datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')} ({safe_orig})"
+    )
+
+    with open(file_path, "wb") as f:
+        f.write(content)
+
+    record = BackupRecord(
+        filename=filename,
+        display_name=display_name,
+        file_size=len(content),
+        backup_type="uploaded",
+        status="completed",
+        notes=f"Yüklenen harici yedek: {safe_orig}",
+    )
+    db.add(record)
+    await db.flush()
+    await db.refresh(record)
+
+    logger.info("Uploaded backup saved: %s (%.1f KB)", filename, len(content) / 1024)
+    return record
+
+
 async def create_backup(
     db: AsyncSession,
     backup_type: str = _BACKUP_TYPE_MANUAL,

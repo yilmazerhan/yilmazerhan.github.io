@@ -4,7 +4,7 @@ Backup router: manual backup, list, download, restore, delete, schedule manageme
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -48,6 +48,46 @@ async def create_backup(
     _: Any = Depends(require_superadmin),
 ) -> dict:
     record = await backup_service.create_backup(db, backup_type="manual", notes=notes)
+    return {
+        "id": str(record.id),
+        "filename": record.filename,
+        "display_name": record.display_name,
+        "file_size": record.file_size,
+        "backup_type": record.backup_type,
+        "status": record.status,
+        "notes": record.notes,
+        "created_at": record.created_at.isoformat(),
+        "file_exists": True,
+    }
+
+
+# ── Upload external backup ────────────────────────────────────────────────────
+
+@router.post("/upload")
+async def upload_backup(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    _: Any = Depends(require_superadmin),
+) -> dict:
+    """
+    Accept an external .sql file, validate its structure, and store it.
+    The stored record can then be restored via the normal restore endpoint.
+    """
+    _UPLOAD_LIMIT = 500 * 1024 * 1024  # 500 MB
+
+    content = await file.read(_UPLOAD_LIMIT + 1)
+    if len(content) > _UPLOAD_LIMIT:
+        raise HTTPException(status_code=413, detail="Dosya 500 MB sınırını aşıyor.")
+
+    result = backup_service.validate_sql_backup(content)
+    if not result["valid"]:
+        raise HTTPException(status_code=422, detail=result["error"])
+
+    record = await backup_service.save_uploaded_backup(
+        db, content, file.filename or "backup.sql"
+    )
+    await db.commit()
+
     return {
         "id": str(record.id),
         "filename": record.filename,
