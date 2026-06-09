@@ -123,7 +123,9 @@
     "action_email_logs": "Email Logs",
     "action_reports": "Reports",
     "action_email_workflows": "Email Workflows",
-    "no_tasks": "No tasks yet"
+    "no_tasks": "No tasks yet",
+    "peak_day": "Peak Day",
+    "daily_avg": "Daily Avg"
   },
   "worklog": {
     "title": "Work Log",

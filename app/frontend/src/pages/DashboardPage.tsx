@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useState, useCallback, useRef, useLayoutEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { format, subDays, isToday, isPast, parseISO, addDays } from 'date-fns'
@@ -30,70 +30,193 @@ const PRIORITY_COLORS: Record<string, string> = {
 
 // ── Pure chart / visual components ────────────────────────────────────────────
 
-/** SVG area sparkline for 7-day worklog trend */
-function TrendChart({ data }: { data: Array<{ label: string; hours: number; isToday: boolean }> }) {
-  const maxH = Math.max(...data.map(d => d.hours), 0.1)
-  const W = 300, H = 72
-  const padX = 6, padY = 6, chartW = W - padX * 2, chartH = H - padY * 2
+/** Measure an element's pixel width (responsive charts without distortion). */
+function useElementWidth<T extends HTMLElement>(): [React.RefObject<T>, number] {
+  const ref = useRef<T>(null)
+  const [width, setWidth] = useState(0)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const update = () => setWidth(el.clientWidth)
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  return [ref, width]
+}
+
+/** Build a smooth Catmull-Rom → cubic-bezier path through points, with control
+ *  points clamped to the chart band so the curve never overshoots the area. */
+function smoothPath(pts: Array<{ x: number; y: number }>, minY: number, maxY: number): string {
+  if (pts.length === 0) return ''
+  if (pts.length === 1) return `M ${pts[0].x},${pts[0].y}`
+  const clamp = (v: number) => Math.max(minY, Math.min(maxY, v))
+  let d = `M ${pts[0].x},${pts[0].y}`
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[i - 1] ?? pts[i]
+    const p1 = pts[i]
+    const p2 = pts[i + 1]
+    const p3 = pts[i + 2] ?? p2
+    const cp1x = p1.x + (p2.x - p0.x) / 6
+    const cp1y = clamp(p1.y + (p2.y - p0.y) / 6)
+    const cp2x = p2.x - (p3.x - p1.x) / 6
+    const cp2y = clamp(p2.y - (p3.y - p1.y) / 6)
+    d += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`
+  }
+  return d
+}
+
+/** Interactive smooth gradient area chart for the 7-day worklog trend. */
+function AreaTrendChart({
+  data, hourAbbr,
+}: {
+  data: Array<{ label: string; hours: number; isToday: boolean }>
+  hourAbbr: string
+}) {
+  const [ref, W] = useElementWidth<HTMLDivElement>()
+  const [active, setActive] = useState<number | null>(null)
+  const H = 132
+  const padX = 10, padTop = 14, padBottom = 10
+  const chartW = Math.max(W - padX * 2, 1)
+  const chartH = H - padTop - padBottom
+  const maxH = Math.max(...data.map(d => d.hours), 1)
+  // "Nice" rounded ceiling for the axis (e.g. 2.5h → 3, 7h → 8)
+  const axisMax = Math.max(Math.ceil(maxH), 1)
 
   const toX = (i: number) => padX + (i / Math.max(data.length - 1, 1)) * chartW
-  const toY = (h: number) => padY + chartH - (h / maxH) * chartH
+  const toY = (h: number) => padTop + chartH - (h / axisMax) * chartH
 
-  const linePoints = data.map((d, i) => `${toX(i)},${toY(d.hours)}`).join(' ')
-  const areaPoints = [
-    `${toX(0)},${padY + chartH}`,
-    ...data.map((d, i) => `${toX(i)},${toY(d.hours)}`),
-    `${toX(data.length - 1)},${padY + chartH}`,
-  ].join(' ')
+  const pts = data.map((d, i) => ({ x: toX(i), y: toY(d.hours) }))
+  const line = smoothPath(pts, padTop, padTop + chartH)
+  const area = W > 0
+    ? `${line} L ${toX(data.length - 1)},${padTop + chartH} L ${toX(0)},${padTop + chartH} Z`
+    : ''
+
+  // Gridlines at 0%, 50%, 100% of axisMax
+  const gridVals = [0, axisMax / 2, axisMax]
+
+  const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const el = ref.current
+    if (!el) return
+    const x = e.clientX - el.getBoundingClientRect().left
+    const idx = Math.round(((x - padX) / chartW) * (data.length - 1))
+    setActive(Math.max(0, Math.min(data.length - 1, idx)))
+  }
+
+  const act = active != null ? data[active] : null
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 72 }}>
-      <defs>
-        <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%"   stopColor="#6366f1" stopOpacity="0.3" />
-          <stop offset="100%" stopColor="#6366f1" stopOpacity="0.02" />
-        </linearGradient>
-      </defs>
-      <polygon points={areaPoints} fill="url(#trendGrad)" />
-      <polyline
-        points={linePoints}
-        fill="none"
-        stroke="#6366f1"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      {data.map((d, i) => (
-        <circle
-          key={i}
-          cx={toX(i)}
-          cy={toY(d.hours)}
-          r={d.isToday ? 4 : 2.5}
-          fill={d.isToday ? '#6366f1' : '#a5b4fc'}
-          stroke="white"
-          strokeWidth="1.5"
+    <div ref={ref} className="relative w-full select-none" onMouseMove={onMove} onMouseLeave={() => setActive(null)}>
+      {W > 0 && (
+        <svg width={W} height={H} className="block">
+          <defs>
+            <linearGradient id="trendArea" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#6366f1" stopOpacity="0.35" />
+              <stop offset="55%" stopColor="#818cf8" stopOpacity="0.12" />
+              <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+            </linearGradient>
+            <linearGradient id="trendLine" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#6366f1" />
+              <stop offset="100%" stopColor="#a855f7" />
+            </linearGradient>
+          </defs>
+
+          {/* Gridlines */}
+          {gridVals.map((v, gi) => (
+            <line
+              key={gi}
+              x1={padX} x2={padX + chartW}
+              y1={toY(v)} y2={toY(v)}
+              className="stroke-gray-200 dark:stroke-gray-700/60"
+              strokeWidth="1"
+              strokeDasharray={gi === 0 ? undefined : '3 4'}
+            />
+          ))}
+
+          <path d={area} fill="url(#trendArea)" />
+          <path
+            d={line}
+            fill="none"
+            stroke="url(#trendLine)"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+
+          {/* Active crosshair */}
+          {act && (
+            <line
+              x1={toX(active!)} x2={toX(active!)}
+              y1={padTop} y2={padTop + chartH}
+              stroke="#6366f1" strokeWidth="1" strokeDasharray="3 3" opacity="0.5"
+            />
+          )}
+
+          {/* Points */}
+          {data.map((d, i) => {
+            const isAct = i === active
+            return (
+              <circle
+                key={i}
+                cx={toX(i)} cy={toY(d.hours)}
+                r={isAct ? 5 : d.isToday ? 4 : 3}
+                fill={d.isToday || isAct ? '#6366f1' : '#c7d2fe'}
+                stroke="white" strokeWidth="2"
+                className="dark:[stroke:#0f172a] transition-all"
+              />
+            )
+          })}
+        </svg>
+      )}
+
+      {/* Tooltip */}
+      {act && W > 0 && (
+        <div
+          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded-lg bg-gray-900 dark:bg-gray-700 px-2.5 py-1.5 shadow-lg"
+          style={{ left: toX(active!), top: toY(act.hours) - 8 }}
         >
-          <title>{`${d.label}: ${d.hours.toFixed(1)}h`}</title>
-        </circle>
-      ))}
-    </svg>
+          <p className="text-[10px] font-medium text-gray-300 whitespace-nowrap">{act.label}</p>
+          <p className="text-xs font-bold text-white whitespace-nowrap">{act.hours.toFixed(1)}{hourAbbr}</p>
+        </div>
+      )}
+    </div>
   )
 }
 
-/** Horizontal segmented bar showing priority distribution */
-function PrioritySegmentBar({ counts }: { counts: Record<string, number> }) {
-  const total = (counts.critical + counts.high + counts.medium + counts.low) || 1
-  const segments = (['critical', 'high', 'medium', 'low'] as const).filter(p => counts[p] > 0)
+/** SVG donut chart for task priority distribution with a centred total. */
+function PriorityDonut({ counts, centerLabel }: { counts: Record<string, number>; centerLabel: string }) {
+  const order = (['critical', 'high', 'medium', 'low'] as const).filter(p => counts[p] > 0)
+  const total = order.reduce((s, p) => s + counts[p], 0) || 1
+  const R = 52, stroke = 16, C = 2 * Math.PI * R
+  let offset = 0
   return (
-    <div className="flex h-3 rounded-full overflow-hidden gap-px">
-      {segments.map(p => (
-        <div
-          key={p}
-          style={{ width: `${(counts[p] / total) * 100}%`, backgroundColor: PRIORITY_COLORS[p] }}
-          className="transition-all duration-500"
-          title={`${p}: ${counts[p]}`}
-        />
-      ))}
+    <div className="relative flex items-center justify-center" style={{ width: 132, height: 132 }}>
+      <svg viewBox="0 0 132 132" className="w-full h-full -rotate-90">
+        <circle cx="66" cy="66" r={R} fill="none" strokeWidth={stroke} className="stroke-gray-100 dark:stroke-gray-800" />
+        {order.map(p => {
+          const frac = counts[p] / total
+          const len = frac * C
+          const seg = (
+            <circle
+              key={p}
+              cx="66" cy="66" r={R} fill="none"
+              stroke={PRIORITY_COLORS[p]}
+              strokeWidth={stroke}
+              strokeDasharray={`${len} ${C - len}`}
+              strokeDashoffset={-offset}
+              strokeLinecap="butt"
+              className="transition-all duration-700"
+            />
+          )
+          offset += len
+          return seg
+        })}
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-2xl font-bold text-gray-900 dark:text-white leading-none">{total}</span>
+        <span className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">{centerLabel}</span>
+      </div>
     </div>
   )
 }
@@ -191,6 +314,13 @@ export default function DashboardPage() {
       return { date: d, label, hours, isToday: d === today }
     })
   }, [logsData, today, locale])
+
+  // Trend summary: peak day + daily average over the 7-day window
+  const trendSummary = useMemo(() => {
+    const peak = dailyTrend.reduce((best, d) => (d.hours > best.hours ? d : best), dailyTrend[0] ?? { hours: 0, label: '' })
+    const total = dailyTrend.reduce((s, d) => s + d.hours, 0)
+    return { peakLabel: peak.hours > 0 ? peak.label : '—', peakHours: peak.hours, avg: total / 7 }
+  }, [dailyTrend])
 
   // Priority distribution
   const priorityCounts = useMemo(() => {
@@ -373,22 +503,27 @@ export default function DashboardPage() {
               <p className="text-sm text-gray-400 py-6 text-center">{t('dashboard.no_logs')}</p>
             ) : (
               <>
-                <TrendChart data={dailyTrend} />
+                <AreaTrendChart data={dailyTrend} hourAbbr={hourAbbr} />
                 <div className="flex justify-between mt-1 px-1">
                   {dailyTrend.map(d => (
-                    <div key={d.date} className="flex flex-col items-center gap-0.5">
-                      <span className={`text-[10px] ${d.isToday ? 'text-indigo-500 font-semibold' : 'text-gray-400 dark:text-gray-600'}`}>
-                        {d.label}
-                      </span>
-                      {d.hours > 0 && (
-                        <span className="text-[9px] text-gray-400 dark:text-gray-600">{d.hours.toFixed(1)}{hourAbbr}</span>
-                      )}
-                    </div>
+                    <span key={d.date} className={`text-[10px] ${d.isToday ? 'text-indigo-500 font-semibold' : 'text-gray-400 dark:text-gray-600'}`}>
+                      {d.label}
+                    </span>
                   ))}
                 </div>
-                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between text-xs">
-                  <span className="text-gray-500 dark:text-gray-400">{t('dashboard.weekly_total')}</span>
-                  <span className="font-semibold text-gray-900 dark:text-white">{stats.totalHours.toFixed(1)}{hourAbbr}</span>
+                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 grid grid-cols-3 gap-2 text-center">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-600">{t('dashboard.weekly_total')}</p>
+                    <p className="text-sm font-bold text-gray-900 dark:text-white mt-0.5">{stats.totalHours.toFixed(1)}{hourAbbr}</p>
+                  </div>
+                  <div className="border-x border-gray-100 dark:border-gray-800">
+                    <p className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-600">{t('dashboard.daily_avg')}</p>
+                    <p className="text-sm font-bold text-gray-900 dark:text-white mt-0.5">{trendSummary.avg.toFixed(1)}{hourAbbr}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-600">{t('dashboard.peak_day')}</p>
+                    <p className="text-sm font-bold text-gray-900 dark:text-white mt-0.5">{trendSummary.peakLabel}</p>
+                  </div>
                 </div>
               </>
             )}
@@ -410,15 +545,18 @@ export default function DashboardPage() {
                 {/* Priority distribution */}
                 <div className="mb-4">
                   <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">{t('dashboard.by_priority')}</p>
-                  <PrioritySegmentBar counts={priorityCounts} />
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
-                    {(['critical','high','medium','low'] as const).map(p => priorityCounts[p] > 0 && (
-                      <span key={p} className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400">
-                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: PRIORITY_COLORS[p] }} />
-                        {t(`dashboard.priority_${p}`)}
-                        <span className="font-semibold text-gray-900 dark:text-white">{priorityCounts[p]}</span>
-                      </span>
-                    ))}
+                  <div className="flex items-center gap-4">
+                    <PriorityDonut counts={priorityCounts} centerLabel={t('dashboard.total_tasks')} />
+                    <div className="flex-1 space-y-1.5">
+                      {(['critical','high','medium','low'] as const).map(p => priorityCounts[p] > 0 && (
+                        <div key={p} className="flex items-center gap-2 text-xs">
+                          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: PRIORITY_COLORS[p] }} />
+                          <span className="text-gray-600 dark:text-gray-400 flex-1">{t(`dashboard.priority_${p}`)}</span>
+                          <span className="font-semibold text-gray-900 dark:text-white">{priorityCounts[p]}</span>
+                          <span className="text-gray-400 dark:text-gray-600 w-9 text-right">{Math.round((priorityCounts[p] / totalPriority) * 100)}%</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -531,8 +669,8 @@ export default function DashboardPage() {
                       </div>
                       <span className="text-sm font-medium text-gray-900 dark:text-white ml-2 flex-shrink-0">{p.hours.toFixed(1)}{hourAbbr}</span>
                     </div>
-                    <div className="h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full bg-primary-400 dark:bg-primary-500 transition-all duration-500" style={{ width: `${(p.hours / maxPersonHours) * 100}%` }} />
+                    <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full bg-gradient-to-r from-primary-400 to-primary-600 dark:from-primary-500 dark:to-primary-400 transition-all duration-500" style={{ width: `${(p.hours / maxPersonHours) * 100}%` }} />
                     </div>
                   </div>
                 ))}

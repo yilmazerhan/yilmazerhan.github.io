@@ -123,7 +123,9 @@
     "action_email_logs": "E-posta Günlüğü",
     "action_reports": "Raporlar",
     "action_email_workflows": "E-posta İş Akışları",
-    "no_tasks": "Henüz görev yok"
+    "no_tasks": "Henüz görev yok",
+    "peak_day": "En Yoğun Gün",
+    "daily_avg": "Günlük Ort."
   },
   "worklog": {
     "title": "İş Günlüğü",
