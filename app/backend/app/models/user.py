@@ -46,12 +46,16 @@ class User(Base):
         secondary="user_teams",
         back_populates="all_members",
     )
+    # passive_deletes=True: these children have NOT NULL user_id with ON DELETE CASCADE
+    # at the DB level, so defer deletion to the database. Without it, a hard delete
+    # makes the ORM try to NULL the FK first, violating the NOT NULL constraint.
     permission_overrides: Mapped[list["PermissionOverride"]] = relationship(
-        "PermissionOverride", back_populates="user", foreign_keys="PermissionOverride.user_id"
+        "PermissionOverride", back_populates="user", foreign_keys="PermissionOverride.user_id",
+        passive_deletes=True,
     )
-    work_logs: Mapped[list["WorkLog"]] = relationship("WorkLog", back_populates="user")
+    work_logs: Mapped[list["WorkLog"]] = relationship("WorkLog", back_populates="user", passive_deletes=True)
     assigned_tasks: Mapped[list["Task"]] = relationship("Task", back_populates="assignee", foreign_keys="Task.assignee_id")
-    refresh_tokens: Mapped[list["RefreshToken"]] = relationship("RefreshToken", back_populates="user")
+    refresh_tokens: Mapped[list["RefreshToken"]] = relationship("RefreshToken", back_populates="user", passive_deletes=True)
 
 
 class RefreshToken(Base):
