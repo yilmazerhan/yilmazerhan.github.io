@@ -249,12 +249,12 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
         await updateTask.mutateAsync({
           id: task.id,
           title: title.trim(),
-          description: description.trim() || undefined,
+          description: description.trim(),
           assignee_id: assigneeId || null,
           priority,
           due_date: dueDate || null,
           start_date: startDate || null,
-          jira_ticket: jiraTicket.trim() || null,
+          jira_ticket: jiraTicket.trim(),
           label_ids: selectedLabelIds,
         })
 

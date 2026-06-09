@@ -74,7 +74,7 @@ export function useDeleteWorkType() {
 
 export function useWorkTypes(activeOnly = true) {
   return useQuery({
-    queryKey: worklogKeys.workTypes,
+    queryKey: [...worklogKeys.workTypes, activeOnly],
     queryFn: () =>
       apiClient.get<WorkType[]>('/worklogs/work-types', { params: { active_only: activeOnly } }).then((r) => r.data),
   })

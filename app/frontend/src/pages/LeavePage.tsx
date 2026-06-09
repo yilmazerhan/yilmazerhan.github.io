@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format, differenceInCalendarDays, parseISO } from 'date-fns'
-import { CalendarDays, Plus, X, Trash2 } from 'lucide-react'
+import { CalendarDays, Plus, X, Trash2, Check } from 'lucide-react'
 import { useLeaves, useCreateLeave, useUpdateLeave, useDeleteLeave, type LeaveRequest } from '@/api/leaves'
 import { useAuthStore } from '@/store/authStore'
 import { useUsers } from '@/api/users'
@@ -36,7 +36,6 @@ export default function LeavePage() {
 
   const params = {
     ...(isManager && filterUserId ? { user_id: filterUserId } : {}),
-    ...(showCancelled ? {} : { status: 'approved' }),
   }
   const { data: leaves = [], isLoading } = useLeaves(params)
   const createLeave = useCreateLeave()
@@ -69,13 +68,25 @@ export default function LeavePage() {
     await updateLeave.mutateAsync({ id: leave.id, status: 'cancelled' })
   }
 
+  async function handleApprove(leave: LeaveRequest) {
+    await updateLeave.mutateAsync({ id: leave.id, status: 'approved' })
+  }
+
+  async function handleReject(leave: LeaveRequest) {
+    const note = prompt(t('leave.review_note'))
+    if (note === null) return
+    await updateLeave.mutateAsync({ id: leave.id, status: 'rejected', review_note: note.trim() || undefined })
+  }
+
   async function handleDelete(id: string) {
     if (!confirm(t('leave.delete_confirm'))) return
     await deleteLeave.mutateAsync(id)
   }
 
-  // Show all leaves when showCancelled, otherwise just non-cancelled
-  const displayed = showCancelled ? leaves : leaves.filter((l) => l.status !== 'cancelled')
+  // "Active" tab shows pending + approved; "All statuses" tab shows everything.
+  const displayed = showCancelled
+    ? leaves
+    : leaves.filter((l) => l.status === 'pending' || l.status === 'approved')
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -247,15 +258,35 @@ export default function LeavePage() {
 
               {/* Status + actions */}
               <div className="flex items-center gap-2 flex-shrink-0">
-                {showCancelled && (
-                  <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUS_COLORS[leave.status] ?? STATUS_COLORS.approved}`}>
-                    {t(`leave.status_${leave.status}`)}
-                  </span>
+                <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${STATUS_COLORS[leave.status] ?? STATUS_COLORS.approved}`}>
+                  {t(`leave.status_${leave.status}`)}
+                </span>
+
+                {/* Approve / reject: managers on pending leaves */}
+                {isManager && leave.status === 'pending' && (
+                  <>
+                    <button
+                      onClick={() => handleApprove(leave)}
+                      className="p-1.5 rounded text-gray-400 hover:text-green-600"
+                      title={t('leave.approve')}
+                    >
+                      <Check className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleReject(leave)}
+                      className="p-1.5 rounded text-gray-400 hover:text-red-500"
+                      title={t('leave.reject')}
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </>
                 )}
 
-                {/* Cancel: owner or manager can cancel any non-cancelled leave */}
-                {leave.status !== 'cancelled' && (
-                  (leave.user_id === user?.id || isManager) && (
+                {/* Cancel/withdraw: owner on their own active leave, or manager on an
+                    already-approved leave. Pending leaves use the manager approve/reject
+                    controls above instead, so we don't show a duplicate X here. */}
+                {leave.status !== 'cancelled' && leave.status !== 'rejected' &&
+                  (leave.user_id === user?.id || (isManager && leave.status === 'approved')) && (
                     <button
                       onClick={() => handleCancel(leave)}
                       className="p-1.5 rounded text-gray-400 hover:text-orange-500"
@@ -263,8 +294,7 @@ export default function LeavePage() {
                     >
                       <X className="h-4 w-4" />
                     </button>
-                  )
-                )}
+                  )}
 
                 {/* SuperAdmin: delete */}
                 {user?.role === 'superadmin' && (

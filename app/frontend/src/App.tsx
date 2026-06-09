@@ -5,6 +5,7 @@ import axios from 'axios'
 import { useThemeStore } from '@/store/themeStore'
 import AppShell from '@/components/layout/AppShell'
 import ProtectedRoute from '@/components/layout/ProtectedRoute'
+import RoleRoute from '@/components/layout/RoleRoute'
 import LoginPage from '@/pages/LoginPage'
 import ForgotPasswordPage from '@/pages/ForgotPasswordPage'
 import ResetPasswordPage from '@/pages/ResetPasswordPage'
@@ -83,22 +84,30 @@ export default function App() {
             <Route path="/gantt" element={<GanttPage />} />
             <Route path="/timeline" element={<TimelinePage />} />
             <Route path="/leave" element={<LeavePage />} />
-            <Route path="/leave/calendar" element={<LeaveCalendarPage />} />
-            <Route path="/users" element={<UsersPage />} />
-            <Route path="/teams" element={<TeamsPage />} />
-            <Route path="/permissions" element={<PermissionsPage />} />
             <Route path="/reports" element={<ReportsPage />} />
-            <Route path="/settings/email/templates" element={<EmailTemplatesPage />} />
-            <Route path="/settings/email/workflows" element={<EmailWorkflowsPage />} />
-            <Route path="/settings/email/logs" element={<EmailLogsPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
             <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/admin/audit-logs" element={<AuditLogsPage />} />
-            <Route path="/admin/backup" element={<BackupPage />} />
-            <Route path="/reports/user/:userId" element={<UserActivityPage />} />
             <Route path="/inventory" element={<InventoryPage />} />
             <Route path="/patches" element={<PatchesPage />} />
-            <Route path="/admin/announcements" element={<AnnouncementsPage />} />
+
+            {/* Manager+ routes */}
+            <Route element={<RoleRoute allow={['superadmin', 'team_manager']} />}>
+              <Route path="/leave/calendar" element={<LeaveCalendarPage />} />
+              <Route path="/reports/user/:userId" element={<UserActivityPage />} />
+            </Route>
+
+            {/* Superadmin-only routes */}
+            <Route element={<RoleRoute allow={['superadmin']} />}>
+              <Route path="/users" element={<UsersPage />} />
+              <Route path="/teams" element={<TeamsPage />} />
+              <Route path="/permissions" element={<PermissionsPage />} />
+              <Route path="/settings/email/templates" element={<EmailTemplatesPage />} />
+              <Route path="/settings/email/workflows" element={<EmailWorkflowsPage />} />
+              <Route path="/settings/email/logs" element={<EmailLogsPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/admin/audit-logs" element={<AuditLogsPage />} />
+              <Route path="/admin/backup" element={<BackupPage />} />
+              <Route path="/admin/announcements" element={<AnnouncementsPage />} />
+            </Route>
           </Route>
         </Route>
 

@@ -207,13 +207,16 @@ async def export_user_activity(
         .options(selectinload(WorkLog.user), selectinload(WorkLog.work_type))
     )
 
-    if target_user_id:
-        q = q.where(WorkLog.user_id == target_user_id)
-    elif current_user.role == "team_manager":
+    if current_user.role == "team_manager":
+        # Always scope a manager to their own team, then optionally narrow to a user.
         from app.models.user import User as UserModel
         q = q.join(UserModel, WorkLog.user_id == UserModel.id).where(
             UserModel.team_id == current_user.team_id
         )
+        if target_user_id:
+            q = q.where(WorkLog.user_id == target_user_id)
+    elif target_user_id:
+        q = q.where(WorkLog.user_id == target_user_id)
 
     if date_from:
         q = q.where(WorkLog.log_date >= date_from)

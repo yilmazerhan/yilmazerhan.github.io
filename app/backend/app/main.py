@@ -22,12 +22,26 @@ from app.routers.patch import router as patch_router
 logger = logging.getLogger(__name__)
 
 
+# Distinct advisory-lock keys so only one process performs each scheduled job
+# per tick, even when uvicorn runs multiple workers and Celery Beat is also active.
+_BACKUP_LOCK_KEY = 943_100_001
+_EMAIL_LOCK_KEY = 943_100_002
+
+
+async def _try_advisory_lock(db, key: int) -> bool:
+    """Acquire a transaction-scoped Postgres advisory lock; False if held elsewhere."""
+    from sqlalchemy import text
+    got = await db.execute(text("SELECT pg_try_advisory_xact_lock(:k)"), {"k": key})
+    return bool(got.scalar())
+
+
 async def _backup_scheduler_loop() -> None:
     """In-process backup scheduler — runs every 60 s as a fallback when Celery Beat is not running.
 
     Also updates the backup_celery_heartbeat so the UI heartbeat indicator turns green
-    even when the Celery container is absent.  The existing 23-hour dedup window in
-    run_scheduled_backup_check prevents duplicate backups across uvicorn workers.
+    even when the Celery container is absent.  A Postgres advisory lock ensures only one
+    worker/process performs the check per tick so multiple uvicorn workers (or Celery Beat
+    running concurrently) cannot create duplicate backups.
     """
     await asyncio.sleep(30)  # brief startup delay
     while True:
@@ -38,8 +52,9 @@ async def _backup_scheduler_loop() -> None:
                 await update_heartbeat(db)
                 await db.commit()
             async with AsyncSessionLocal() as db:
-                await run_scheduled_backup_check(db)
-                await db.commit()
+                if await _try_advisory_lock(db, _BACKUP_LOCK_KEY):
+                    await run_scheduled_backup_check(db)
+                    await db.commit()
         except Exception as exc:
             logger.warning("In-process backup scheduler: %s", exc)
         await asyncio.sleep(60)
@@ -56,8 +71,13 @@ async def _email_scheduler_loop() -> None:
     await asyncio.sleep(90)  # offset from backup loop startup
     while True:
         try:
+            from app.database import AsyncSessionLocal
             from app.tasks.email_tasks import _evaluate_workflows_async
-            await _evaluate_workflows_async()
+            run_eval = False
+            async with AsyncSessionLocal() as db:
+                run_eval = await _try_advisory_lock(db, _EMAIL_LOCK_KEY)
+                if run_eval:
+                    await _evaluate_workflows_async()
         except Exception as exc:
             logger.warning("In-process email scheduler: %s", exc)
         await asyncio.sleep(900)  # 15 minutes

@@ -424,7 +424,8 @@
     "edit_column": "Sütunu Düzenle",
     "confirm_delete_column": "Bu sütunu silmek istediğinizden emin misiniz?",
     "confirm_delete_work_type": "Bu iş tipini silmek istediğinizden emin misiniz?",
-    "smtp_test": "Test E-postası Gönder"
+    "smtp_test": "Test E-postası Gönder",
+    "labels_description": "Filtreleme ve kategorilendirme için görev etiketlerini yönetin."
   },
   "common": {
     "save": "Kaydet",
@@ -595,7 +596,8 @@
     "csv_user": "Kullanıcı",
     "csv_work_type": "İş Tipi",
     "csv_duration": "Süre (s)",
-    "csv_description": "Açıklama"
+    "csv_description": "Açıklama",
+    "trend_col": "Eğilim"
   },
   "history": {
     "title": "Geçmiş",

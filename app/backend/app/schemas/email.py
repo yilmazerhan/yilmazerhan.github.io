@@ -79,7 +79,8 @@ class EmailWorkflowCreate(BaseModel):
     recipient_type: str
     trigger_config: Optional[dict] = None
     condition_config: Optional[dict] = None
-    recipient_users: Optional[list[uuid.UUID]] = None
+    # Holds user UUIDs (specific_users) or email strings (specific_emails); stored as JSONB.
+    recipient_users: Optional[list[str]] = None
     send_teams: bool = False
     teams_webhook_id: Optional[uuid.UUID] = None
 
@@ -106,7 +107,7 @@ class EmailWorkflowUpdate(BaseModel):
     condition_config: Optional[dict] = None
     template_id: Optional[uuid.UUID] = None
     recipient_type: Optional[str] = None
-    recipient_users: Optional[list[uuid.UUID]] = None
+    recipient_users: Optional[list[str]] = None
     send_teams: Optional[bool] = None
     teams_webhook_id: Optional[uuid.UUID] = None
     is_active: Optional[bool] = None

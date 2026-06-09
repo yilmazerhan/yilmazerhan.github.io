@@ -313,7 +313,7 @@ async def update_task(
         priority=body.priority,
         due_date=body.due_date if "due_date" in sent else ...,
         start_date=body.start_date if "start_date" in sent else ...,
-        jira_ticket=body.jira_ticket,
+        jira_ticket=body.jira_ticket if "jira_ticket" in sent else ...,
         is_archived=body.is_archived,
         label_ids=body.label_ids,
     )

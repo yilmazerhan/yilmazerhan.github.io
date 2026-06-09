@@ -531,7 +531,7 @@ class KanbanService:
         priority: Optional[str] = None,
         due_date: object = ...,      # Ellipsis = not sent; None = clear
         start_date: object = ...,    # Ellipsis = not sent; None = clear
-        jira_ticket: Optional[str] = None,
+        jira_ticket: object = ...,   # Ellipsis = not sent; None/"" = clear
         is_archived: Optional[bool] = None,
         label_ids: Optional[list[uuid.UUID]] = None,  # None = no change; [] = clear
     ) -> Task:
@@ -571,8 +571,8 @@ class KanbanService:
             if old_start != new_start:
                 changes.append({"field": "start_date", "old": old_start, "new": new_start})
             task.start_date = start_date  # type: ignore[assignment]
-        if jira_ticket is not None:
-            new_jira = jira_ticket.strip() or None
+        if jira_ticket is not ...:
+            new_jira = (jira_ticket or "").strip() or None
             if new_jira != task.jira_ticket:
                 changes.append({"field": "jira_ticket", "old": task.jira_ticket, "new": new_jira})
             task.jira_ticket = new_jira

@@ -58,6 +58,11 @@ async def get_team(
 ):
     svc = TeamService(db)
     team = await svc.get_by_id(team_id)
+    # A team_manager may only view teams they belong to; superadmin sees all.
+    if current_user.role == "team_manager":
+        member_ids = {m.id for m in team.members}
+        if current_user.id not in member_ids and team.manager_id != current_user.id:
+            raise ForbiddenError("Bu takıma erişim yetkiniz yok.")
     data = TeamDetailResponse.model_validate(team)
     data.member_count = len(team.members)
     data.members = team.members

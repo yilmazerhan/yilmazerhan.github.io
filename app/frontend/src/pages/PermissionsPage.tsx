@@ -58,7 +58,7 @@ export default function PermissionsPage() {
                 </td>
                 <td className="px-4 py-3">
                   <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${ROLE_BADGE[u.role] ?? ''}`}>
-                    {t(`users.role_${u.role.replace('team_', '')}`)}
+                    {t(`users.role_${u.role}`)}
                   </span>
                   {u.role === 'superadmin' && (
                     <span className="ml-1 text-xs text-gray-400">— {t('permissions.superadmin_note')}</span>
