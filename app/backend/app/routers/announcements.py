@@ -73,7 +73,8 @@ async def create_announcement(
         message_en=body.message_en or None,
         type=body.type,
         target_type=body.target_type,
-        target_ids=body.target_ids,
+        # target_ids is a JSONB column — store UUIDs as strings so they serialize.
+        target_ids=[str(i) for i in body.target_ids] if body.target_ids else body.target_ids,
         starts_at=body.starts_at,
         ends_at=body.ends_at,
         is_active=body.is_active,
@@ -103,7 +104,7 @@ async def update_announcement(
     if body.message_en is not None: ann.message_en = body.message_en or None
     if body.type is not None: ann.type = body.type
     if body.target_type is not None: ann.target_type = body.target_type
-    if body.target_ids is not None: ann.target_ids = body.target_ids
+    if body.target_ids is not None: ann.target_ids = [str(i) for i in body.target_ids]
     if body.starts_at is not None: ann.starts_at = body.starts_at
     if body.ends_at is not None: ann.ends_at = body.ends_at
     if body.is_active is not None: ann.is_active = body.is_active

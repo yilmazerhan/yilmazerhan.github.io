@@ -216,6 +216,10 @@ class UserService:
             is_personal=True,
         )
 
+        # Eager-load the team relationship so response serialization doesn't trigger
+        # a lazy load outside the async context (MissingGreenlet) when team_id is set.
+        await self.db.refresh(user, attribute_names=["team"])
+
         return user, temp_password
 
     async def update_user(
@@ -295,6 +299,9 @@ class UserService:
             user.preferred_theme = preferred_theme
 
         await self.db.flush()
+        # Refresh team so the response reflects a changed team_id (and never lazy-loads
+        # outside the async context during serialization).
+        await self.db.refresh(user, attribute_names=["team"])
         return user
 
     async def _get_fallback_superadmin(self, exclude_user_id: uuid.UUID) -> Optional[User]:
