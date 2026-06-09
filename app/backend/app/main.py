@@ -9,7 +9,7 @@ from slowapi.errors import RateLimitExceeded
 from app.config import settings
 
 _APP_START_TIME = _time_module.time()
-from app.core.middleware import SecurityHeadersMiddleware, AuditLogMiddleware
+from app.core.middleware import SecurityHeadersMiddleware, AuditLogMiddleware, DBSessionMiddleware
 from app.core.rate_limit import limiter, rate_limit_exceeded_handler
 from app.routers import auth, users, teams, permissions, worklog, kanban, jira, email, admin, notifications
 from app.routers.leave import router as leave_router
@@ -141,6 +141,11 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 # Audit log (runs after security headers; fire-and-forget DB write)
 app.add_middleware(AuditLogMiddleware)
+
+# Request-scoped DB session — added last so it is the outermost middleware:
+# request.state.db is available throughout the request, and the commit runs
+# before the response is dispatched (fixes read-after-write race).
+app.add_middleware(DBSessionMiddleware)
 
 
 # ─── Routers ──────────────────────────────────────────────────────────────

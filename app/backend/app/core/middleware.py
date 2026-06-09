@@ -21,6 +21,42 @@ _UUID_RE = re.compile(
 )
 
 
+class DBSessionMiddleware(BaseHTTPMiddleware):
+    """Request-scoped DB session that commits BEFORE the response is sent.
+
+    FastAPI runs `yield`-dependency teardown *after* the response has been
+    dispatched, so committing in get_db's teardown lets the client observe a
+    success response before the data is durably committed — an immediate
+    read-after-write (e.g. a list refetch right after a create) can miss the
+    new row. Owning the session here and committing after the endpoint returns
+    but before the response leaves this middleware closes that race.
+
+    The session is created lazily (only when a route actually uses get_db) and
+    shared with the route via request.state (backed by the ASGI scope).
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        request.state.db = None
+        try:
+            response = await call_next(request)
+        except Exception:
+            db = getattr(request.state, "db", None)
+            if db is not None:
+                await db.rollback()
+                await db.close()
+            raise
+        db = getattr(request.state, "db", None)
+        if db is not None:
+            try:
+                if response.status_code < 400:
+                    await db.commit()
+                else:
+                    await db.rollback()
+            finally:
+                await db.close()
+        return response
+
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response: Response = await call_next(request)
