@@ -1100,9 +1100,8 @@ export default function InventoryPage() {
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">{t('inventory.fields.display_name')}</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400 hidden md:table-cell">{t('inventory.item_type')}</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400 hidden lg:table-cell">Host / Account</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400 hidden xl:table-cell">{t('inventory.fields.username')}</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400 hidden lg:table-cell">{t('inventory.fields.credentials')}</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400 hidden lg:table-cell">{t('inventory.fields.owner')}</th>
-                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400 hidden xl:table-cell">Gizli Bilgiler</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400 hidden lg:table-cell">{t('inventory.fields.tags')}</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400 hidden md:table-cell">{t('inventory.group')}</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400 hidden 2xl:table-cell">{t('inventory.fields.notes')}</th>
@@ -1130,14 +1129,11 @@ export default function InventoryPage() {
                   <td className="px-4 py-3 hidden lg:table-cell text-gray-600 dark:text-gray-300 text-xs">
                     {renderItemSubtitle(item)}
                   </td>
-                  <td className="px-4 py-3 hidden xl:table-cell text-gray-600 dark:text-gray-300 text-xs">
-                    {item.username || '—'}
-                  </td>
-                  <td className="px-4 py-3 hidden lg:table-cell text-gray-600 dark:text-gray-300 text-xs">
-                    {item.owner || '—'}
-                  </td>
-                  <td className="px-4 py-3 hidden xl:table-cell">
+                  <td className="px-4 py-3 hidden lg:table-cell">
                     <div className="space-y-1">
+                      <div className="text-xs text-gray-600 dark:text-gray-300">
+                        {item.username || '—'}
+                      </div>
                       {renderSecretFields(item).map(({ label, field }) => (
                         <div key={field} className="flex items-center gap-2">
                           <span className="text-xs text-gray-500 dark:text-gray-400 min-w-[50px]">{label}:</span>
@@ -1145,6 +1141,9 @@ export default function InventoryPage() {
                         </div>
                       ))}
                     </div>
+                  </td>
+                  <td className="px-4 py-3 hidden lg:table-cell text-gray-600 dark:text-gray-300 text-xs">
+                    {item.owner || '—'}
                   </td>
                   <td className="px-4 py-3 hidden lg:table-cell">
                     <div className="flex flex-wrap gap-1">

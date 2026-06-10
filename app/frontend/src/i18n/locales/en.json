@@ -906,6 +906,7 @@
       "description": "Description",
       "notes": "Notes",
       "owner": "Owner",
+      "credentials": "Username / Password",
       "tags": "Tags",
       "is_active": "Active",
       "hostname": "Hostname",

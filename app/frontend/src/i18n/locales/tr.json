@@ -906,6 +906,7 @@
       "description": "Açıklama",
       "notes": "Notlar",
       "owner": "Sahip",
+      "credentials": "Kullanıcı Adı / Şifre",
       "tags": "Etiketler",
       "is_active": "Aktif",
       "hostname": "Sunucu Adı (Hostname)",
