@@ -46,6 +46,7 @@ function JsonDiff({ oldData, newData, action }: {
   newData: Record<string, unknown> | null
   action: string
 }) {
+  const { t } = useTranslation()
   const serialize = (v: unknown) => {
     if (v === null || v === undefined) return '—'
     if (typeof v === 'object') return JSON.stringify(v)
@@ -92,16 +93,16 @@ function JsonDiff({ oldData, newData, action }: {
   )
 
   if (changedKeys.length === 0) {
-    return <span className="text-xs text-gray-400">Değişen alan bulunamadı.</span>
+    return <span className="text-xs text-gray-400">{t('audit.no_changed_fields')}</span>
   }
 
   return (
     <table className="w-full text-xs border-collapse">
       <thead>
         <tr className="text-gray-400 dark:text-gray-500 border-b border-gray-200 dark:border-gray-700">
-          <th className="text-left pb-1 pr-3 font-medium w-36">Alan</th>
-          <th className="text-left pb-1 pr-3 font-medium">Önceki</th>
-          <th className="text-left pb-1 font-medium">Sonraki</th>
+          <th className="text-left pb-1 pr-3 font-medium w-36">{t('audit.field')}</th>
+          <th className="text-left pb-1 pr-3 font-medium">{t('audit.before')}</th>
+          <th className="text-left pb-1 font-medium">{t('audit.after')}</th>
         </tr>
       </thead>
       <tbody>
@@ -122,6 +123,7 @@ function JsonDiff({ oldData, newData, action }: {
 }
 
 function DetailPanel({ log }: { log: AuditLog }) {
+  const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
   const hasData = !!(log.old_data || log.new_data)
 
@@ -137,18 +139,18 @@ function DetailPanel({ log }: { log: AuditLog }) {
       {/* Full record ID */}
       {log.record_id && (
         <div className="flex items-center gap-2 flex-wrap text-xs">
-          <span className="text-gray-400 dark:text-gray-500 flex-shrink-0">Record ID</span>
+          <span className="text-gray-400 dark:text-gray-500 flex-shrink-0">{t('audit.record_id')}</span>
           <code className="font-mono text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
             {log.record_id}
           </code>
           <button
             onClick={copyId}
             className="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
-            title="Kopyala"
+            title={t('audit.copy')}
           >
             <Copy className="h-3 w-3" />
           </button>
-          {copied && <span className="text-green-600 dark:text-green-400 text-xs">Kopyalandı!</span>}
+          {copied && <span className="text-green-600 dark:text-green-400 text-xs">{t('audit.copied')}</span>}
         </div>
       )}
 
@@ -165,10 +167,10 @@ function DetailPanel({ log }: { log: AuditLog }) {
         <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
           <div className="px-3 py-1.5 bg-gray-50 dark:bg-gray-800/60 text-gray-500 dark:text-gray-400 font-medium text-xs border-b border-gray-200 dark:border-gray-700">
             {log.action === 'create'
-              ? 'Oluşturulan Veriler'
+              ? t('audit.created_data')
               : log.action === 'delete'
-              ? 'Silinen Veriler'
-              : 'Değişiklikler (Önceki → Sonraki)'}
+              ? t('audit.deleted_data')
+              : t('audit.changes')}
           </div>
           <div className="px-3 py-2.5 overflow-x-auto">
             <JsonDiff oldData={log.old_data} newData={log.new_data} action={log.action} />
@@ -309,12 +311,12 @@ export default function AuditLogsPage() {
                         <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${badgeCls}`}>{label}</span>
                         <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-400 font-mono">{log.table_name}</code>
                         {log.username && (
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                            by <span className="font-medium text-gray-700 dark:text-gray-300">{log.username}</span>
+                          <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                            {t('audit.by_user', { name: log.username })}
                           </span>
                         )}
                         {(log.old_data || log.new_data) && (
-                          <span className="text-xs text-primary-500 dark:text-primary-400">· detay mevcut</span>
+                          <span className="text-xs text-primary-500 dark:text-primary-400">· {t('audit.detail_available')}</span>
                         )}
                       </p>
                       <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 flex flex-wrap items-center gap-2">

@@ -139,13 +139,15 @@ app.add_middleware(
 # Security headers
 app.add_middleware(SecurityHeadersMiddleware)
 
-# Audit log (runs after security headers; fire-and-forget DB write)
-app.add_middleware(AuditLogMiddleware)
-
-# Request-scoped DB session — added last so it is the outermost middleware:
-# request.state.db is available throughout the request, and the commit runs
-# before the response is dispatched (fixes read-after-write race).
+# Request-scoped DB session: request.state.db is available throughout the
+# request, and the commit runs before the response is dispatched (fixes
+# read-after-write race).
 app.add_middleware(DBSessionMiddleware)
+
+# Audit log (fire-and-forget DB write). Added after (= outside) the DB session
+# middleware so the route's transaction is already committed when the audit
+# task snapshots the new row state for new_data.
+app.add_middleware(AuditLogMiddleware)
 
 
 # ─── Routers ──────────────────────────────────────────────────────────────

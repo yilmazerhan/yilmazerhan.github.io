@@ -739,7 +739,18 @@
     "ip": "IP",
     "no_records": "Kayıt bulunamadı.",
     "page_of": "Sayfa {{current}} / {{total}}",
-    "user": "Kullanıcı"
+    "user": "Kullanıcı",
+    "detail_available": "detay mevcut",
+    "created_data": "Oluşturulan Veriler",
+    "deleted_data": "Silinen Veriler",
+    "changes": "Değişiklikler (Önceki → Sonraki)",
+    "field": "Alan",
+    "before": "Önceki",
+    "after": "Sonraki",
+    "no_changed_fields": "Değişen alan bulunamadı.",
+    "copy": "Kopyala",
+    "copied": "Kopyalandı!",
+    "by_user": "{{name}} tarafından"
   },
   "kanban_tabs": {
     "details": "Detaylar"

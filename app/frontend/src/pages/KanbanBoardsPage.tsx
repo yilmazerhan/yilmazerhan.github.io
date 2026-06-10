@@ -134,7 +134,7 @@ export default function KanbanBoardsPage() {
   const [viewPersonalOwnerId, setViewPersonalOwnerId] = useState<string>('')
 
   // Load all users for the picker (managers/superadmin only)
-  const { data: usersData } = useUsers({ is_active: true, limit: 500 }, isManager)
+  const { data: usersData } = useUsers({ is_active: true, limit: 200 }, isManager)
   const allUsers = usersData?.items ?? []
 
   const boardParams: { include_archived?: boolean; personal_owner_id?: string } = {}

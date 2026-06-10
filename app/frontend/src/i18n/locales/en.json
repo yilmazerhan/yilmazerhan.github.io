@@ -739,7 +739,18 @@
     "ip": "IP",
     "no_records": "No records found.",
     "page_of": "Page {{current}} / {{total}}",
-    "user": "User"
+    "user": "User",
+    "detail_available": "details available",
+    "created_data": "Created Data",
+    "deleted_data": "Deleted Data",
+    "changes": "Changes (Before → After)",
+    "field": "Field",
+    "before": "Before",
+    "after": "After",
+    "no_changed_fields": "No changed fields found.",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "by_user": "by {{name}}"
   },
   "kanban_tabs": {
     "details": "Details"
