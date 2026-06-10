@@ -36,6 +36,7 @@ def _item_to_response(item) -> InventoryItemResponse:
         display_name=item.display_name,
         description=item.description,
         notes=item.notes,
+        owner=item.owner,
         tags=item.tags or [],
         is_active=item.is_active,
         hostname=item.hostname,

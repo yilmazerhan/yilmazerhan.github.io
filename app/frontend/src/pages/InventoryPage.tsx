@@ -128,6 +128,7 @@ function ItemFormModal({ item, onClose, groups = [] }: ItemFormModalProps) {
     display_name: item?.display_name ?? '',
     description: item?.description ?? '',
     notes: item?.notes ?? '',
+    owner: item?.owner ?? '',
     tags: item?.tags ?? [],
     is_active: item?.is_active ?? true,
     hostname: item?.hostname ?? '',
@@ -391,8 +392,17 @@ function ItemFormModal({ item, onClose, groups = [] }: ItemFormModalProps) {
             </div>
           )}
 
-          {/* Tags + notes (all types) */}
+          {/* Tags + owner + notes (all types) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t pt-4 dark:border-gray-700">
+            <div>
+              <label className={labelCls}>{t('inventory.fields.owner')}</label>
+              <input
+                type="text"
+                value={form.owner}
+                onChange={(e) => set('owner', e.target.value)}
+                className={inputCls}
+              />
+            </div>
             <div>
               <label className={labelCls}>{t('inventory.fields.tags')}</label>
               <input
@@ -774,21 +784,69 @@ function DeleteConfirmModal({ name, onConfirm, onCancel }: {
 
 // ─── Masked Notes ─────────────────────────────────────────────────────────────
 
-function MaskedNotes({ notes }: { notes?: string | null }) {
-  const [revealed, setRevealed] = useState(false)
+function NotesModal({ name, notes, onClose }: { name: string; notes: string; onClose: () => void }) {
+  const { t } = useTranslation()
+  const [copied, setCopied] = useState(false)
+
+  async function handleCopy() {
+    await navigator.clipboard.writeText(notes)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
+      <div
+        className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white truncate">
+            {name} — {t('inventory.fields.notes')}
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="p-6">
+          <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap break-words max-h-[55vh] overflow-y-auto">
+            {notes}
+          </p>
+        </div>
+        <div className="border-t border-gray-200 dark:border-gray-700 px-6 py-3 flex justify-end gap-3">
+          <button
+            onClick={handleCopy}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+          >
+            {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied ? t('inventory.copied') : t('inventory.copy_to_clipboard')}
+          </button>
+          <button
+            onClick={onClose}
+            className="px-3 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium"
+          >
+            {t('common.close')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MaskedNotes({ name, notes }: { name: string; notes?: string | null }) {
+  const [open, setOpen] = useState(false)
   if (!notes) return <span className="text-gray-400 dark:text-gray-500">—</span>
   return (
-    <span className="flex items-center gap-1">
-      <span className="text-xs text-gray-600 dark:text-gray-300 line-clamp-2 max-w-[130px]" title={revealed ? notes : undefined}>
-        {revealed ? notes : '•••'}
-      </span>
+    <>
       <button
-        onClick={() => setRevealed((v) => !v)}
-        className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
       >
-        {revealed ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+        <span className="text-xs tracking-widest">•••</span>
+        <Eye className="h-3.5 w-3.5 shrink-0" />
       </button>
-    </span>
+      {open && <NotesModal name={name} notes={notes} onClose={() => setOpen(false)} />}
+    </>
   )
 }
 
@@ -1043,6 +1101,7 @@ export default function InventoryPage() {
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400 hidden md:table-cell">{t('inventory.item_type')}</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400 hidden lg:table-cell">Host / Account</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400 hidden xl:table-cell">{t('inventory.fields.username')}</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400 hidden lg:table-cell">{t('inventory.fields.owner')}</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400 hidden xl:table-cell">Gizli Bilgiler</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400 hidden lg:table-cell">{t('inventory.fields.tags')}</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400 hidden md:table-cell">{t('inventory.group')}</th>
@@ -1073,6 +1132,9 @@ export default function InventoryPage() {
                   </td>
                   <td className="px-4 py-3 hidden xl:table-cell text-gray-600 dark:text-gray-300 text-xs">
                     {item.username || '—'}
+                  </td>
+                  <td className="px-4 py-3 hidden lg:table-cell text-gray-600 dark:text-gray-300 text-xs">
+                    {item.owner || '—'}
                   </td>
                   <td className="px-4 py-3 hidden xl:table-cell">
                     <div className="space-y-1">
@@ -1110,7 +1172,7 @@ export default function InventoryPage() {
                     )}
                   </td>
                   <td className="px-4 py-3 hidden 2xl:table-cell text-xs max-w-[160px]">
-                    <MaskedNotes notes={item.notes} />
+                    <MaskedNotes name={item.display_name} notes={item.notes} />
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">

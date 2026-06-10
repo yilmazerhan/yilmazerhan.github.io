@@ -905,6 +905,7 @@
       "display_name": "Görünen Ad",
       "description": "Açıklama",
       "notes": "Notlar",
+      "owner": "Sahip",
       "tags": "Etiketler",
       "is_active": "Aktif",
       "hostname": "Sunucu Adı (Hostname)",

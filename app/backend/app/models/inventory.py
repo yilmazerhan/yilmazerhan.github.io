@@ -37,6 +37,7 @@ class InventoryItem(Base):
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    owner: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     tags: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 

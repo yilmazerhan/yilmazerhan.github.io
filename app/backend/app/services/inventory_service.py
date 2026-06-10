@@ -42,7 +42,7 @@ _TYPE_COLOR = {
     "generic": "4B5563",
 }
 
-_COMMON_TAIL_HEADERS = ["Grup", "Etiketler", "Notlar", "Aktif", "Oluşturulma"]
+_COMMON_TAIL_HEADERS = ["Sahip", "Grup", "Etiketler", "Notlar", "Aktif", "Oluşturulma"]
 
 _TYPE_HEADERS: dict[str, list[str]] = {
     "server": [
@@ -96,6 +96,7 @@ class InventoryService:
                     InventoryItem.ip_address.ilike(term),
                     InventoryItem.email_address.ilike(term),
                     InventoryItem.description.ilike(term),
+                    InventoryItem.owner.ilike(term),
                 )
             )
         if tags:
@@ -561,6 +562,7 @@ def _item_to_visible_row(item: InventoryItem) -> list:
         t,
         host_account,
         item.username or "",
+        item.owner or "",
         tags,
         group_name,
         item.notes or "",
@@ -568,14 +570,14 @@ def _item_to_visible_row(item: InventoryItem) -> list:
     ]
 
 
-_VISIBLE_HEADERS = ["Ad", "Tür", "Host / Hesap", "Kullanıcı Adı", "Etiketler", "Grup", "Notlar", "Aktif"]
+_VISIBLE_HEADERS = ["Ad", "Tür", "Host / Hesap", "Kullanıcı Adı", "Sahip", "Etiketler", "Grup", "Notlar", "Aktif"]
 
 
 def _item_to_typed_row(item: InventoryItem) -> list:
     """Return a type-specific row matching _TYPE_HEADERS[item.item_type]."""
     group_name = item.group.name if item.group else ""
     tags = ", ".join(item.tags) if item.tags else ""
-    tail = [group_name, tags, item.notes or "", "Evet" if item.is_active else "Hayır",
+    tail = [item.owner or "", group_name, tags, item.notes or "", "Evet" if item.is_active else "Hayır",
             item.created_at.strftime("%Y-%m-%d %H:%M") if item.created_at else ""]
 
     t = item.item_type

@@ -44,6 +44,7 @@ export interface InventoryItem {
   display_name: string
   description?: string
   notes?: string
+  owner?: string
   tags: string[]
   is_active: boolean
 
@@ -91,6 +92,7 @@ export interface InventoryItemCreate {
   display_name: string
   description?: string
   notes?: string
+  owner?: string
   tags?: string[]
   is_active?: boolean
   hostname?: string

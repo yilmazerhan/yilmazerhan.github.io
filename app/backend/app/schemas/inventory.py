@@ -57,6 +57,7 @@ class InventoryItemCreate(BaseModel):
     display_name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = Field(None, max_length=5000)
     notes: Optional[str] = Field(None, max_length=5000)
+    owner: Optional[str] = Field(None, max_length=255)
     tags: list[str] = Field(default_factory=list)
     is_active: bool = True
 
@@ -118,6 +119,7 @@ class InventoryItemUpdate(BaseModel):
     display_name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = Field(None, max_length=5000)
     notes: Optional[str] = Field(None, max_length=5000)
+    owner: Optional[str] = Field(None, max_length=255)
     tags: Optional[list[str]] = None
     is_active: Optional[bool] = None
 
@@ -167,6 +169,7 @@ class InventoryItemResponse(BaseModel):
     display_name: str
     description: Optional[str] = None
     notes: Optional[str] = None
+    owner: Optional[str] = None
     tags: list[str] = []
     is_active: bool
 
