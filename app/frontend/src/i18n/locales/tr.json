@@ -1014,7 +1014,12 @@
         "related": "İlişkili",
         "other": "Diğer"
       }
-    }
+    },
+    "delete_confirm_title": "Silme Onayı",
+    "delete_confirm_body": "{{name}} adlı kaydı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+    "export_scope_visible": "Tablodaki sütunlar",
+    "export_scope_all": "Tüm veriler",
+    "fields_notes": "Notlar"
   },
   "patches": {
     "title": "Müşteri Yamaları",

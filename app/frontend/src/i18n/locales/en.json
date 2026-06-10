@@ -1014,7 +1014,12 @@
         "related": "Related",
         "other": "Other"
       }
-    }
+    },
+    "delete_confirm_title": "Confirm Delete",
+    "delete_confirm_body": "Are you sure you want to delete {{name}}? This action cannot be undone.",
+    "export_scope_visible": "Visible columns",
+    "export_scope_all": "All data",
+    "fields_notes": "Notes"
   },
   "patches": {
     "title": "Customer Patches",

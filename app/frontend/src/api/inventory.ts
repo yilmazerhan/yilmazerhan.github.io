@@ -223,8 +223,8 @@ export function useRevealField() {
 
 // ─── Export ───────────────────────────────────────────────────────────────────
 
-export async function exportInventory(format: 'excel' | 'csv', item_type?: string) {
-  const params = new URLSearchParams({ format })
+export async function exportInventory(format: 'excel' | 'csv', item_type?: string, scope: 'all' | 'visible' = 'all') {
+  const params = new URLSearchParams({ format, scope })
   if (item_type) params.set('item_type', item_type)
 
   const res = await apiClient.get(`/inventory/export?${params.toString()}`, {

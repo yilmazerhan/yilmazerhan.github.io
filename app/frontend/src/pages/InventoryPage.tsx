@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Plus, Search, Pencil, Trash2, Eye, EyeOff, Download, Server, Database, Mail,
-  Cloud, Package, Copy, Check, ChevronDown, ChevronRight, Send, X, Calendar, Layers,
+  Cloud, Package, Copy, Check, ChevronDown, ChevronRight, Send, X, Calendar, Layers, AlertTriangle,
 } from 'lucide-react'
 import {
   useInventoryItems,
@@ -731,6 +731,47 @@ function GroupModal({ group, onClose }: GroupModalProps) {
   )
 }
 
+// ─── Delete Confirm Modal ─────────────────────────────────────────────────────
+
+function DeleteConfirmModal({ name, onConfirm, onCancel }: {
+  name: string
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4">
+        <div className="flex items-center gap-3">
+          <span className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+            <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+          </span>
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+            {t('inventory.delete_confirm_title')}
+          </h2>
+        </div>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          {t('inventory.delete_confirm_body', { name })}
+        </p>
+        <div className="flex justify-end gap-3 pt-1">
+          <button
+            onClick={onCancel}
+            className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+          >
+            {t('common.cancel')}
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition-colors"
+          >
+            {t('inventory.delete')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function InventoryPage() {
@@ -744,6 +785,7 @@ export default function InventoryPage() {
   const [groupFilter, setGroupFilter] = useState<string>('')
   const [editItem, setEditItem] = useState<InventoryItem | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<InventoryItem | null>(null)
   const [groupsOpen, setGroupsOpen] = useState(false)
   const [editGroup, setEditGroup] = useState<InventoryGroup | null>(null)
   const [groupCreateOpen, setGroupCreateOpen] = useState(false)
@@ -751,6 +793,7 @@ export default function InventoryPage() {
   const [editSchedule, setEditSchedule] = useState<InventorySchedule | null>(null)
   const [scheduleCreateOpen, setScheduleCreateOpen] = useState(false)
   const [exportLoading, setExportLoading] = useState(false)
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
 
   // Use effective permissions (role defaults + overrides) so granted users see full UI
   const isMgrOrAbove = currentUser?.role === 'superadmin' || currentUser?.role === 'team_manager'
@@ -773,8 +816,13 @@ export default function InventoryPage() {
   const sendNow = useSendInventoryScheduleNow()
 
   async function handleDelete(item: InventoryItem) {
-    if (!confirm(t('inventory.delete_confirm'))) return
-    await deleteItem.mutateAsync(item.id)
+    setDeleteTarget(item)
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return
+    await deleteItem.mutateAsync(deleteTarget.id)
+    setDeleteTarget(null)
   }
 
   async function handleDeleteGroup(group: InventoryGroup) {
@@ -788,10 +836,11 @@ export default function InventoryPage() {
     await deleteSchedule.mutateAsync(sch.id)
   }
 
-  async function handleExport(format: 'excel' | 'csv') {
+  async function handleExport(format: 'excel' | 'csv', scope: 'all' | 'visible') {
     setExportLoading(true)
+    setExportMenuOpen(false)
     try {
-      await exportInventory(format, typeFilter || undefined)
+      await exportInventory(format, typeFilter || undefined, scope)
     } finally {
       setExportLoading(false)
     }
@@ -832,23 +881,43 @@ export default function InventoryPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('inventory.title')}</h1>
         <div className="flex items-center gap-2">
-          {/* Export buttons */}
-          <button
-            onClick={() => handleExport('excel')}
-            disabled={exportLoading}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-60"
-          >
-            <Download className="h-4 w-4" />
-            Excel
-          </button>
-          <button
-            onClick={() => handleExport('csv')}
-            disabled={exportLoading}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-60"
-          >
-            <Download className="h-4 w-4" />
-            CSV
-          </button>
+          {/* Export dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setExportMenuOpen((v) => !v)}
+              disabled={exportLoading}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-60"
+            >
+              <Download className="h-4 w-4" />
+              {t('inventory.export')}
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
+            {exportMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setExportMenuOpen(false)} />
+                <div className="absolute right-0 top-full mt-1 z-20 w-52 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div className="px-3 py-1.5 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide border-b border-gray-100 dark:border-gray-700">
+                    Excel
+                  </div>
+                  <button onClick={() => handleExport('excel', 'visible')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    {t('inventory.export_scope_visible')}
+                  </button>
+                  <button onClick={() => handleExport('excel', 'all')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    {t('inventory.export_scope_all')}
+                  </button>
+                  <div className="px-3 py-1.5 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide border-t border-b border-gray-100 dark:border-gray-700">
+                    CSV
+                  </div>
+                  <button onClick={() => handleExport('csv', 'visible')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    {t('inventory.export_scope_visible')}
+                  </button>
+                  <button onClick={() => handleExport('csv', 'all')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    {t('inventory.export_scope_all')}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
 
           {canCreate && (
             <button
@@ -957,6 +1026,7 @@ export default function InventoryPage() {
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400 hidden xl:table-cell">Gizli Bilgiler</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400 hidden lg:table-cell">{t('inventory.fields.tags')}</th>
                 <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400 hidden md:table-cell">{t('inventory.group')}</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400 hidden 2xl:table-cell">{t('inventory.fields.notes')}</th>
                 <th className="px-4 py-3 text-right font-medium text-gray-600 dark:text-gray-400">İşlemler</th>
               </tr>
             </thead>
@@ -1017,6 +1087,13 @@ export default function InventoryPage() {
                       </span>
                     ) : (
                       <span className="text-xs text-gray-400 dark:text-gray-500">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 hidden 2xl:table-cell text-xs text-gray-600 dark:text-gray-300 max-w-[160px]">
+                    {item.notes ? (
+                      <span className="line-clamp-2" title={item.notes}>{item.notes}</span>
+                    ) : (
+                      <span className="text-gray-400 dark:text-gray-500">—</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-right">
@@ -1198,6 +1275,15 @@ export default function InventoryPage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Delete confirmation */}
+      {deleteTarget && (
+        <DeleteConfirmModal
+          name={deleteTarget.display_name}
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
       )}
 
       {/* Modals */}

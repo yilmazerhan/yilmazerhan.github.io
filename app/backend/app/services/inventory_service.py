@@ -429,6 +429,49 @@ class InventoryService:
 
         return output.getvalue()
 
+    async def export_excel_visible(self, item_type: Optional[str] = None) -> bytes:
+        """Export only the visible table columns as a single-sheet Excel file."""
+        items = await self.list_items(item_type=item_type, limit=10000)
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Envanter"
+
+        dark_fill = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid")
+        dark_font = Font(color="FFFFFF", bold=True)
+        center = Alignment(horizontal="center")
+
+        for col_idx, hdr in enumerate(_VISIBLE_HEADERS, start=1):
+            cell = ws.cell(row=1, column=col_idx, value=hdr)
+            cell.fill = dark_fill
+            cell.font = dark_font
+            cell.alignment = center
+
+        for row_idx, item in enumerate(items, start=2):
+            for col_idx, value in enumerate(_item_to_visible_row(item), start=1):
+                ws.cell(row=row_idx, column=col_idx, value=value)
+
+        for col in ws.columns:
+            max_len = max(len(str(cell.value or "")) for cell in col)
+            ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 50)
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        return buf.read()
+
+    async def export_csv_visible(self, item_type: Optional[str] = None) -> str:
+        """Export only the visible table columns as CSV."""
+        import csv as _csv
+        items = await self.list_items(item_type=item_type, limit=10000)
+
+        output = io.StringIO()
+        writer = _csv.writer(output)
+        writer.writerow(_VISIBLE_HEADERS)
+        for item in items:
+            writer.writerow(_item_to_visible_row(item))
+        return output.getvalue()
+
     # ─── Email Schedules ─────────────────────────────────────────────────────
 
     async def list_schedules(self) -> list[InventoryEmailSchedule]:
@@ -497,6 +540,36 @@ class InventoryService:
 
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
+
+def _item_to_visible_row(item: InventoryItem) -> list:
+    """Return the 'visible columns' row — matches what the UI table shows."""
+    group_name = item.group.name if item.group else ""
+    tags = ", ".join(item.tags) if item.tags else ""
+
+    t = item.item_type
+    if t == "server" or t == "database":
+        host_account = item.hostname or item.ip_address or ""
+    elif t == "email_account":
+        host_account = item.email_address or ""
+    elif t == "cloud_account":
+        host_account = f"{item.provider or ''} / {item.account_id or ''}"
+    else:
+        host_account = item.url or ""
+
+    return [
+        item.display_name,
+        t,
+        host_account,
+        item.username or "",
+        tags,
+        group_name,
+        item.notes or "",
+        "Evet" if item.is_active else "Hayır",
+    ]
+
+
+_VISIBLE_HEADERS = ["Ad", "Tür", "Host / Hesap", "Kullanıcı Adı", "Etiketler", "Grup", "Notlar", "Aktif"]
+
 
 def _item_to_typed_row(item: InventoryItem) -> list:
     """Return a type-specific row matching _TYPE_HEADERS[item.item_type]."""

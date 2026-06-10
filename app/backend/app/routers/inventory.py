@@ -238,18 +238,25 @@ async def export_inventory(
     db: Annotated[AsyncSession, Depends(get_db)],
     fmt: str = Query("excel", alias="format"),
     item_type: Optional[str] = Query(None),
+    scope: str = Query("all"),  # "all" | "visible"
 ):
     svc = InventoryService(db)
 
     if fmt == "csv":
-        csv_content = await svc.export_csv(item_type=item_type)
+        if scope == "visible":
+            csv_content = await svc.export_csv_visible(item_type=item_type)
+        else:
+            csv_content = await svc.export_csv(item_type=item_type)
         return Response(
             content=csv_content.encode("utf-8-sig"),
             media_type="text/csv",
             headers={"Content-Disposition": "attachment; filename=inventory.csv"},
         )
     else:
-        excel_bytes = await svc.export_excel(item_type=item_type)
+        if scope == "visible":
+            excel_bytes = await svc.export_excel_visible(item_type=item_type)
+        else:
+            excel_bytes = await svc.export_excel(item_type=item_type)
         return Response(
             content=excel_bytes,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
