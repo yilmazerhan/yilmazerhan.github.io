@@ -22,15 +22,19 @@ from app.tests.conftest import get_auth_headers
 
 class TestComputeNextRun:
     def test_daily_before_hour_returns_today(self):
+        from zoneinfo import ZoneInfo
         from app.services.report_schedule_service import compute_next_run
-        now = datetime.now(timezone.utc)
-        # Pick an hour that is still in the future (today)
-        future_hour = (now.hour + 1) % 24
+        ist = ZoneInfo("Europe/Istanbul")
+        now_local = datetime.now(timezone.utc).astimezone(ist)
+        # Pick an hour that is still in the future (today, Istanbul time —
+        # compute_next_run interprets the hour in Istanbul local time)
+        future_hour = (now_local.hour + 1) % 24
         result = compute_next_run("daily", None, None, future_hour)
         assert result is not None
         assert result.tzinfo is not None  # must be timezone-aware
-        assert result.hour == future_hour
-        assert result.date() == now.date() or result.date() == now.date() + timedelta(days=1)
+        result_local = result.astimezone(ist)
+        assert result_local.hour == future_hour
+        assert result_local.date() == now_local.date() or result_local.date() == now_local.date() + timedelta(days=1)
 
     def test_daily_after_hour_returns_tomorrow(self):
         from app.services.report_schedule_service import compute_next_run

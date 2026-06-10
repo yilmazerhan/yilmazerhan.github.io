@@ -27,6 +27,12 @@ _CHECK_LOG_KEY = "backup_check_log"
 _CHECK_LOG_MAX = 30  # keep at most 30 entries
 _HEARTBEAT_KEY = "backup_celery_heartbeat"
 
+# Postgres advisory-lock key shared by every backup-check runner (the in-process
+# scheduler loop in main.py AND the Celery task). Both must acquire this lock in
+# their transaction before running the check, otherwise two runners that fire in
+# the same minute both pass the dedup query and create duplicate backups.
+BACKUP_LOCK_KEY = 943_100_001
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -568,6 +574,13 @@ async def run_scheduled_backup_check(db: AsyncSession, now: datetime | None = No
     backup_hour = int(schedule.get("backup_hour", "2"))
     backup_minute = int(schedule.get("backup_minute", "0"))
     frequency = schedule.get("backup_frequency", "daily")
+
+    if not (0 <= backup_hour <= 23) or not (0 <= backup_minute <= 59):
+        logger.warning(
+            "Scheduled backup: invalid configured time %s:%s — skipping.",
+            backup_hour, backup_minute,
+        )
+        return False
 
     # Run if the scheduled time has already passed today (catch-up: handles API restarts after configured time)
     today_run = now_local.replace(hour=backup_hour, minute=backup_minute, second=0, microsecond=0)

@@ -24,7 +24,8 @@ logger = logging.getLogger(__name__)
 
 # Distinct advisory-lock keys so only one process performs each scheduled job
 # per tick, even when uvicorn runs multiple workers and Celery Beat is also active.
-_BACKUP_LOCK_KEY = 943_100_001
+# The backup key is shared with the Celery task (see backup_service.BACKUP_LOCK_KEY).
+from app.services.backup_service import BACKUP_LOCK_KEY as _BACKUP_LOCK_KEY
 _EMAIL_LOCK_KEY = 943_100_002
 
 

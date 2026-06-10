@@ -35,8 +35,13 @@ def run_backup_check():
 
 
 async def _run_backup_check_async():
+    from sqlalchemy import text
     from sqlalchemy.ext.asyncio import async_sessionmaker
-    from app.services.backup_service import run_scheduled_backup_check, update_heartbeat
+    from app.services.backup_service import (
+        BACKUP_LOCK_KEY,
+        run_scheduled_backup_check,
+        update_heartbeat,
+    )
 
     engine = _make_engine()
     SessionLocal = async_sessionmaker(engine, expire_on_commit=False)
@@ -51,6 +56,15 @@ async def _run_backup_check_async():
 
     try:
         async with SessionLocal.begin() as db:
+            # Advisory lock shared with the in-process scheduler loop in main.py.
+            # Without it, both runners fire in the same minute, both pass the
+            # dedup query before either commits, and two backups are created.
+            got = await db.execute(
+                text("SELECT pg_try_advisory_xact_lock(:k)"), {"k": BACKUP_LOCK_KEY}
+            )
+            if not bool(got.scalar()):
+                logger.info("Backup check: lock held by another process — skipping.")
+                return
             await run_scheduled_backup_check(db)
     except Exception as exc:
         error_str = str(exc)

@@ -342,8 +342,31 @@ class KanbanService:
         if not include_archived:
             q = q.where(Task.is_archived == False)
 
+        # ── Board-aware visibility ────────────────────────────────────────────
+        # When listing a specific board, the board itself governs visibility:
+        # shared boards expose all tasks to every user; personal boards are
+        # restricted to their owner, the owner's team managers, and superadmin.
+        board = None
+        if board_id:
+            board = await self.get_board(board_id)
+            if board.is_personal and not await self._can_see_board(board, requester):
+                raise ForbiddenError("Bu panoya erişim izniniz yok.")
+
         # ── Role-based scoping ────────────────────────────────────────────────
-        if requester.role == "superadmin":
+        if board is not None:
+            # Board-scoped listing: visibility already resolved above.
+            # Apply optional filters only.
+            if team_id:
+                team_member_ids = (
+                    select(user_teams.c.user_id)
+                    .where(user_teams.c.team_id == team_id)
+                    .scalar_subquery()
+                )
+                q = q.where(Task.assignee_id.in_(team_member_ids))
+            if assignee_id:
+                q = q.where(Task.assignee_id == assignee_id)
+
+        elif requester.role == "superadmin":
             # Superadmin sees everything; optional filters
             if team_id:
                 # Filter tasks whose assignee belongs to a given team (via junction)
@@ -416,6 +439,15 @@ class KanbanService:
             raise NotFoundError("Görev")
         return task
 
+    async def _task_on_shared_board(self, task: Task) -> bool:
+        """Return True if the task's board is a shared (non-personal) board."""
+        if task.column is None:
+            return False
+        result = await self.db.execute(
+            select(KanbanBoard.is_personal).where(KanbanBoard.id == task.column.board_id)
+        )
+        return result.scalar_one_or_none() is False
+
     async def get_task(self, task_id: uuid.UUID, requester: User) -> Task:
         task = await self._get_task(task_id)
         # Enforce same role-based access as list_tasks
@@ -437,9 +469,13 @@ class KanbanService:
             # Manager created the task themselves
             if task.created_by == requester.id:
                 return task
+            if await self._task_on_shared_board(task):
+                return task
             raise ForbiddenError("Bu göreve erişim yetkiniz yok.")
-        # Regular user: only own assigned tasks or created tasks
+        # Regular user: own assigned/created tasks, or any task on a shared board
         if task.assignee_id == requester.id or task.created_by == requester.id:
+            return task
+        if await self._task_on_shared_board(task):
             return task
         raise ForbiddenError("Bu göreve erişim yetkiniz yok.")
 
