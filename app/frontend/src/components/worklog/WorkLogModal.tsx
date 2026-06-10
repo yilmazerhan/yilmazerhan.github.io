@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { X } from 'lucide-react'
 import { format } from 'date-fns'
 import { useWorkTypes, useCreateWorkLog, useUpdateWorkLog, type WorkLog } from '@/api/worklog'
@@ -38,6 +38,12 @@ export default function WorkLogModal({ log, duplicate, onClose }: Props) {
   const createLog = useCreateWorkLog()
   const updateLog = useUpdateWorkLog(log?.id || '')
   const loading = createLog.isPending || updateLog.isPending
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
