@@ -9,12 +9,13 @@ import { resolveName } from '@/utils/i18nName'
 
 interface Props {
   log?: WorkLog
+  duplicate?: WorkLog
   onClose: () => void
 }
 
 const DURATION_OPTIONS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 3.5, 4, 4.5, 5, 6, 7, 8]
 
-export default function WorkLogModal({ log, onClose }: Props) {
+export default function WorkLogModal({ log, duplicate, onClose }: Props) {
   const { t } = useTranslation()
   const currentUser = useAuthStore((s) => s.user)
   const isEdit = !!log
@@ -27,10 +28,10 @@ export default function WorkLogModal({ log, onClose }: Props) {
   const { data: usersData } = useUsers(canSelectUser ? usersParams : undefined)
 
   const today = format(new Date(), 'yyyy-MM-dd')
-  const [workTypeId, setWorkTypeId] = useState(log?.work_type_id || '')
+  const [workTypeId, setWorkTypeId] = useState(log?.work_type_id || duplicate?.work_type_id || '')
   const [logDate, setLogDate] = useState(log?.log_date || today)
-  const [duration, setDuration] = useState(log?.duration_hours || 1)
-  const [description, setDescription] = useState(log?.description || '')
+  const [duration, setDuration] = useState(log?.duration_hours ?? duplicate?.duration_hours ?? 1)
+  const [description, setDescription] = useState(log?.description || duplicate?.description || '')
   const [targetUserId, setTargetUserId] = useState('')
   const [error, setError] = useState('')
 
@@ -72,7 +73,7 @@ export default function WorkLogModal({ log, onClose }: Props) {
       <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-lg shadow-xl">
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {isEdit ? t('worklog.edit') : t('worklog.add')}
+            {isEdit ? t('worklog.edit') : duplicate ? t('worklog.duplicate') : t('worklog.add')}
           </h2>
           <button onClick={onClose} className="p-1 rounded text-gray-400 hover:text-gray-600">
             <X className="h-5 w-5" />

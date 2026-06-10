@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format, subDays, startOfMonth, endOfMonth, eachDayOfInterval, getDay, addMonths, subMonths, isSameMonth, startOfWeek, addDays } from 'date-fns'
 import { tr, enUS, type Locale } from 'date-fns/locale'
-import { Plus, Pencil, Trash2, Clock, AlertTriangle, List, CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Pencil, Trash2, Copy, Clock, AlertTriangle, List, CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useWorkLogs, useDeleteWorkLog, type WorkLog } from '@/api/worklog'
 import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
@@ -163,6 +163,7 @@ export default function WorkLogPage() {
   const [selectedUserId, setSelectedUserId] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
   const [editLog, setEditLog] = useState<WorkLog | null>(null)
+  const [duplicateLog, setDuplicateLog] = useState<WorkLog | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [page, setPage] = useState(0)
 
@@ -332,6 +333,15 @@ export default function WorkLogPage() {
                             <AlertTriangle className="h-4 w-4 text-amber-400" />
                           </span>
                         )}
+                        {log.user_id === user?.id && (
+                          <button
+                            onClick={() => setDuplicateLog(log)}
+                            className="p-1.5 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                            title={t('worklog.duplicate')}
+                          >
+                            <Copy className="h-4 w-4" />
+                          </button>
+                        )}
                         {editable && (
                           <>
                             <button
@@ -367,6 +377,7 @@ export default function WorkLogPage() {
 
       {createOpen && <WorkLogModal onClose={() => setCreateOpen(false)} />}
       {editLog && <WorkLogModal log={editLog} onClose={() => setEditLog(null)} />}
+      {duplicateLog && <WorkLogModal duplicate={duplicateLog} onClose={() => setDuplicateLog(null)} />}
     </div>
   )
 }

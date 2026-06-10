@@ -772,6 +772,26 @@ function DeleteConfirmModal({ name, onConfirm, onCancel }: {
   )
 }
 
+// ─── Masked Notes ─────────────────────────────────────────────────────────────
+
+function MaskedNotes({ notes }: { notes?: string | null }) {
+  const [revealed, setRevealed] = useState(false)
+  if (!notes) return <span className="text-gray-400 dark:text-gray-500">—</span>
+  return (
+    <span className="flex items-center gap-1">
+      <span className="text-xs text-gray-600 dark:text-gray-300 line-clamp-2 max-w-[130px]" title={revealed ? notes : undefined}>
+        {revealed ? notes : '•••'}
+      </span>
+      <button
+        onClick={() => setRevealed((v) => !v)}
+        className="shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+      >
+        {revealed ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+      </button>
+    </span>
+  )
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function InventoryPage() {
@@ -1089,12 +1109,8 @@ export default function InventoryPage() {
                       <span className="text-xs text-gray-400 dark:text-gray-500">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 hidden 2xl:table-cell text-xs text-gray-600 dark:text-gray-300 max-w-[160px]">
-                    {item.notes ? (
-                      <span className="line-clamp-2" title={item.notes}>{item.notes}</span>
-                    ) : (
-                      <span className="text-gray-400 dark:text-gray-500">—</span>
-                    )}
+                  <td className="px-4 py-3 hidden 2xl:table-cell text-xs max-w-[160px]">
+                    <MaskedNotes notes={item.notes} />
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">

@@ -163,7 +163,8 @@
     "wt_release_testing": "Release Testi",
     "wt_documentation": "Dokümantasyon",
     "wt_code_review": "Code Review",
-    "wt_training": "Eğitim / Araştırma"
+    "wt_training": "Eğitim / Araştırma",
+    "duplicate": "Kopyala"
   },
   "kanban": {
     "title": "Görev Panosu",

@@ -163,7 +163,8 @@
     "wt_release_testing": "Release Testing",
     "wt_documentation": "Documentation",
     "wt_code_review": "Code Review",
-    "wt_training": "Training / Research"
+    "wt_training": "Training / Research",
+    "duplicate": "Duplicate"
   },
   "kanban": {
     "title": "Task Board",
