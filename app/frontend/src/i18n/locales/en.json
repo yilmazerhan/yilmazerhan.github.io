@@ -606,7 +606,9 @@
     "last_login": "Last Login",
     "worklog_this_month": "Worklogs This Month",
     "open_tasks": "Open Tasks",
-    "never_logged_in": "Never logged in"
+    "never_logged_in": "Never logged in",
+    "weekly_title": "Weekly Activity Matrix",
+    "no_record": "No record"
   },
   "history": {
     "title": "History",

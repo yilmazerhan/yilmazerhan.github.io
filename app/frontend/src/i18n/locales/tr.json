@@ -606,7 +606,9 @@
     "last_login": "Son Giriş",
     "worklog_this_month": "Bu Ay Worklog",
     "open_tasks": "Açık Görev",
-    "never_logged_in": "Hiç giriş yapılmadı"
+    "never_logged_in": "Hiç giriş yapılmadı",
+    "weekly_title": "Haftalık Aktivite Matrisi",
+    "no_record": "Kayıt yok"
   },
   "history": {
     "title": "Geçmiş",

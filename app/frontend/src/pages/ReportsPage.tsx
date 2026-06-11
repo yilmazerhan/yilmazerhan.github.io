@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { format, startOfMonth } from 'date-fns'
+import { format, startOfMonth, subDays } from 'date-fns'
+import { tr as trLocale, enUS } from 'date-fns/locale'
 import { Clock, Users, FileText, TrendingUp, CalendarClock, Plus, Trash2, Play, Pencil, Trophy, Activity } from 'lucide-react'
-import { useWorkLogs } from '@/api/worklog'
+import { useWorkLogs, type WorkLog } from '@/api/worklog'
 import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
 import ExportButton from '@/components/ui/ExportButton'
@@ -127,6 +128,107 @@ function MiniSparkline({ dailyData }: { dailyData: Array<[string, number]> }) {
         className="stroke-indigo-400 dark:stroke-indigo-500"
       />
     </svg>
+  )
+}
+
+// ── Weekly Activity Matrix ────────────────────────────────────────────────────
+
+function WeeklyActivityMatrix({
+  users,
+  logs,
+  weekDates,
+}: {
+  users: Array<{ id: string; full_name: string }>
+  logs: WorkLog[]
+  weekDates: string[]
+}) {
+  const { t, i18n } = useTranslation()
+  const locale = i18n.language === 'tr' ? trLocale : enUS
+  const hourAbbr = t('worklog.hours_abbr')
+
+  const matrix = useMemo(() => {
+    const m: Record<string, Record<string, number>> = {}
+    for (const log of logs) {
+      if (!m[log.user_id]) m[log.user_id] = {}
+      m[log.user_id][log.log_date] = (m[log.user_id][log.log_date] ?? 0) + log.duration_hours
+    }
+    return m
+  }, [logs])
+
+  const maxHours = useMemo(() => {
+    let max = 0.1
+    for (const byDay of Object.values(matrix)) {
+      for (const h of Object.values(byDay)) { if (h > max) max = h }
+    }
+    return max
+  }, [matrix])
+
+  const todayStr = format(new Date(), 'yyyy-MM-dd')
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm border-collapse">
+        <thead>
+          <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
+            <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400 min-w-[150px]">
+              {t('reports.user_col')}
+            </th>
+            {weekDates.map(d => {
+              const dt = new Date(d + 'T12:00:00')
+              const isToday = d === todayStr
+              return (
+                <th key={d} className={`px-2 py-3 font-medium text-center min-w-[68px] ${isToday ? 'text-primary-600 dark:text-primary-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                  <div className="text-xs">{format(dt, 'EEE', { locale })}</div>
+                  <div className={`text-xs font-normal ${isToday ? 'text-primary-500' : 'text-gray-400'}`}>{format(dt, 'dd MMM', { locale })}</div>
+                </th>
+              )
+            })}
+            <th className="px-4 py-3 font-medium text-gray-600 dark:text-gray-400 text-right">{t('reports.total_col')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {users.map(user => {
+            const byDay = matrix[user.id] ?? {}
+            const total = weekDates.reduce((s, d) => s + (byDay[d] ?? 0), 0)
+            return (
+              <tr key={user.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50/60 dark:hover:bg-gray-800/20">
+                <td className="px-4 py-2.5 font-medium text-gray-800 dark:text-gray-200 whitespace-nowrap">{user.full_name}</td>
+                {weekDates.map(d => {
+                  const hours = byDay[d] ?? 0
+                  const intensity = hours > 0 ? Math.min(hours / maxHours, 1) : 0
+                  const isToday = d === todayStr
+                  return (
+                    <td key={d} className="px-1.5 py-2 text-center">
+                      <div
+                        title={`${user.full_name} · ${format(new Date(d + 'T12:00:00'), 'dd MMM', { locale })}: ${hours > 0 ? hours + hourAbbr : t('reports.no_record')}`}
+                        className={`mx-auto flex items-center justify-center rounded-lg text-xs font-semibold h-9 w-14 transition-colors select-none
+                          ${isToday ? 'ring-2 ring-primary-400 ring-offset-1' : ''}`}
+                        style={
+                          hours > 0
+                            ? {
+                                backgroundColor: `rgba(34,197,94,${0.15 + intensity * 0.72})`,
+                                color: intensity > 0.55 ? '#14532d' : '#166534',
+                              }
+                            : {
+                                border: '1.5px dashed #d1d5db',
+                                color: '#9ca3af',
+                              }
+                        }
+                      >
+                        {hours > 0 ? `${hours}${hourAbbr}` : '—'}
+                      </div>
+                    </td>
+                  )
+                })}
+                <td className="px-4 py-2.5 text-right font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                  {total > 0 ? `${total.toFixed(1)}${hourAbbr}` : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
   )
 }
 
@@ -305,6 +407,20 @@ export default function ReportsPage() {
   const hourAbbr = t('worklog.hours_abbr')
   const { data: activitySummary } = useUserActivitySummary()
 
+  // Weekly chart: always last 7 days, all users, separate from main filter
+  const weekEnd = format(new Date(), 'yyyy-MM-dd')
+  const weekStart = format(subDays(new Date(), 6), 'yyyy-MM-dd')
+  const weekDates = useMemo(() =>
+    Array.from({ length: 7 }, (_, i) => format(subDays(new Date(), 6 - i), 'yyyy-MM-dd')),
+    []
+  )
+  const { data: weekData } = useWorkLogs({ date_from: weekStart, date_to: weekEnd, limit: 500 })
+  const weekLogs = weekData?.items ?? []
+  const weekUsers = useMemo(
+    () => (usersData?.items ?? []).filter(u => u.is_active),
+    [usersData]
+  )
+
   // Build pivot: user → workType → hours
   const pivot = useMemo(() => {
     if (!logs.length) return null
@@ -466,6 +582,17 @@ export default function ReportsPage() {
           </div>
         </div>
       </div>
+
+      {/* Weekly Activity Matrix — always last 7 days, all users */}
+      {canFilterByUser && weekUsers.length > 0 && (
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
+            <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">{t('reports.weekly_title')}</h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{weekStart} — {weekEnd}</p>
+          </div>
+          <WeeklyActivityMatrix users={weekUsers} logs={weekLogs} weekDates={weekDates} />
+        </div>
+      )}
 
       {isLoading ? (
         <div className="text-center py-12 text-gray-400">{t('common.loading')}</div>
