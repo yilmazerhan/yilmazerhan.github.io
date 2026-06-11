@@ -622,14 +622,21 @@ def _item_to_typed_row(item: InventoryItem) -> list:
 
 async def _send_inventory_email(db: AsyncSession, schedule: InventoryEmailSchedule) -> int:
     """Generate Excel and send to all schedule recipients. Returns count of sent emails."""
+    import logging as _logging
+    _logger = _logging.getLogger(__name__)
     from app.models.email_config import SmtpConfig
 
     smtp_result = await db.execute(
-        select(SmtpConfig).where(SmtpConfig.is_active == True).limit(1)
+        select(SmtpConfig).where(SmtpConfig.is_active == True)
+        .order_by(SmtpConfig.updated_at.desc())
+        .limit(1)
     )
     smtp = smtp_result.scalar_one_or_none()
 
-    if not smtp or not schedule.recipient_emails:
+    if not smtp:
+        _logger.warning("inventory email: no active SMTP config — skipping schedule '%s'", schedule.name)
+        return 0
+    if not schedule.recipient_emails:
         return 0
 
     # Generate inventory Excel
@@ -685,10 +692,10 @@ async def _send_inventory_email(db: AsyncSession, schedule: InventoryEmailSchedu
                 server.sendmail(smtp.from_email, recipient, msg.as_string())
                 server.quit()
                 sent += 1
-            except Exception:
-                pass
-    except Exception:
-        pass
+            except Exception as _e:
+                _logger.error("inventory email: failed to send to %s: %s", recipient, _e)
+    except Exception as _e:
+        _logger.error("inventory email: unexpected error for schedule '%s': %s", schedule.name, _e, exc_info=True)
 
     return sent
 

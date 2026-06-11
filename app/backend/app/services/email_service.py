@@ -23,7 +23,11 @@ class EmailService:
     # ─── SMTP Config ─────────────────────────────────────────────────────────
 
     async def get_smtp_config(self) -> Optional[SmtpConfig]:
-        result = await self.db.execute(select(SmtpConfig).where(SmtpConfig.is_active == True).limit(1))
+        result = await self.db.execute(
+            select(SmtpConfig).where(SmtpConfig.is_active == True)
+            .order_by(SmtpConfig.updated_at.desc())
+            .limit(1)
+        )
         return result.scalar_one_or_none()
 
     async def list_smtp_configs(self) -> list[SmtpConfig]:
@@ -41,6 +45,10 @@ class EmailService:
         from_name: str,
         use_ssl: bool = False,
     ) -> SmtpConfig:
+        # Deactivate existing active configs before creating a new one
+        await self.db.execute(
+            SmtpConfig.__table__.update().where(SmtpConfig.is_active == True).values(is_active=False)
+        )
         cfg = SmtpConfig(
             host=host,
             port=port,
@@ -80,7 +88,15 @@ class EmailService:
         if use_ssl is not None: cfg.use_ssl = use_ssl
         if from_email is not None: cfg.from_email = from_email
         if from_name is not None: cfg.from_name = from_name
-        if is_active is not None: cfg.is_active = is_active
+        if is_active is not None:
+            if is_active and not cfg.is_active:
+                # Deactivate all other active configs before activating this one
+                await self.db.execute(
+                    SmtpConfig.__table__.update()
+                    .where(SmtpConfig.is_active == True, SmtpConfig.id != config_id)
+                    .values(is_active=False)
+                )
+            cfg.is_active = is_active
         await self.db.flush()
         await self.db.refresh(cfg)
         return cfg

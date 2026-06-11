@@ -600,7 +600,13 @@
     "csv_work_type": "İş Tipi",
     "csv_duration": "Süre (s)",
     "csv_description": "Açıklama",
-    "trend_col": "Eğilim"
+    "trend_col": "Eğilim",
+    "activity_title": "Kullanıcı Aktivite Özeti",
+    "activity_subtitle": "Bu ayki iş günlüğü ve açık görev sayısı",
+    "last_login": "Son Giriş",
+    "worklog_this_month": "Bu Ay Worklog",
+    "open_tasks": "Açık Görev",
+    "never_logged_in": "Hiç giriş yapılmadı"
   },
   "history": {
     "title": "Geçmiş",

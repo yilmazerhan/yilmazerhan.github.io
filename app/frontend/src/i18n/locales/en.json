@@ -600,7 +600,13 @@
     "csv_work_type": "Work Type",
     "csv_duration": "Duration (h)",
     "csv_description": "Description",
-    "trend_col": "Trend"
+    "trend_col": "Trend",
+    "activity_title": "User Activity Summary",
+    "activity_subtitle": "This month's work log entries and open task count",
+    "last_login": "Last Login",
+    "worklog_this_month": "Worklogs This Month",
+    "open_tasks": "Open Tasks",
+    "never_logged_in": "Never logged in"
   },
   "history": {
     "title": "History",

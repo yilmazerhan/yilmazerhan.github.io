@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format, startOfMonth } from 'date-fns'
-import { Clock, Users, FileText, TrendingUp, CalendarClock, Plus, Trash2, Play, Pencil, Trophy } from 'lucide-react'
+import { Clock, Users, FileText, TrendingUp, CalendarClock, Plus, Trash2, Play, Pencil, Trophy, Activity } from 'lucide-react'
 import { useWorkLogs } from '@/api/worklog'
 import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
@@ -9,7 +9,7 @@ import ExportButton from '@/components/ui/ExportButton'
 import { exportWorklogs } from '@/api/export'
 import {
   useReportSchedules, useCreateReportSchedule, useUpdateReportSchedule,
-  useDeleteReportSchedule, useRunReportSchedule, type ReportSchedule,
+  useDeleteReportSchedule, useRunReportSchedule, useUserActivitySummary, type ReportSchedule,
 } from '@/api/admin'
 import { resolveName } from '@/utils/i18nName'
 
@@ -303,6 +303,7 @@ export default function ReportsPage() {
 
   const logs = data?.items ?? []
   const hourAbbr = t('worklog.hours_abbr')
+  const { data: activitySummary } = useUserActivitySummary()
 
   // Build pivot: user → workType → hours
   const pivot = useMemo(() => {
@@ -602,6 +603,64 @@ export default function ReportsPage() {
             </div>
           </div>
         </>
+      )}
+
+      {/* User Activity Summary — superadmin and team_manager */}
+      {canFilterByUser && activitySummary && activitySummary.length > 0 && (
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center gap-2">
+            <Activity className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+            <div>
+              <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">{t('reports.activity_title')}</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{t('reports.activity_subtitle')}</p>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-800">
+                  <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('reports.user_col')}</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('reports.last_login')}</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('reports.worklog_this_month')}</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('reports.open_tasks')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activitySummary.map((u) => (
+                  <tr key={u.user_id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-gray-800 dark:text-gray-200">{u.full_name}</p>
+                      <p className="text-xs text-gray-400">{u.email}</p>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400 text-sm">
+                      {u.last_login_at
+                        ? format(new Date(u.last_login_at), 'dd MMM yyyy HH:mm')
+                        : <span className="text-gray-400 italic">{t('reports.never_logged_in')}</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className={`inline-flex items-center justify-center min-w-[2rem] px-2 py-0.5 rounded-full text-xs font-semibold ${
+                        u.worklog_count_this_month > 0
+                          ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                          : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+                      }`}>
+                        {u.worklog_count_this_month}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className={`inline-flex items-center justify-center min-w-[2rem] px-2 py-0.5 rounded-full text-xs font-semibold ${
+                        u.open_task_count > 0
+                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                          : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+                      }`}>
+                        {u.open_task_count}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
 
       {/* Scheduled Reports — only for superadmin */}

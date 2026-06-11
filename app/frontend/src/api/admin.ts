@@ -58,12 +58,22 @@ export interface SystemHealth {
   redis_error: string | null
 }
 
+export interface UserActivitySummary {
+  user_id: string
+  full_name: string
+  email: string
+  last_login_at: string | null
+  worklog_count_this_month: number
+  open_task_count: number
+}
+
 const adminKeys = {
   ssl: ['admin', 'ssl'] as const,
   branding: ['admin', 'branding'] as const,
   auditLogs: (p: Record<string, unknown>) => ['admin', 'audit-logs', p] as const,
   dashboardStats: ['admin', 'stats', 'dashboard'] as const,
   systemHealth: ['admin', 'system-health'] as const,
+  userActivitySummary: ['admin', 'users', 'activity-summary'] as const,
 }
 
 export function useSslCertificates() {
@@ -277,5 +287,12 @@ export function useRunReportSchedule() {
   return useMutation({
     mutationFn: (id: string) => apiClient.post(`/admin/reports/schedules/${id}/run`),
     onSuccess: () => qc.invalidateQueries({ queryKey: reportScheduleKeys.all }),
+  })
+}
+
+export function useUserActivitySummary() {
+  return useQuery({
+    queryKey: adminKeys.userActivitySummary,
+    queryFn: () => apiClient.get<UserActivitySummary[]>('/admin/users/activity-summary').then((r) => r.data),
   })
 }

@@ -394,6 +394,72 @@ async def download_backup(
     )
 
 
+# ─── User Activity Summary ────────────────────────────────────────────────────
+
+@router.get("/users/activity-summary")
+async def users_activity_summary(
+    current_user: Annotated[User, Depends(require_manager_or_above)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    from datetime import date as _date
+
+    today = _date.today()
+    month_start = today.replace(day=1)
+
+    users_q = (
+        select(User)
+        .where(User.is_deleted == False, User.is_active == True)
+        .order_by(User.full_name)
+    )
+    if current_user.role == "team_manager":
+        from app.models.user_team import user_teams as ut
+        manager_teams = select(ut.c.team_id).where(ut.c.user_id == current_user.id)
+        member_ids = select(ut.c.user_id).where(ut.c.team_id.in_(manager_teams))
+        users_q = users_q.where(User.id.in_(member_ids))
+
+    users = list((await db.execute(users_q)).scalars().all())
+    if not users:
+        return []
+
+    user_ids = [u.id for u in users]
+
+    wl_rows = (await db.execute(
+        select(WorkLog.user_id, func.count(WorkLog.id).label("cnt"))
+        .where(
+            WorkLog.user_id.in_(user_ids),
+            WorkLog.log_date >= month_start,
+            WorkLog.log_date <= today,
+        )
+        .group_by(WorkLog.user_id)
+    )).all()
+    wl_counts = {str(r.user_id): r.cnt for r in wl_rows}
+
+    from app.models.kanban import KanbanColumn
+    task_rows = (await db.execute(
+        select(Task.assignee_id, func.count(Task.id).label("cnt"))
+        .join(KanbanColumn, Task.column_id == KanbanColumn.id)
+        .where(
+            Task.assignee_id.in_(user_ids),
+            Task.is_archived == False,
+            KanbanColumn.is_terminal == False,
+        )
+        .group_by(Task.assignee_id)
+    )).all()
+    task_counts = {str(r.assignee_id): r.cnt for r in task_rows}
+
+    return [
+        {
+            "user_id": str(u.id),
+            "full_name": u.full_name,
+            "email": u.email,
+            "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
+            "worklog_count_this_month": wl_counts.get(str(u.id), 0),
+            "open_task_count": task_counts.get(str(u.id), 0),
+        }
+        for u in users
+    ]
+
+
 # ─── User Activity Report ──────────────────────────────────────────────────────
 
 @router.get("/reports/user/{user_id}")
