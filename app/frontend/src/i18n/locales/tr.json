@@ -832,6 +832,7 @@
     "reason": "Sebep",
     "reason_placeholder": "Yıllık izin, kişisel, sağlık...",
     "submit": "Talebi Gönder",
+    "kolayik_notice": "Buradan girilen izinlerin resmi bir geçerliliği yoktur; yalnızca bilgilendirme amaçlıdır. İzinlerinizi resmi olarak KolayİK sistemi üzerinden girmeniz gerekmektedir.",
     "date_required": "Başlangıç ve bitiş tarihi zorunludur.",
     "date_range_invalid": "Bitiş tarihi başlangıç tarihinden sonra olmalıdır.",
     "days": "gün",

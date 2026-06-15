@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format, differenceInCalendarDays, parseISO } from 'date-fns'
-import { CalendarDays, Plus, X, Trash2, Check } from 'lucide-react'
+import { CalendarDays, Plus, X, Trash2, Check, Info } from 'lucide-react'
 import { useLeaves, useCreateLeave, useUpdateLeave, useDeleteLeave, type LeaveRequest } from '@/api/leaves'
 import { useAuthStore } from '@/store/authStore'
 import { useUsers } from '@/api/users'
@@ -164,6 +164,10 @@ export default function LeavePage() {
             <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600">
               <X className="h-4 w-4" />
             </button>
+          </div>
+          <div className="flex items-start gap-2.5 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50">
+            <Info className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-amber-800 dark:text-amber-300">{t('leave.kolayik_notice')}</p>
           </div>
           <form onSubmit={handleCreate} className="space-y-3">
             {formError && <p className="text-sm text-red-600">{formError}</p>}
