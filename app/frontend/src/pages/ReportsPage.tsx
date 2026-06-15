@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { format, startOfMonth, subDays } from 'date-fns'
+import { format, startOfMonth, startOfWeek, addWeeks, addDays } from 'date-fns'
 import { tr as trLocale, enUS } from 'date-fns/locale'
-import { Clock, Users, FileText, TrendingUp, CalendarClock, Plus, Trash2, Play, Pencil, Trophy, Activity, CalendarCheck } from 'lucide-react'
+import { Clock, Users, FileText, TrendingUp, CalendarClock, Plus, Trash2, Play, Pencil, Trophy, Activity, CalendarCheck, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useWorkLogs, type WorkLog } from '@/api/worklog'
 import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
@@ -490,7 +490,8 @@ function ReportScheduleSection({ t }: { t: (k: string) => string }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function ReportsPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = i18n.language === 'tr' ? trLocale : enUS
   const user = useAuthStore((s) => s.user)
   const canFilterByUser = user?.role === 'superadmin' || user?.role === 'team_manager'
 
@@ -516,20 +517,29 @@ export default function ReportsPage() {
   const hourAbbr = t('worklog.hours_abbr')
   const { data: activitySummary } = useUserActivitySummary()
 
-  // Weekly chart: always last 7 days, all users, separate from main filter
-  const weekEnd = format(new Date(), 'yyyy-MM-dd')
-  const weekStart = format(subDays(new Date(), 6), 'yyyy-MM-dd')
-  const weekDates = useMemo(() =>
-    Array.from({ length: 7 }, (_, i) => format(subDays(new Date(), 6 - i), 'yyyy-MM-dd')),
-    []
+  // Weekly matrix: calendar weeks Mon–Sun, navigable via weekOffset
+  const [weekOffset, setWeekOffset] = useState(0)
+  const weekMonday = useMemo(
+    () => addWeeks(startOfWeek(new Date(), { weekStartsOn: 1 }), weekOffset),
+    [weekOffset]
   )
+  const weekDates = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => format(addDays(weekMonday, i), 'yyyy-MM-dd')),
+    [weekMonday]
+  )
+  const weekStart = weekDates[0]
+  const weekEnd = weekDates[6]
+
   const { data: weekData } = useWorkLogs({ date_from: weekStart, date_to: weekEnd, limit: 500 })
   const weekLogs = weekData?.items ?? []
   const weekUsers = useMemo(
     () => (usersData?.items ?? []).filter(u => u.is_active),
     [usersData]
   )
-  const todayLogs = useMemo(() => weekLogs.filter(l => l.log_date === today), [weekLogs, today])
+
+  // Today's status: always current day regardless of which week is viewed
+  const { data: todayData } = useWorkLogs({ date_from: today, date_to: today, limit: 200 })
+  const todayLogs = todayData?.items ?? []
 
   // Build pivot: user → workType → hours
   const pivot = useMemo(() => {
@@ -698,12 +708,46 @@ export default function ReportsPage() {
         <TodayWorklogStatus users={weekUsers} todayLogs={todayLogs} />
       )}
 
-      {/* Weekly Activity Matrix — always last 7 days, all users */}
+      {/* Weekly Activity Matrix — calendar weeks Mon–Sun, navigable */}
       {canFilterByUser && weekUsers.length > 0 && (
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
-            <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">{t('reports.weekly_title')}</h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400">{weekStart} — {weekEnd}</p>
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">{t('reports.weekly_title')}</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {format(new Date(weekStart + 'T12:00:00'), 'dd MMM', { locale })}
+                {' — '}
+                {format(new Date(weekEnd + 'T12:00:00'), 'dd MMM yyyy', { locale })}
+                {weekOffset === 0 && (
+                  <span className="ml-2 text-primary-500 font-medium">· {t('reports.week_current')}</span>
+                )}
+              </p>
+            </div>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              <button
+                onClick={() => setWeekOffset(o => o - 1)}
+                className="p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+                title={t('reports.week_prev')}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              {weekOffset < 0 && (
+                <button
+                  onClick={() => setWeekOffset(0)}
+                  className="px-2.5 py-1 text-xs rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium"
+                >
+                  {t('reports.week_current')}
+                </button>
+              )}
+              <button
+                onClick={() => setWeekOffset(o => o + 1)}
+                disabled={weekOffset >= 0}
+                className="p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed"
+                title={t('reports.week_next')}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
           <WeeklyActivityMatrix users={weekUsers} logs={weekLogs} weekDates={weekDates} />
         </div>
