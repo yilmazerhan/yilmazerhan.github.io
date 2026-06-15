@@ -124,6 +124,7 @@ async def generate_and_send_report(db: AsyncSession, schedule) -> int:
 
     sent = 0
     try:
+        import asyncio
         import smtplib
         from email.mime.multipart import MIMEMultipart
         from email.mime.text import MIMEText
@@ -134,40 +135,49 @@ async def generate_and_send_report(db: AsyncSession, schedule) -> int:
 
         password = decrypt_field(smtp.password_encrypted, settings.SMTP_ENCRYPTION_KEY)
 
+        # Capture connection primitives so the blocking send can run in a worker
+        # thread without touching the async session.
+        host, port = smtp.host, smtp.port
+        use_tls, use_ssl = bool(smtp.use_tls), bool(getattr(smtp, "use_ssl", False))
+        username, from_email = smtp.username, smtp.from_email
+
+        def _send_one(recipient: str) -> None:
+            import ssl as _ssl
+            msg = MIMEMultipart()
+            msg['From'] = f"{smtp.from_name} <{from_email}>"
+            msg['To'] = recipient
+            msg['Subject'] = f"Work Log Report: {start_date} - {end_date} ({schedule.name})"
+
+            body = f"Attached is the work log report for {start_date} to {end_date}.\n\nTotal entries: {len(logs)}"
+            msg.attach(MIMEText(body, 'plain'))
+
+            attachment = MIMEBase('application', 'octet-stream')
+            attachment.set_payload(csv_content.encode('utf-8'))
+            encoders.encode_base64(attachment)
+            filename = f"report_{start_date}_{end_date}.csv"
+            attachment.add_header('Content-Disposition', f'attachment; filename="{filename}"')
+            msg.attach(attachment)
+
+            _ctx = _ssl.create_default_context()
+            if use_ssl:
+                server = smtplib.SMTP_SSL(host, port, context=_ctx, timeout=15)
+            elif use_tls:
+                server = smtplib.SMTP(host, port, timeout=15)
+                server.ehlo()
+                server.starttls(context=_ctx)
+                server.ehlo()
+            else:
+                server = smtplib.SMTP(host, port, timeout=15)
+                server.ehlo()
+            try:
+                server.login(username, password)
+                server.sendmail(from_email, recipient, msg.as_string())
+            finally:
+                server.quit()
+
         for recipient in schedule.recipient_emails:
             try:
-                msg = MIMEMultipart()
-                msg['From'] = f"{smtp.from_name} <{smtp.from_email}>"
-                msg['To'] = recipient
-                msg['Subject'] = f"Work Log Report: {start_date} - {end_date} ({schedule.name})"
-
-                body = f"Attached is the work log report for {start_date} to {end_date}.\n\nTotal entries: {len(logs)}"
-                msg.attach(MIMEText(body, 'plain'))
-
-                # Attach CSV
-                attachment = MIMEBase('application', 'octet-stream')
-                attachment.set_payload(csv_content.encode('utf-8'))
-                encoders.encode_base64(attachment)
-                filename = f"report_{start_date}_{end_date}.csv"
-                attachment.add_header('Content-Disposition', f'attachment; filename="{filename}"')
-                msg.attach(attachment)
-
-                import ssl as _ssl
-                _ctx = _ssl.create_default_context()
-                if getattr(smtp, 'use_ssl', False):
-                    server = smtplib.SMTP_SSL(smtp.host, smtp.port, context=_ctx, timeout=15)
-                elif smtp.use_tls:
-                    server = smtplib.SMTP(smtp.host, smtp.port, timeout=15)
-                    server.ehlo()
-                    server.starttls(context=_ctx)
-                    server.ehlo()
-                else:
-                    server = smtplib.SMTP(smtp.host, smtp.port, timeout=15)
-                    server.ehlo()
-
-                server.login(smtp.username, password)
-                server.sendmail(smtp.from_email, recipient, msg.as_string())
-                server.quit()
+                await asyncio.to_thread(_send_one, recipient)
                 sent += 1
             except Exception:
                 pass
@@ -175,3 +185,40 @@ async def generate_and_send_report(db: AsyncSession, schedule) -> int:
         pass
 
     return sent
+
+
+async def run_due_report_schedules(db: AsyncSession) -> None:
+    """Send any report schedules whose next_run_at has passed.
+
+    Called by the in-process scheduler loop (and could be wired to Celery Beat).
+    Each due row is claimed with FOR UPDATE SKIP LOCKED so two concurrent
+    runners (e.g. uvicorn worker + Celery) never send the same report twice.
+    """
+    from app.models.report_schedule import ReportSchedule
+
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        select(ReportSchedule)
+        .where(
+            ReportSchedule.is_active == True,
+            ReportSchedule.next_run_at.isnot(None),
+            ReportSchedule.next_run_at <= now,
+        )
+        .with_for_update(skip_locked=True)
+    )
+    schedules = list(result.scalars().all())
+
+    for sch in schedules:
+        # Advance the schedule first so a delivery failure does not cause a
+        # tight resend loop on the next tick.
+        sch.last_run_at = now
+        sch.next_run_at = compute_next_run(
+            sch.frequency, sch.day_of_week, sch.day_of_month, sch.hour
+        )
+        try:
+            await generate_and_send_report(db, sch)
+        except Exception:
+            pass
+
+    if schedules:
+        await db.flush()

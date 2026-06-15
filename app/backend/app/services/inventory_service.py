@@ -645,6 +645,7 @@ async def _send_inventory_email(db: AsyncSession, schedule: InventoryEmailSchedu
 
     sent = 0
     try:
+        import asyncio
         import smtplib
         from email.mime.multipart import MIMEMultipart
         from email.mime.text import MIMEText
@@ -655,42 +656,53 @@ async def _send_inventory_email(db: AsyncSession, schedule: InventoryEmailSchedu
 
         smtp_password = _dec(smtp.password_encrypted, _s.SMTP_ENCRYPTION_KEY)
 
+        # Capture connection primitives so the blocking SMTP I/O can run in a
+        # worker thread (asyncio.to_thread) without blocking the event loop —
+        # this path runs from both request handlers and the scheduler loop.
+        host, port = smtp.host, smtp.port
+        use_tls, use_ssl = bool(smtp.use_tls), bool(getattr(smtp, "use_ssl", False))
+        username, from_email, from_name = smtp.username, smtp.from_email, smtp.from_name
+        today_str = datetime.now(timezone.utc).strftime("%Y%m%d")
+
+        def _send_one(recipient: str) -> None:
+            import ssl as _ssl
+            msg = MIMEMultipart()
+            msg["From"] = f"{from_name} <{from_email}>"
+            msg["To"] = recipient
+            msg["Subject"] = f"Envanter Raporu — {schedule.name}"
+
+            body = "Ekte envanter raporu yer almaktadır.\n"
+            msg.attach(MIMEText(body, "plain", "utf-8"))
+
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(excel_bytes)
+            encoders.encode_base64(part)
+            part.add_header(
+                "Content-Disposition",
+                f'attachment; filename="inventory_{today_str}.xlsx"',
+            )
+            msg.attach(part)
+
+            _ctx = _ssl.create_default_context()
+            if use_ssl:
+                server = smtplib.SMTP_SSL(host, port, context=_ctx, timeout=15)
+            elif use_tls:
+                server = smtplib.SMTP(host, port, timeout=15)
+                server.ehlo()
+                server.starttls(context=_ctx)
+                server.ehlo()
+            else:
+                server = smtplib.SMTP(host, port, timeout=15)
+                server.ehlo()
+            try:
+                server.login(username, smtp_password)
+                server.sendmail(from_email, recipient, msg.as_string())
+            finally:
+                server.quit()
+
         for recipient in schedule.recipient_emails:
             try:
-                msg = MIMEMultipart()
-                msg["From"] = f"{smtp.from_name} <{smtp.from_email}>"
-                msg["To"] = recipient
-                msg["Subject"] = f"Envanter Raporu — {schedule.name}"
-
-                body = "Ekte envanter raporu yer almaktadır.\n"
-                msg.attach(MIMEText(body, "plain", "utf-8"))
-
-                part = MIMEBase("application", "octet-stream")
-                part.set_payload(excel_bytes)
-                encoders.encode_base64(part)
-                today_str = datetime.now(timezone.utc).strftime("%Y%m%d")
-                part.add_header(
-                    "Content-Disposition",
-                    f'attachment; filename="inventory_{today_str}.xlsx"',
-                )
-                msg.attach(part)
-
-                import ssl as _ssl
-                _ctx = _ssl.create_default_context()
-                if getattr(smtp, 'use_ssl', False):
-                    server = smtplib.SMTP_SSL(smtp.host, smtp.port, context=_ctx, timeout=15)
-                elif smtp.use_tls:
-                    server = smtplib.SMTP(smtp.host, smtp.port, timeout=15)
-                    server.ehlo()
-                    server.starttls(context=_ctx)
-                    server.ehlo()
-                else:
-                    server = smtplib.SMTP(smtp.host, smtp.port, timeout=15)
-                    server.ehlo()
-
-                server.login(smtp.username, smtp_password)
-                server.sendmail(smtp.from_email, recipient, msg.as_string())
-                server.quit()
+                await asyncio.to_thread(_send_one, recipient)
                 sent += 1
             except Exception as _e:
                 _logger.error("inventory email: failed to send to %s: %s", recipient, _e)
@@ -701,24 +713,34 @@ async def _send_inventory_email(db: AsyncSession, schedule: InventoryEmailSchedu
 
 
 async def run_due_inventory_schedules(db: AsyncSession) -> None:
-    """Called by Celery Beat hourly — sends emails for due schedules."""
+    """Send emails for any inventory schedules whose next_run_at has passed.
+
+    Called by the in-process scheduler loop (and the Celery Beat task).  Each
+    due row is claimed with FOR UPDATE SKIP LOCKED so two concurrent runners
+    (uvicorn worker + Celery) never send the same schedule twice.
+    """
     from datetime import timezone as _tz
     now = datetime.now(_tz.utc)
     result = await db.execute(
-        select(InventoryEmailSchedule).where(
+        select(InventoryEmailSchedule)
+        .where(
             InventoryEmailSchedule.is_active == True,
+            InventoryEmailSchedule.next_run_at.isnot(None),
             InventoryEmailSchedule.next_run_at <= now,
         )
+        .with_for_update(skip_locked=True)
     )
     schedules = list(result.scalars().all())
 
     for sch in schedules:
+        # Advance the schedule first so a send failure cannot cause a resend
+        # storm on the next tick.
+        sch.last_run_at = now
+        sch.next_run_at = compute_next_run(
+            sch.frequency, sch.day_of_week, sch.day_of_month, sch.hour
+        )
         try:
             await _send_inventory_email(db, sch)
-            sch.last_run_at = now
-            sch.next_run_at = compute_next_run(
-                sch.frequency, sch.day_of_week, sch.day_of_month, sch.hour
-            )
         except Exception:
             pass
 

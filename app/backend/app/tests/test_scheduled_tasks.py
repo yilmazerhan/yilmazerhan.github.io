@@ -432,13 +432,12 @@ class TestEvaluateWorkflows:
         wf = await self._setup_workflow(db, "task_due_soon", tmpl,
                                         trigger_config={"days_before": 3})
 
-        with patch("app.tasks.email_tasks.send_email_task") as mock_task:
-            mock_task.delay = MagicMock()
+        with patch("app.tasks.email_tasks._dispatch_email_inline", new_callable=AsyncMock) as mock_send:
             await _handle_task_due_soon(db, wf, target_date)
 
-        mock_task.delay.assert_called_once()
-        call_kwargs = mock_task.delay.call_args.kwargs
-        assert call_kwargs["to_email"] == assignee.email
+        mock_send.assert_called_once()
+        # _dispatch_email_inline(db, to_email, subject, html, log_id) — positional
+        assert mock_send.call_args.args[1] == assignee.email
 
     async def test_task_due_soon_skips_no_assignee(self, db: AsyncSession):
         from app.tasks.email_tasks import _handle_task_due_soon
@@ -472,11 +471,10 @@ class TestEvaluateWorkflows:
         wf = await self._setup_workflow(db, "task_due_soon", tmpl,
                                         trigger_config={"days_before": 2})
 
-        with patch("app.tasks.email_tasks.send_email_task") as mock_task:
-            mock_task.delay = MagicMock()
+        with patch("app.tasks.email_tasks._dispatch_email_inline", new_callable=AsyncMock) as mock_send:
             await _handle_task_due_soon(db, wf, target_date)
 
-        mock_task.delay.assert_not_called()
+        mock_send.assert_not_called()
 
     async def test_task_overdue_sends_email(self, db: AsyncSession):
         from app.tasks.email_tasks import _handle_task_overdue
@@ -509,11 +507,10 @@ class TestEvaluateWorkflows:
 
         wf = await self._setup_workflow(db, "task_overdue", tmpl)
 
-        with patch("app.tasks.email_tasks.send_email_task") as mock_task:
-            mock_task.delay = MagicMock()
+        with patch("app.tasks.email_tasks._dispatch_email_inline", new_callable=AsyncMock) as mock_send:
             await _handle_task_overdue(db, wf, date.today())
 
-        mock_task.delay.assert_called_once()
+        mock_send.assert_called_once()
 
     async def test_task_overdue_skips_terminal_column(self, db: AsyncSession):
         from app.tasks.email_tasks import _handle_task_overdue
@@ -546,11 +543,10 @@ class TestEvaluateWorkflows:
 
         wf = await self._setup_workflow(db, "task_overdue", tmpl)
 
-        with patch("app.tasks.email_tasks.send_email_task") as mock_task:
-            mock_task.delay = MagicMock()
+        with patch("app.tasks.email_tasks._dispatch_email_inline", new_callable=AsyncMock) as mock_send:
             await _handle_task_overdue(db, wf, date.today())
 
-        mock_task.delay.assert_not_called()
+        mock_send.assert_not_called()
 
     async def test_worklog_reminder_skips_users_who_logged(self, db: AsyncSession):
         from app.tasks.email_tasks import _handle_worklog_reminder
@@ -584,13 +580,13 @@ class TestEvaluateWorkflows:
 
         wf = await self._setup_workflow(db, "worklog_reminder", tmpl)
 
-        with patch("app.tasks.email_tasks.send_email_task") as mock_task:
-            mock_task.delay = MagicMock()
+        with patch("app.tasks.email_tasks._dispatch_email_inline", new_callable=AsyncMock) as mock_send:
             await _handle_worklog_reminder(db, wf, date.today())
 
-        # user_logged should NOT receive reminder (already logged)
-        for call in mock_task.delay.call_args_list:
-            assert call.kwargs.get("to_email") != user_logged.email
+        # user_logged should NOT receive reminder (already logged).
+        # _dispatch_email_inline(db, to_email, ...) — to_email is positional arg[1].
+        for call in mock_send.call_args_list:
+            assert call.args[1] != user_logged.email
 
     async def test_dashboard_report_sends_to_specific_emails(self, db: AsyncSession):
         from app.tasks.email_tasks import _handle_dashboard_report
@@ -611,12 +607,11 @@ class TestEvaluateWorkflows:
             recipient_users=["exec@test.com", "mgr@test.com"],
         )
 
-        with patch("app.tasks.email_tasks.send_email_task") as mock_task:
-            mock_task.delay = MagicMock()
+        with patch("app.tasks.email_tasks._dispatch_email_inline", new_callable=AsyncMock) as mock_send:
             await _handle_dashboard_report(db, wf, date.today())
 
-        assert mock_task.delay.call_count == 2
-        sent_to = {c.kwargs["to_email"] for c in mock_task.delay.call_args_list}
+        assert mock_send.call_count == 2
+        sent_to = {c.args[1] for c in mock_send.call_args_list}
         assert "exec@test.com" in sent_to
         assert "mgr@test.com" in sent_to
 
@@ -752,12 +747,11 @@ class TestEvaluateWorkflows:
         # Force created_at to today by refreshing after insert
         # (it uses server_default=now())
 
-        with patch("app.tasks.email_tasks.send_email_task") as mock_task:
-            mock_task.delay = MagicMock()
+        with patch("app.tasks.email_tasks._dispatch_email_inline", new_callable=AsyncMock) as mock_send:
             await _handle_dashboard_report(db, wf, date.today())
 
         # Should not send again because already_sent check uses EmailLog.created_at >= today_start
-        mock_task.delay.assert_not_called()
+        mock_send.assert_not_called()
 
 
 # ─── Backup service ───────────────────────────────────────────────────────────

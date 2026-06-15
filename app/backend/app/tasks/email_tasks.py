@@ -213,6 +213,84 @@ async def _mark_log_failed(db, log_id: str, error: str):
     )
 
 
+def _smtp_deliver_sync(
+    *, host: str, port: int, use_tls: bool, use_ssl: bool,
+    username: str, password: str, from_email: str, to_email: str, raw_message: str,
+) -> None:
+    """Blocking SMTP delivery of a pre-built message. Raises on failure.
+
+    Pure-primitive arguments (no ORM objects) so it is safe to run in a worker
+    thread via asyncio.to_thread without touching the async DB session.
+    """
+    context = ssl_lib.create_default_context()
+    if use_ssl:
+        with smtplib.SMTP_SSL(host, port, context=context, timeout=15) as server:
+            server.login(username, password)
+            server.sendmail(from_email, [to_email], raw_message)
+    elif use_tls:
+        with smtplib.SMTP(host, port, timeout=15) as server:
+            server.ehlo()
+            server.starttls(context=context)
+            server.ehlo()
+            server.login(username, password)
+            server.sendmail(from_email, [to_email], raw_message)
+    else:
+        with smtplib.SMTP(host, port, timeout=15) as server:
+            server.ehlo()
+            server.login(username, password)
+            server.sendmail(from_email, [to_email], raw_message)
+
+
+async def _dispatch_email_inline(db, to_email: str, subject: str, html_body: str, log_id: str) -> bool:
+    """Send one scheduled/workflow email directly in-process and update its log.
+
+    Unlike send_email_task.delay(), this does NOT require a running Celery worker —
+    scheduled emails are delivered even when the broker is unavailable.  The
+    EmailLog row identified by log_id must already be flushed in `db`.  The
+    blocking SMTP I/O runs in a worker thread so the caller's event loop (the
+    uvicorn server loop, for the in-process scheduler) is never blocked.
+    Returns True on success, False otherwise.  Never raises.
+    """
+    from app.services.email_service import EmailService
+    from app.core.security import decrypt_field
+    from app.config import settings
+
+    svc = EmailService(db)
+    smtp_cfg = await svc.get_smtp_config()
+    if not smtp_cfg:
+        logger.warning("Inline email to %s skipped — SMTP not configured", to_email)
+        await _mark_log_failed(db, log_id, "SMTP yapılandırması yok.")
+        return False
+
+    try:
+        password = decrypt_field(smtp_cfg.password_encrypted, settings.SMTP_ENCRYPTION_KEY)
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = f"{smtp_cfg.from_name} <{smtp_cfg.from_email}>"
+        msg["To"] = to_email
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+        await asyncio.to_thread(
+            _smtp_deliver_sync,
+            host=smtp_cfg.host,
+            port=smtp_cfg.port,
+            use_tls=bool(smtp_cfg.use_tls),
+            use_ssl=bool(getattr(smtp_cfg, "use_ssl", False)),
+            username=smtp_cfg.username,
+            password=password,
+            from_email=smtp_cfg.from_email,
+            to_email=to_email,
+            raw_message=msg.as_string(),
+        )
+        await _mark_log_sent(db, log_id)
+        return True
+    except Exception as exc:
+        logger.error("Inline email send to %s failed: %s", to_email, exc)
+        await _mark_log_failed(db, log_id, str(exc))
+        return False
+
+
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=30)
 def send_activation_email_task(self, to_email: str, full_name: str, activation_token: str):
     try:
@@ -489,12 +567,7 @@ async def _handle_task_due_soon(db, workflow, target_date: date):
         )
         await db.flush()
 
-        send_email_task.delay(
-            to_email=task.assignee.email,
-            subject=subject,
-            html_body=html,
-            log_id=str(log.id),
-        )
+        await _dispatch_email_inline(db, task.assignee.email, subject, html, str(log.id))
 
         if workflow.send_teams and workflow.teams_webhook_id:
             send_teams_message_task.delay(
@@ -547,12 +620,7 @@ async def _handle_task_overdue(db, workflow, today: date):
         )
         await db.flush()
 
-        send_email_task.delay(
-            to_email=task.assignee.email,
-            subject=subject,
-            html_body=html,
-            log_id=str(log.id),
-        )
+        await _dispatch_email_inline(db, task.assignee.email, subject, html, str(log.id))
 
 
 async def _handle_worklog_reminder(db, workflow, today: date):
@@ -593,12 +661,7 @@ async def _handle_worklog_reminder(db, workflow, today: date):
         )
         await db.flush()
 
-        send_email_task.delay(
-            to_email=user.email,
-            subject=subject,
-            html_body=html,
-            log_id=str(log.id),
-        )
+        await _dispatch_email_inline(db, user.email, subject, html, str(log.id))
 
 
 async def _handle_dashboard_report(db, workflow, today: date):
@@ -681,12 +744,7 @@ async def _handle_dashboard_report(db, workflow, today: date):
             template_id=workflow.template_id,
         )
         await db.flush()
-        send_email_task.delay(
-            to_email=email,
-            subject=subject,
-            html_body=html,
-            log_id=str(log.id),
-        )
+        await _dispatch_email_inline(db, email, subject, html, str(log.id))
 
 
 @celery_app.task
@@ -715,8 +773,20 @@ def send_worklog_reminders():
     asyncio.run(_send_worklog_reminders_async())
 
 
+_WORKLOG_REMINDER_HOUR = 17  # 17:00 Europe/Istanbul, Mon–Fri
+
+
 async def _send_worklog_reminders_async():
-    from datetime import date, datetime, timezone
+    """Email a reminder to every active user who has not logged work today.
+
+    Delivery is in-process (no Celery worker required).  This is gated to
+    Mon–Fri at 17:00 Europe/Istanbul so that it is safe to call from BOTH the
+    Celery Beat schedule and the every-15-minute in-process scheduler loop —
+    the per-user EmailLog dedup guarantees a single reminder per user per day
+    even when several 17:xx ticks fire.
+    """
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
     from sqlalchemy import select, func
     from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
     from sqlalchemy.pool import NullPool
@@ -726,10 +796,15 @@ async def _send_worklog_reminders_async():
     from app.services.email_service import EmailService
     from app.config import settings
 
-    today = date.today()
-    if today.weekday() >= 5:  # Saturday=5, Sunday=6
-        logger.info("send_worklog_reminders: skipping — today is a weekend")
+    now_ist = datetime.now(ZoneInfo("Europe/Istanbul"))
+    if now_ist.weekday() >= 5:  # Saturday=5, Sunday=6
+        logger.info("send_worklog_reminders: skipping — weekend")
         return
+    if now_ist.hour != _WORKLOG_REMINDER_HOUR:
+        # Not the reminder hour (e.g. an off-hour in-process tick) — skip quietly.
+        return
+
+    today = now_ist.date()
 
     engine = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
     Session = async_sessionmaker(engine, expire_on_commit=False)
@@ -762,10 +837,12 @@ async def _send_worklog_reminders_async():
                 if user.id in logged_ids:
                     continue
 
+                # Dedup: count pending+sent (not failed, so failures can retry).
                 already_sent = (await db.execute(
                     select(func.count(EmailLog.id)).where(
                         EmailLog.template_id == template.id,
                         EmailLog.recipient_id == user.id,
+                        EmailLog.status.in_(["sent", "pending"]),
                         EmailLog.created_at >= today_start,
                     )
                 )).scalar_one()
@@ -777,23 +854,20 @@ async def _send_worklog_reminders_async():
                     "date": str(today),
                 })
 
+                # Commit the pending log BEFORE sending so the dedup record
+                # survives a crash and prevents a duplicate on the next tick.
                 log = await svc.create_log_entry(
                     to_email=user.email,
                     subject=subject,
                     template_id=template.id,
                     recipient_id=user.id,
                 )
-                await db.flush()
+                await db.commit()
 
-                send_email_task.delay(
-                    to_email=user.email,
-                    subject=subject,
-                    html_body=html,
-                    log_id=str(log.id),
-                )
-                logger.info("send_worklog_reminders: queued reminder for %s", user.email)
+                await _dispatch_email_inline(db, user.email, subject, html, str(log.id))
+                await db.commit()
+                logger.info("send_worklog_reminders: sent reminder to %s", user.email)
 
-            await db.commit()
             logger.info("send_worklog_reminders: done for %s", today)
     finally:
         await engine.dispose()

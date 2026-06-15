@@ -62,26 +62,61 @@ async def _backup_scheduler_loop() -> None:
 
 
 async def _email_scheduler_loop() -> None:
-    """In-process email workflow evaluator — runs every 15 min as a fallback.
+    """In-process scheduler for all email jobs — runs every 15 min.
 
-    Keeps the email Celery heartbeat fresh and evaluates scheduled workflows.
-    Actual SMTP delivery is dispatched to Celery if available; if Celery is
-    not running the dispatch call will raise a broker error that is caught
-    per-workflow so other workflows still execute.
+    This is the reliable delivery path: SMTP is sent directly in-process so
+    scheduled emails arrive even when no Celery worker/broker is running.  It
+    covers email workflows, inventory schedules, work-log report schedules, and
+    the daily work-log reminder.  A Postgres advisory lock ensures only one
+    uvicorn worker performs the batch per tick; each job is isolated in its own
+    try/except so one failure never blocks the others.  All jobs are
+    idempotent (EmailLog dedup / next_run_at claiming) so running alongside
+    Celery Beat cannot send duplicates.
     """
     await asyncio.sleep(90)  # offset from backup loop startup
     while True:
         try:
             from app.database import AsyncSessionLocal
-            from app.tasks.email_tasks import _evaluate_workflows_async
-            run_eval = False
-            async with AsyncSessionLocal() as db:
-                run_eval = await _try_advisory_lock(db, _EMAIL_LOCK_KEY)
-                if run_eval:
-                    await _evaluate_workflows_async()
+            async with AsyncSessionLocal() as lock_db:
+                if await _try_advisory_lock(lock_db, _EMAIL_LOCK_KEY):
+                    await _run_email_jobs()
         except Exception as exc:
             logger.warning("In-process email scheduler: %s", exc)
         await asyncio.sleep(900)  # 15 minutes
+
+
+async def _run_email_jobs() -> None:
+    """Run every scheduled email job once. Each is isolated so one failure
+    does not prevent the others from running."""
+    from app.database import AsyncSessionLocal
+    from app.tasks.email_tasks import _evaluate_workflows_async, _send_worklog_reminders_async
+    from app.services.inventory_service import run_due_inventory_schedules
+    from app.services.report_schedule_service import run_due_report_schedules
+
+    try:
+        await _evaluate_workflows_async()
+    except Exception as exc:
+        logger.warning("In-process scheduler: workflow evaluation failed: %s", exc)
+
+    try:
+        async with AsyncSessionLocal() as db:
+            await run_due_inventory_schedules(db)
+            await db.commit()
+    except Exception as exc:
+        logger.warning("In-process scheduler: inventory schedules failed: %s", exc)
+
+    try:
+        async with AsyncSessionLocal() as db:
+            await run_due_report_schedules(db)
+            await db.commit()
+    except Exception as exc:
+        logger.warning("In-process scheduler: report schedules failed: %s", exc)
+
+    try:
+        # Self-gated to Mon–Fri 17:00 Europe/Istanbul; a no-op at other times.
+        await _send_worklog_reminders_async()
+    except Exception as exc:
+        logger.warning("In-process scheduler: worklog reminders failed: %s", exc)
 
 
 @asynccontextmanager
@@ -91,6 +126,10 @@ async def lifespan(app: FastAPI):
     from app.services.seed_service import seed_initial_data
     async with AsyncSessionLocal() as db:
         await seed_initial_data(db)
+        # seed_initial_data only flushes; commit so seeded rows (e.g. the
+        # dashboard_report email template, which has no migration) actually
+        # persist instead of being rolled back when the session closes.
+        await db.commit()
 
     # Start in-process scheduler loops. These complement Celery Beat: if Celery
     # containers are not running, scheduled backups and workflow evaluations still
