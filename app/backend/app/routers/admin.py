@@ -24,7 +24,7 @@ from app.schemas.admin import (
 )
 from app.schemas.auth import MessageResponse
 from app.services.ssl_service import SslService
-from app.services.branding_service import get_branding, update_branding, update_logo
+from app.services.branding_service import get_branding, update_branding, update_logo, update_favicon
 from app.core.dependencies import get_current_user, require_superadmin, require_manager_or_above
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -146,6 +146,44 @@ async def upload_logo(
     b64 = base64.b64encode(data).decode()
     logo_url = f"data:{detected_type};base64,{b64}"
     return await update_logo(db, current_user.id, logo_url)
+
+
+@router.post("/settings/branding/favicon", response_model=BrandingResponse)
+async def upload_favicon(
+    current_user: Annotated[User, Depends(require_superadmin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    favicon: UploadFile = File(...),
+):
+    if favicon.content_type not in ("image/png", "image/x-icon", "image/vnd.microsoft.icon", "image/webp"):
+        from app.core.exceptions import ValidationError
+        raise ValidationError("Favicon PNG, ICO veya WebP formatında olmalıdır.")
+
+    data = await favicon.read()
+    if len(data) > 512_000:  # 512KB
+        from app.core.exceptions import ValidationError
+        raise ValidationError("Favicon dosyası 512KB'dan küçük olmalıdır.")
+
+    _FAVICON_MAGIC = {
+        b"\x89PNG\r\n\x1a\n": "image/png",
+        b"\x00\x00\x01\x00": "image/x-icon",
+        b"RIFF": "image/webp",
+    }
+    def _check_magic(raw: bytes) -> str | None:
+        for sig, mime in _FAVICON_MAGIC.items():
+            if raw[:len(sig)] == sig:
+                if mime == "image/webp" and raw[8:12] != b"WEBP":
+                    continue
+                return mime
+        return None
+
+    from app.core.exceptions import ValidationError as _VE
+    detected_type = _check_magic(data)
+    if not detected_type:
+        raise _VE("Favicon geçerli bir PNG, ICO veya WebP dosyası olmalıdır.")
+
+    b64 = base64.b64encode(data).decode()
+    favicon_url = f"data:{detected_type};base64,{b64}"
+    return await update_favicon(db, current_user.id, favicon_url)
 
 
 # ─── Audit Logs ───────────────────────────────────────────────────────────────

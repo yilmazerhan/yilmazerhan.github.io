@@ -6,7 +6,7 @@ from sqlalchemy import select
 from app.models.app_setting import AppSetting
 
 
-BRANDING_KEYS = ("company_name", "company_logo", "primary_color", "jira_base_url")
+BRANDING_KEYS = ("company_name", "company_logo", "primary_color", "jira_base_url", "favicon")
 
 
 async def get_branding(db: AsyncSession) -> dict:
@@ -20,6 +20,7 @@ async def get_branding(db: AsyncSession) -> dict:
         "company_logo": data.get("company_logo", ""),
         "primary_color": data.get("primary_color", "#3b82f6"),
         "jira_base_url": data.get("jira_base_url", ""),
+        "favicon": data.get("favicon", ""),
     }
 
 
@@ -63,5 +64,21 @@ async def update_logo(
         setting.updated_by = updated_by
     else:
         db.add(AppSetting(key="company_logo", value=logo_data, updated_by=updated_by))
+    await db.flush()
+    return await get_branding(db)
+
+
+async def update_favicon(
+    db: AsyncSession,
+    updated_by: uuid.UUID,
+    favicon_data: str,
+) -> dict:
+    result = await db.execute(select(AppSetting).where(AppSetting.key == "favicon"))
+    setting = result.scalar_one_or_none()
+    if setting:
+        setting.value = favicon_data
+        setting.updated_by = updated_by
+    else:
+        db.add(AppSetting(key="favicon", value=favicon_data, updated_by=updated_by))
     await db.flush()
     return await get_branding(db)

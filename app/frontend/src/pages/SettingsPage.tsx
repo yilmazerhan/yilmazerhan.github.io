@@ -41,6 +41,7 @@ import {
   useBranding,
   useUpdateBranding,
   useUploadLogo,
+  useUploadFavicon,
 } from '@/api/admin'
 import {
   useTeamsWebhooks,
@@ -125,7 +126,9 @@ export default function SettingsPage() {
   const uploadJks = useUploadJks()
   const updateBranding = useUpdateBranding()
   const uploadLogo = useUploadLogo()
+  const uploadFavicon = useUploadFavicon()
   const logoInputRef = useRef<HTMLInputElement>(null)
+  const faviconInputRef = useRef<HTMLInputElement>(null)
 
   const { data: teamsWebhooks = [] } = useTeamsWebhooks()
   const createWebhook = useCreateTeamsWebhook()
@@ -190,6 +193,13 @@ export default function SettingsPage() {
     if (!file) return
     try { await uploadLogo.mutateAsync(file) }
     catch (err: any) { alert(err.response?.data?.detail || t('settings.logo_failed')) }
+  }
+
+  async function handleFaviconUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    try { await uploadFavicon.mutateAsync(file) }
+    catch (err: any) { alert(err.response?.data?.detail || t('settings.favicon_failed')) }
   }
 
   const createConfig = useCreateJiraConfig()
@@ -542,6 +552,21 @@ export default function SettingsPage() {
                 {uploadLogo.isPending ? t('common.uploading') : t('settings.upload_logo')}
               </button>
               <p className="text-xs text-gray-400 mt-0.5">{t('settings.logo_format_hint')}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 border-t border-gray-100 dark:border-gray-800 pt-4">
+            {branding?.favicon ? (
+              <img src={branding.favicon} alt="Favicon" className="h-8 w-8 object-contain rounded" />
+            ) : (
+              <div className="h-8 w-8 rounded bg-gray-100 dark:bg-gray-800 flex items-center justify-center text-gray-400 text-[10px]">ICO</div>
+            )}
+            <div>
+              <input ref={faviconInputRef} type="file" accept="image/png,image/x-icon,.ico,image/webp" onChange={handleFaviconUpload} className="hidden" />
+              <button onClick={() => faviconInputRef.current?.click()} disabled={uploadFavicon.isPending} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50">
+                <Upload className="h-3.5 w-3.5" />
+                {uploadFavicon.isPending ? t('common.uploading') : t('settings.upload_favicon')}
+              </button>
+              <p className="text-xs text-gray-400 mt-0.5">{t('settings.favicon_format_hint')}</p>
             </div>
           </div>
           <form onSubmit={handleBrandingSave} className="space-y-3">

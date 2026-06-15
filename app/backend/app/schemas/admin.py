@@ -19,6 +19,7 @@ class BrandingResponse(BaseModel):
     company_logo: str
     primary_color: str
     jira_base_url: str
+    favicon: str
 
 
 class BrandingUpdate(BaseModel):

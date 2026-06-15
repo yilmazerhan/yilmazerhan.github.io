@@ -15,6 +15,7 @@ export interface BrandingData {
   company_logo: string
   primary_color: string
   jira_base_url: string
+  favicon: string
 }
 
 export interface AuditLog {
@@ -157,6 +158,23 @@ export function useUploadLogo() {
       const fd = new FormData()
       fd.append('logo', logoFile)
       return apiClient.post<BrandingData>('/admin/settings/branding/logo', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      }).then((r) => r.data)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: adminKeys.branding })
+      qc.invalidateQueries({ queryKey: ['branding'] })
+    },
+  })
+}
+
+export function useUploadFavicon() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (faviconFile: File) => {
+      const fd = new FormData()
+      fd.append('favicon', faviconFile)
+      return apiClient.post<BrandingData>('/admin/settings/branding/favicon', fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
       }).then((r) => r.data)
     },

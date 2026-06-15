@@ -48,6 +48,16 @@ function BrandingInit() {
     if (branding?.company_name) {
       document.title = branding.company_name
     }
+    if (branding?.favicon) {
+      let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
+      if (!link) {
+        link = document.createElement('link')
+        link.rel = 'icon'
+        document.head.appendChild(link)
+      }
+      link.href = branding.favicon
+      link.type = branding.favicon.startsWith('data:image/x-icon') ? 'image/x-icon' : 'image/png'
+    }
   }, [branding])
 
   return null
