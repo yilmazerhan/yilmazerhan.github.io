@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format, startOfMonth, subDays } from 'date-fns'
 import { tr as trLocale, enUS } from 'date-fns/locale'
-import { Clock, Users, FileText, TrendingUp, CalendarClock, Plus, Trash2, Play, Pencil, Trophy, Activity } from 'lucide-react'
+import { Clock, Users, FileText, TrendingUp, CalendarClock, Plus, Trash2, Play, Pencil, Trophy, Activity, CalendarCheck } from 'lucide-react'
 import { useWorkLogs, type WorkLog } from '@/api/worklog'
 import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
@@ -128,6 +128,115 @@ function MiniSparkline({ dailyData }: { dailyData: Array<[string, number]> }) {
         className="stroke-indigo-400 dark:stroke-indigo-500"
       />
     </svg>
+  )
+}
+
+// ── Today's Worklog Status ─────────────────────────────────────────────────────
+
+function userInitials(name: string): string {
+  return name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('')
+}
+
+function ProgressRing({ pct }: { pct: number }) {
+  const size = 76, stroke = 7
+  const r = (size - stroke) / 2
+  const c = 2 * Math.PI * r
+  const offset = c - (pct / 100) * c
+  const color = pct >= 100 ? '#22c55e' : pct >= 50 ? '#3b82f6' : '#f59e0b'
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="flex-shrink-0">
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={stroke} className="stroke-gray-100 dark:stroke-gray-800" />
+      <circle
+        cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={stroke} stroke={color}
+        strokeDasharray={c} strokeDashoffset={offset} strokeLinecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        style={{ transition: 'stroke-dashoffset 0.6s ease' }}
+      />
+      <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" fontSize="17" fontWeight="bold" className="fill-gray-800 dark:fill-gray-100">{pct}%</text>
+    </svg>
+  )
+}
+
+function TodayWorklogStatus({
+  users,
+  todayLogs,
+}: {
+  users: Array<{ id: string; full_name: string }>
+  todayLogs: WorkLog[]
+}) {
+  const { t } = useTranslation()
+  const hourAbbr = t('worklog.hours_abbr')
+
+  const { logged, missing, pct } = useMemo(() => {
+    const hours: Record<string, number> = {}
+    for (const log of todayLogs) hours[log.user_id] = (hours[log.user_id] ?? 0) + log.duration_hours
+    const logged = users
+      .filter(u => (hours[u.id] ?? 0) > 0)
+      .map(u => ({ ...u, hours: hours[u.id] }))
+      .sort((a, b) => b.hours - a.hours)
+    const missing = users.filter(u => !((hours[u.id] ?? 0) > 0))
+    const pct = users.length ? Math.round((logged.length / users.length) * 100) : 0
+    return { logged, missing, pct }
+  }, [users, todayLogs])
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800 flex items-center gap-2">
+        <CalendarCheck className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+        <div>
+          <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">{t('reports.today_status_title')}</h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400">{t('reports.today_status_subtitle')}</p>
+        </div>
+      </div>
+      <div className="p-6 flex flex-col md:flex-row gap-6">
+        <div className="flex items-center gap-4 md:w-52 flex-shrink-0">
+          <ProgressRing pct={pct} />
+          <div>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white">{logged.length}<span className="text-base font-medium text-gray-400">/{users.length}</span></p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{t('reports.today_completion')}</p>
+          </div>
+        </div>
+        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div>
+            <div className="flex items-center gap-1.5 mb-2.5">
+              <span className="w-2 h-2 rounded-full bg-amber-500" />
+              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('reports.today_missing')} ({missing.length})</h3>
+            </div>
+            {missing.length === 0 ? (
+              <p className="text-sm text-green-600 dark:text-green-400">{t('reports.today_all_logged')}</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {missing.map(u => (
+                  <span key={u.id} className="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 text-xs">
+                    <span className="w-5 h-5 rounded-full bg-amber-200 dark:bg-amber-800/60 text-amber-900 dark:text-amber-200 flex items-center justify-center text-[10px] font-bold flex-shrink-0">{userInitials(u.full_name)}</span>
+                    {u.full_name}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5 mb-2.5">
+              <span className="w-2 h-2 rounded-full bg-green-500" />
+              <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('reports.today_logged')} ({logged.length})</h3>
+            </div>
+            {logged.length === 0 ? (
+              <p className="text-sm text-gray-400">{t('reports.today_none_logged')}</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5">
+                {logged.map(u => (
+                  <span key={u.id} className="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 text-xs">
+                    <span className="w-5 h-5 rounded-full bg-green-200 dark:bg-green-800/60 text-green-900 dark:text-green-200 flex items-center justify-center text-[10px] font-bold flex-shrink-0">{userInitials(u.full_name)}</span>
+                    {u.full_name}
+                    <span className="font-semibold">{u.hours.toFixed(1)}{hourAbbr}</span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -420,6 +529,7 @@ export default function ReportsPage() {
     () => (usersData?.items ?? []).filter(u => u.is_active),
     [usersData]
   )
+  const todayLogs = useMemo(() => weekLogs.filter(l => l.log_date === today), [weekLogs, today])
 
   // Build pivot: user → workType → hours
   const pivot = useMemo(() => {
@@ -582,6 +692,11 @@ export default function ReportsPage() {
           </div>
         </div>
       </div>
+
+      {/* Today's Worklog Status — who has / hasn't logged today */}
+      {canFilterByUser && weekUsers.length > 0 && (
+        <TodayWorklogStatus users={weekUsers} todayLogs={todayLogs} />
+      )}
 
       {/* Weekly Activity Matrix — always last 7 days, all users */}
       {canFilterByUser && weekUsers.length > 0 && (

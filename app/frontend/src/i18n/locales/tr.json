@@ -608,7 +608,14 @@
     "open_tasks": "Açık Görev",
     "never_logged_in": "Hiç giriş yapılmadı",
     "weekly_title": "Haftalık Aktivite Matrisi",
-    "no_record": "Kayıt yok"
+    "no_record": "Kayıt yok",
+    "today_status_title": "Bugünün Durumu",
+    "today_status_subtitle": "Bugün iş günlüğü giren ve girmeyen kullanıcılar",
+    "today_logged": "Girenler",
+    "today_missing": "Girmeyenler",
+    "today_all_logged": "Bugün herkes iş günlüğü girdi 🎉",
+    "today_none_logged": "Bugün henüz kimse iş günlüğü girmedi",
+    "today_completion": "kullanıcı bugün giriş yaptı"
   },
   "history": {
     "title": "Geçmiş",

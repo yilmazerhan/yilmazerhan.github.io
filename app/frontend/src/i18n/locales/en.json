@@ -608,7 +608,14 @@
     "open_tasks": "Open Tasks",
     "never_logged_in": "Never logged in",
     "weekly_title": "Weekly Activity Matrix",
-    "no_record": "No record"
+    "no_record": "No record",
+    "today_status_title": "Today's Status",
+    "today_status_subtitle": "Who has and hasn't logged work today",
+    "today_logged": "Logged",
+    "today_missing": "Not Logged",
+    "today_all_logged": "Everyone logged work today 🎉",
+    "today_none_logged": "No one has logged work today yet",
+    "today_completion": "users logged today"
   },
   "history": {
     "title": "History",
