@@ -16,6 +16,51 @@ from app.models.user import User
 from app.tests.conftest import get_auth_headers
 
 
+# A genuine legacy JKS keystore (magic 0xFEEDFEED), generated with:
+#   keytool -genkeypair -alias t -keyalg RSA -keysize 2048 -storetype JKS \
+#           -keystore fix.jks -storepass testpass -keypass testpass \
+#           -dname "CN=jkstest" -validity 3650
+_LEGACY_JKS_B64 = (
+    "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"
+    "9H6OiY4IJr90jA=="
+)
+
+
 def _generate_self_signed_pem() -> tuple[bytes, bytes]:
     """Generate a real self-signed cert+key pair for tests."""
     from cryptography import x509
@@ -273,3 +318,30 @@ class TestJksToPemConversion:
 
         with pytest.raises((ValidationError, Exception)):
             SslService._convert_jks_to_pem(b"this is not a jks file", "any")
+
+    def test_legacy_jks_conversion(self):
+        """Genuine legacy JKS (magic 0xFEEDFEED) must be parsed natively, since the
+        cryptography library only reads PKCS12. Fixture: keytool -storetype JKS,
+        alias t, store/key password 'testpass', CN=jkstest."""
+        import base64
+        from app.services.ssl_service import SslService
+        from cryptography import x509
+        from cryptography.hazmat.backends import default_backend
+
+        jks_bytes = base64.b64decode(_LEGACY_JKS_B64)
+        assert jks_bytes[:4] == b"\xfe\xed\xfe\xed"
+
+        cert_pem, key_pem = SslService._convert_jks_to_pem(jks_bytes, "testpass")
+
+        cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
+        assert cert.subject.rfc4514_string() == "CN=jkstest"
+        assert key_pem.startswith(b"-----BEGIN")
+
+    def test_legacy_jks_wrong_password_raises(self):
+        import base64
+        from app.services.ssl_service import SslService
+        from app.core.exceptions import ValidationError
+
+        jks_bytes = base64.b64decode(_LEGACY_JKS_B64)
+        with pytest.raises(ValidationError):
+            SslService._convert_jks_to_pem(jks_bytes, "wrongpass")

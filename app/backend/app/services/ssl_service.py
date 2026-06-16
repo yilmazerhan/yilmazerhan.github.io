@@ -4,6 +4,7 @@ Supports PEM upload and JKS → PEM conversion.
 Writes active certificate to disk and reloads nginx.
 """
 import uuid
+import hashlib
 import subprocess
 from datetime import datetime, timezone
 from typing import Optional
@@ -11,7 +12,7 @@ from pathlib import Path
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.serialization import (
-    Encoding, PrivateFormat, NoEncryption, pkcs12
+    Encoding, PrivateFormat, NoEncryption, pkcs12, load_der_private_key
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -110,8 +111,18 @@ class SslService:
         except Exception as e:
             raise ValidationError(f"PEM sertifikası okunamadı: {e}")
 
+    # JKS magic number (legacy Oracle Java KeyStore format)
+    _JKS_MAGIC = b"\xfe\xed\xfe\xed"
+
     @staticmethod
     def _convert_jks_to_pem(jks_bytes: bytes, password: str) -> tuple[bytes, bytes]:
+        # Genuine legacy JKS files (magic 0xFEEDFEED) cannot be read by the
+        # cryptography library — it only understands PKCS12. Parse those natively.
+        # Everything else (real PKCS12, or modern keytool output which is PKCS12
+        # despite a .jks extension) goes through the PKCS12 loader.
+        if jks_bytes[:4] == SslService._JKS_MAGIC:
+            return SslService._convert_native_jks_to_pem(jks_bytes, password)
+
         try:
             private_key, certificate, additional_certs = pkcs12.load_key_and_certificates(
                 jks_bytes, password.encode(), default_backend()
@@ -125,6 +136,90 @@ class SslService:
         cert_pem = certificate.public_bytes(Encoding.PEM)
         key_pem = private_key.private_bytes(Encoding.PEM, PrivateFormat.TraditionalOpenSSL, NoEncryption())
         return cert_pem, key_pem
+
+    @staticmethod
+    def _convert_native_jks_to_pem(jks_bytes: bytes, password: str) -> tuple[bytes, bytes]:
+        try:
+            key_der, cert_chain = SslService._parse_jks(jks_bytes, password)
+        except Exception as e:
+            raise ValidationError(f"JKS okunamadı (parola yanlış veya dosya bozuk olabilir): {e}")
+
+        if not key_der or not cert_chain:
+            raise ValidationError("JKS dosyasında özel anahtar veya sertifika bulunamadı.")
+
+        private_key = load_der_private_key(key_der, password=None, backend=default_backend())
+        key_pem = private_key.private_bytes(Encoding.PEM, PrivateFormat.TraditionalOpenSSL, NoEncryption())
+        # Concatenate the full chain (leaf first) so nginx serves intermediates too.
+        cert_pem = b"".join(
+            x509.load_der_x509_certificate(c, default_backend()).public_bytes(Encoding.PEM)
+            for c in cert_chain
+        )
+        return cert_pem, key_pem
+
+    @staticmethod
+    def _parse_jks(data: bytes, password: str) -> tuple[Optional[bytes], list[bytes]]:
+        """Parse a legacy JKS keystore, returning (PKCS#8 key DER, [cert DER, ...])."""
+        if data[:4] != SslService._JKS_MAGIC:
+            raise ValueError("Geçersiz JKS dosyası (magic eşleşmiyor).")
+        off = 4
+        version = int.from_bytes(data[off:off + 4], "big"); off += 4
+        count = int.from_bytes(data[off:off + 4], "big"); off += 4
+        key_der: Optional[bytes] = None
+        cert_chain: list[bytes] = []
+        for _ in range(count):
+            tag = int.from_bytes(data[off:off + 4], "big"); off += 4
+            alias_len = int.from_bytes(data[off:off + 2], "big"); off += 2
+            off += alias_len                       # alias
+            off += 8                               # creation timestamp
+            if tag == 1:                           # private key entry
+                klen = int.from_bytes(data[off:off + 4], "big"); off += 4
+                key_enc = data[off:off + klen]; off += klen
+                nchain = int.from_bytes(data[off:off + 4], "big"); off += 4
+                for _ in range(nchain):
+                    if version == 2:
+                        tlen = int.from_bytes(data[off:off + 2], "big"); off += 2
+                        off += tlen                # cert type ("X.509")
+                    clen = int.from_bytes(data[off:off + 4], "big"); off += 4
+                    cert_chain.append(data[off:off + clen]); off += clen
+                key_der = SslService._jks_decrypt_key(key_enc, password)
+            elif tag == 2:                         # trusted cert entry (skipped)
+                if version == 2:
+                    tlen = int.from_bytes(data[off:off + 2], "big"); off += 2
+                    off += tlen
+                clen = int.from_bytes(data[off:off + 4], "big"); off += 4
+                off += clen
+            else:
+                raise ValueError(f"Bilinmeyen JKS entry tipi: {tag}")
+        return key_der, cert_chain
+
+    @staticmethod
+    def _jks_decrypt_key(epki_der: bytes, password: str) -> bytes:
+        """Decrypt the Sun JKS key protector, returning the PKCS#8 PrivateKeyInfo DER."""
+        # epki_der is a DER EncryptedPrivateKeyInfo: SEQ { AlgorithmIdentifier, OCTET STRING }
+        _, content, _ = SslService._der_read_tlv(epki_der, 0)
+        _, _alg, after_alg = SslService._der_read_tlv(content, 0)   # skip AlgorithmIdentifier
+        _, enc, _ = SslService._der_read_tlv(content, after_alg)    # encryptedData OCTET STRING
+        salt, encrypted, digest = enc[:20], enc[20:-20], enc[-20:]
+        pw = password.encode("utf-16-be")          # Java encodes chars as UTF-16BE
+        keystream = b""
+        cur = salt
+        while len(keystream) < len(encrypted):
+            cur = hashlib.sha1(pw + cur).digest()
+            keystream += cur
+        key = bytes(a ^ b for a, b in zip(encrypted, keystream[:len(encrypted)]))
+        if hashlib.sha1(pw + key).digest() != digest:
+            raise ValueError("parola doğrulaması başarısız")
+        return key
+
+    @staticmethod
+    def _der_read_tlv(data: bytes, off: int) -> tuple[int, bytes, int]:
+        """Read one DER tag-length-value at offset; return (tag, value, next_offset)."""
+        tag = data[off]; off += 1
+        length = data[off]; off += 1
+        if length & 0x80:
+            n = length & 0x7F
+            length = int.from_bytes(data[off:off + n], "big"); off += n
+        return tag, data[off:off + length], off + length
 
     @staticmethod
     def _reload_nginx() -> None:
