@@ -614,6 +614,8 @@
     "week_current": "This Week",
     "week_prev": "Previous Week",
     "week_next": "Next Week",
+    "hours_per_person": "Hours Per Person",
+    "by_work_type": "By Work Type",
     "no_record": "No record",
     "breakdown_title": "Work Breakdown",
     "breakdown_more": "+{{count}} more",

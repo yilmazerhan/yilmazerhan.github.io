@@ -614,6 +614,8 @@
     "week_current": "Bu Hafta",
     "week_prev": "Önceki Hafta",
     "week_next": "Sonraki Hafta",
+    "hours_per_person": "Kişi Bazında Saat",
+    "by_work_type": "İş Tipine Göre",
     "no_record": "Kayıt yok",
     "breakdown_title": "İş Dökümü",
     "breakdown_more": "+{{count}} kayıt daha",

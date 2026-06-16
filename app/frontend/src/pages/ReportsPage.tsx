@@ -568,6 +568,86 @@ function ReportScheduleSection({ t }: { t: (k: string) => string }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
+type Pivot = {
+  sortedUsers: [string, { name: string; byType: Record<string, number>; total: number }][]
+  typeList: [string, { name: string; name_key?: string | null; color: string }][]
+  typeTotals: Record<string, number>
+  grandTotal: number
+}
+
+// Aggregate logs into user → workType hour breakdown (used by both the
+// month-range pivot table and the weekly per-person / work-type widgets).
+function buildPivot(logs: WorkLog[]): Pivot | null {
+  if (!logs.length) return null
+
+  const users: Record<string, { name: string; byType: Record<string, number>; total: number }> = {}
+  const types: Record<string, { name: string; name_key?: string | null; color: string }> = {}
+
+  for (const log of logs) {
+    if (!users[log.user_id]) {
+      users[log.user_id] = { name: log.user.full_name, byType: {}, total: 0 }
+    }
+    users[log.user_id].byType[log.work_type_id] = (users[log.user_id].byType[log.work_type_id] ?? 0) + log.duration_hours
+    users[log.user_id].total += log.duration_hours
+    if (!types[log.work_type_id]) {
+      types[log.work_type_id] = { name: log.work_type.name, name_key: log.work_type.name_key, color: log.work_type.color }
+    }
+  }
+
+  const sortedUsers = Object.entries(users).sort((a, b) => b[1].total - a[1].total)
+  const typeList = Object.entries(types)
+
+  const typeTotals: Record<string, number> = {}
+  let grandTotal = 0
+  for (const [, uData] of sortedUsers) {
+    for (const [typeId, hours] of Object.entries(uData.byType)) {
+      typeTotals[typeId] = (typeTotals[typeId] ?? 0) + hours
+      grandTotal += hours
+    }
+  }
+
+  return { sortedUsers, typeList, typeTotals, grandTotal }
+}
+
+// Prev / This-week / Next buttons, shared by the matrix and the weekly widgets.
+function WeekNav({
+  weekOffset,
+  setWeekOffset,
+  t,
+}: {
+  weekOffset: number
+  setWeekOffset: React.Dispatch<React.SetStateAction<number>>
+  t: (k: string) => string
+}) {
+  return (
+    <div className="flex items-center gap-1 flex-shrink-0">
+      <button
+        onClick={() => setWeekOffset(o => o - 1)}
+        className="p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
+        title={t('reports.week_prev')}
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </button>
+      {weekOffset < 0 && (
+        <button
+          onClick={() => setWeekOffset(0)}
+          className="px-2.5 py-1 text-xs rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium"
+        >
+          {t('reports.week_current')}
+        </button>
+      )}
+      <button
+        onClick={() => setWeekOffset(o => o + 1)}
+        disabled={weekOffset >= 0}
+        className="p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed"
+        title={t('reports.week_next')}
+      >
+        <ChevronRight className="h-4 w-4" />
+      </button>
+    </div>
+  )
+}
+
 export default function ReportsPage() {
   const { t, i18n } = useTranslation()
   const locale = i18n.language === 'tr' ? trLocale : enUS
@@ -620,38 +700,12 @@ export default function ReportsPage() {
   const { data: todayData } = useWorkLogs({ date_from: today, date_to: today, limit: 200 })
   const todayLogs = todayData?.items ?? []
 
-  // Build pivot: user → workType → hours
-  const pivot = useMemo(() => {
-    if (!logs.length) return null
+  // Month-range pivot (drives the pivot table + summary): user → workType → hours
+  const pivot = useMemo(() => buildPivot(logs), [logs])
 
-    const users: Record<string, { name: string; byType: Record<string, number>; total: number }> = {}
-    const types: Record<string, { name: string; name_key?: string | null; color: string }> = {}
-
-    for (const log of logs) {
-      if (!users[log.user_id]) {
-        users[log.user_id] = { name: log.user.full_name, byType: {}, total: 0 }
-      }
-      users[log.user_id].byType[log.work_type_id] = (users[log.user_id].byType[log.work_type_id] ?? 0) + log.duration_hours
-      users[log.user_id].total += log.duration_hours
-      if (!types[log.work_type_id]) {
-        types[log.work_type_id] = { name: log.work_type.name, name_key: log.work_type.name_key, color: log.work_type.color }
-      }
-    }
-
-    const sortedUsers = Object.entries(users).sort((a, b) => b[1].total - a[1].total)
-    const typeList = Object.entries(types)
-
-    const typeTotals: Record<string, number> = {}
-    let grandTotal = 0
-    for (const [, uData] of sortedUsers) {
-      for (const [typeId, hours] of Object.entries(uData.byType)) {
-        typeTotals[typeId] = (typeTotals[typeId] ?? 0) + hours
-        grandTotal += hours
-      }
-    }
-
-    return { sortedUsers, typeList, typeTotals, grandTotal }
-  }, [logs])
+  // Weekly pivot (drives the per-person bars + work-type donut), scoped to the
+  // selected Mon–Sun week via weekLogs (shares weekOffset with the matrix).
+  const weekPivot = useMemo(() => buildPivot(weekLogs), [weekLogs])
 
   const summaryStats = useMemo(() => {
     const totalHours = logs.reduce((s, l) => s + l.duration_hours, 0)
@@ -674,19 +728,24 @@ export default function ReportsPage() {
     )
   }, [logs])
 
-  // Donut data: type → total hours, sorted desc
-  const donutData = useMemo(() => {
-    if (!pivot) return []
-    return pivot.typeList
+  // Weekly donut data: type → total hours for the selected week, sorted desc
+  const weekDonutData = useMemo(() => {
+    if (!weekPivot) return []
+    return weekPivot.typeList
       .map(([typeId, type]) => ({
         name: resolveName(t, type.name, type.name_key),
         color: type.color,
-        hours: pivot.typeTotals[typeId] ?? 0,
+        hours: weekPivot.typeTotals[typeId] ?? 0,
       }))
       .sort((a, b) => b.hours - a.hours)
-  }, [pivot, t])
+  }, [weekPivot, t])
 
-  const maxUserHours = pivot ? Math.max(...pivot.sortedUsers.map(([, u]) => u.total), 1) : 1
+  // Per-person bar derived values (weekly)
+  const weekMaxUserHours = weekPivot ? Math.max(...weekPivot.sortedUsers.map(([, u]) => u.total), 1) : 1
+  const weekMultipleUsers = (weekPivot?.sortedUsers.length ?? 0) > 1
+  const weekMaxTotal = weekPivot?.sortedUsers[0]?.[1].total ?? 0
+
+  // Pivot-table derived values (month range)
   const multipleUsers = (pivot?.sortedUsers.length ?? 0) > 1
   const maxTotal = pivot?.sortedUsers[0]?.[1].total ?? 0
   const minTotal = pivot?.sortedUsers[pivot.sortedUsers.length - 1]?.[1].total ?? 0
@@ -802,52 +861,39 @@ export default function ReportsPage() {
                 )}
               </p>
             </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <button
-                onClick={() => setWeekOffset(o => o - 1)}
-                className="p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
-                title={t('reports.week_prev')}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              {weekOffset < 0 && (
-                <button
-                  onClick={() => setWeekOffset(0)}
-                  className="px-2.5 py-1 text-xs rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 font-medium"
-                >
-                  {t('reports.week_current')}
-                </button>
-              )}
-              <button
-                onClick={() => setWeekOffset(o => o + 1)}
-                disabled={weekOffset >= 0}
-                className="p-1.5 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed"
-                title={t('reports.week_next')}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
+            <WeekNav weekOffset={weekOffset} setWeekOffset={setWeekOffset} t={t} />
           </div>
           <WeeklyActivityMatrix users={weekUsers} logs={weekLogs} weekDates={weekDates} />
         </div>
       )}
 
-      {isLoading ? (
-        <div className="text-center py-12 text-gray-400">{t('common.loading')}</div>
-      ) : !pivot ? (
-        <div className="text-center py-12 text-gray-400">{t('reports.no_data')}</div>
-      ) : (
-        <>
-          {/* Hours per user bar chart + Donut chart */}
+      {/* Weekly per-person hours + work-type donut — Mon–Sun week, navigable */}
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6 space-y-5">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {format(new Date(weekStart + 'T12:00:00'), 'dd MMM', { locale })}
+              {' — '}
+              {format(new Date(weekEnd + 'T12:00:00'), 'dd MMM yyyy', { locale })}
+              {weekOffset === 0 && (
+                <span className="ml-2 text-primary-500 font-medium">· {t('reports.week_current')}</span>
+              )}
+            </p>
+          </div>
+          <WeekNav weekOffset={weekOffset} setWeekOffset={setWeekOffset} t={t} />
+        </div>
+
+        {!weekPivot ? (
+          <div className="text-center py-12 text-gray-400">{t('reports.no_data')}</div>
+        ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <TrendingUp className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">{t('dashboard.hours_by_person')}</h2>
-              </div>
+            {/* Hours per person */}
+            <div className="lg:col-span-2">
+              <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200 mb-4">{t('reports.hours_per_person')}</h2>
               <div className="space-y-2">
-                {pivot.sortedUsers.map(([uid, uData]) => {
-                  const isMax = multipleUsers && uData.total === maxTotal && maxTotal > 0
+                {weekPivot.sortedUsers.map(([uid, uData]) => {
+                  const isMax = weekMultipleUsers && uData.total === weekMaxTotal && weekMaxTotal > 0
                   return (
                     <div key={uid} className="flex items-center gap-3">
                       <div className="flex items-center gap-1 w-36 flex-shrink-0">
@@ -855,11 +901,8 @@ export default function ReportsPage() {
                         <span className="text-sm text-gray-600 dark:text-gray-400 truncate">{uData.name}</span>
                       </div>
                       <div className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full h-5 overflow-hidden">
-                        <div
-                          className="flex h-full"
-                          style={{ width: `${(uData.total / maxUserHours) * 100}%` }}
-                        >
-                          {pivot.typeList
+                        <div className="flex h-full" style={{ width: `${(uData.total / weekMaxUserHours) * 100}%` }}>
+                          {weekPivot.typeList
                             .filter(([typeId]) => (uData.byType[typeId] ?? 0) > 0)
                             .map(([typeId, type]) => (
                               <div
@@ -884,16 +927,21 @@ export default function ReportsPage() {
               </div>
             </div>
 
-            {/* Donut chart */}
-            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <TrendingUp className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">{t('dashboard.hours_by_type')}</h2>
-              </div>
-              <DonutChart data={donutData} hourAbbr={hourAbbr} />
+            {/* Work-type donut */}
+            <div>
+              <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200 mb-4">{t('reports.by_work_type')}</h2>
+              <DonutChart data={weekDonutData} hourAbbr={hourAbbr} />
             </div>
           </div>
+        )}
+      </div>
 
+      {isLoading ? (
+        <div className="text-center py-12 text-gray-400">{t('common.loading')}</div>
+      ) : !pivot ? (
+        <div className="text-center py-12 text-gray-400">{t('reports.no_data')}</div>
+      ) : (
+        <>
           {/* Pivot table */}
           <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
