@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { format, startOfMonth, startOfWeek, addWeeks, addDays } from 'date-fns'
 import { tr as trLocale, enUS } from 'date-fns/locale'
@@ -264,6 +265,37 @@ function WeeklyActivityMatrix({
     return m
   }, [logs])
 
+  // Per-cell work-log details (for the hover breakdown), highest hours first.
+  const cellLogs = useMemo(() => {
+    const m: Record<string, Record<string, WorkLog[]>> = {}
+    for (const log of logs) {
+      if (!m[log.user_id]) m[log.user_id] = {}
+      if (!m[log.user_id][log.log_date]) m[log.user_id][log.log_date] = []
+      m[log.user_id][log.log_date].push(log)
+    }
+    for (const byDay of Object.values(m)) {
+      for (const arr of Object.values(byDay)) arr.sort((a, b) => b.duration_hours - a.duration_hours)
+    }
+    return m
+  }, [logs])
+
+  // Hover breakdown tooltip state (rendered in a portal so it is never clipped
+  // by the table's horizontal-scroll container).
+  const [tip, setTip] = useState<
+    { logs: WorkLog[]; title: string; cx: number; y: number; above: boolean } | null
+  >(null)
+
+  const MAX_DESC = 46   // per-line character cap — only a summary is shown
+  const MAX_LINES = 7
+  const truncate = (s: string) => (s.length > MAX_DESC ? s.slice(0, MAX_DESC - 1) + '…' : s)
+
+  function showTip(el: HTMLElement, dayLogs: WorkLog[], title: string) {
+    const r = el.getBoundingClientRect()
+    const above = r.bottom > window.innerHeight * 0.6
+    const cx = Math.min(Math.max(r.left + r.width / 2, 152), window.innerWidth - 152)
+    setTip({ logs: dayLogs, title, cx, y: above ? r.top - 8 : r.bottom + 8, above })
+  }
+
   const maxHours = useMemo(() => {
     let max = 0.1
     for (const byDay of Object.values(matrix)) {
@@ -306,11 +338,24 @@ function WeeklyActivityMatrix({
                   const hours = byDay[d] ?? 0
                   const intensity = hours > 0 ? Math.min(hours / maxHours, 1) : 0
                   const isToday = d === todayStr
+                  const dayLogs = hours > 0 ? (cellLogs[user.id]?.[d] ?? []) : []
+                  const dayLabel = format(new Date(d + 'T12:00:00'), 'dd MMM', { locale })
+                  const tipTitle = `${user.full_name} · ${dayLabel} · ${hours}${hourAbbr}`
+                  const hoverProps = hours > 0
+                    ? {
+                        onMouseEnter: (e: React.MouseEvent<HTMLDivElement>) => showTip(e.currentTarget, dayLogs, tipTitle),
+                        onMouseLeave: () => setTip(null),
+                        onFocus: (e: React.FocusEvent<HTMLDivElement>) => showTip(e.currentTarget, dayLogs, tipTitle),
+                        onBlur: () => setTip(null),
+                        tabIndex: 0,
+                      }
+                    : { title: `${user.full_name} · ${dayLabel}: ${t('reports.no_record')}` }
                   return (
                     <td key={d} className="px-1.5 py-2 text-center">
                       <div
-                        title={`${user.full_name} · ${format(new Date(d + 'T12:00:00'), 'dd MMM', { locale })}: ${hours > 0 ? hours + hourAbbr : t('reports.no_record')}`}
-                        className={`mx-auto flex items-center justify-center rounded-lg text-xs font-semibold h-9 w-14 transition-colors select-none
+                        {...hoverProps}
+                        className={`mx-auto flex items-center justify-center rounded-lg text-xs font-semibold h-9 w-14 transition-colors select-none outline-none
+                          ${hours > 0 ? 'cursor-help focus-visible:ring-2 focus-visible:ring-primary-500' : ''}
                           ${isToday ? 'ring-2 ring-primary-400 ring-offset-1' : ''}`}
                         style={
                           hours > 0
@@ -337,6 +382,40 @@ function WeeklyActivityMatrix({
           })}
         </tbody>
       </table>
+
+      {tip && createPortal(
+        <div
+          role="tooltip"
+          className="fixed z-50 w-72 max-w-[18rem] rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-xl p-3 pointer-events-none"
+          style={{
+            left: tip.cx,
+            top: tip.y,
+            transform: `translateX(-50%) ${tip.above ? 'translateY(-100%)' : ''}`,
+          }}
+        >
+          <div className="text-xs font-semibold text-gray-700 dark:text-gray-200 pb-1.5 mb-1.5 border-b border-gray-100 dark:border-gray-800">
+            {tip.title}
+          </div>
+          <ul className="space-y-1">
+            {tip.logs.slice(0, MAX_LINES).map(log => (
+              <li key={log.id} className="flex items-baseline gap-1.5 text-xs leading-snug">
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400 whitespace-nowrap tabular-nums">
+                  {log.duration_hours}{hourAbbr}
+                </span>
+                <span className="text-gray-600 dark:text-gray-300 truncate">
+                  {log.description?.trim() ? truncate(log.description.trim()) : t('reports.breakdown_no_desc')}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {tip.logs.length > MAX_LINES && (
+            <div className="mt-1.5 text-[11px] text-gray-400 dark:text-gray-500">
+              {t('reports.breakdown_more', { count: tip.logs.length - MAX_LINES })}
+            </div>
+          )}
+        </div>,
+        document.body,
+      )}
     </div>
   )
 }
