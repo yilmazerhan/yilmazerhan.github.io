@@ -12,6 +12,7 @@ import {
 interface SidebarProps {
   open: boolean
   onShortcutsOpen?: () => void
+  onClose?: () => void
 }
 
 interface NavItem {
@@ -42,7 +43,10 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/admin/backup', icon: HardDriveDownload, labelKey: 'nav.backup', requiredRole: ['superadmin'] },
 ]
 
-export default function Sidebar({ open, onShortcutsOpen }: SidebarProps) {
+export default function Sidebar({ open, onShortcutsOpen, onClose }: SidebarProps) {
+  const handleNavClick = () => {
+    if (window.innerWidth < 1024) onClose?.()
+  }
   const { t } = useTranslation()
   const user = useAuthStore((s) => s.user)
 
@@ -56,7 +60,14 @@ export default function Sidebar({ open, onShortcutsOpen }: SidebarProps) {
   if (!open) return null
 
   return (
-    <aside className="w-64 flex-shrink-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col">
+    <>
+      {/* Backdrop — mobile only */}
+      <div
+        className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <aside className="fixed inset-y-0 left-0 z-50 w-64 flex-shrink-0 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col lg:relative lg:inset-auto lg:z-auto">
       {/* Logo / Company name */}
       <div className="h-16 flex items-center gap-3 px-4 border-b border-gray-200 dark:border-gray-800">
         {branding?.company_logo && (
@@ -76,6 +87,7 @@ export default function Sidebar({ open, onShortcutsOpen }: SidebarProps) {
               key={to}
               to={to}
               end={to === '/'}
+              onClick={handleNavClick}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors border-l-[3px] ${
                   isActive
@@ -95,6 +107,7 @@ export default function Sidebar({ open, onShortcutsOpen }: SidebarProps) {
       <div className="px-2 py-3 border-t border-gray-200 dark:border-gray-800 space-y-1">
         <NavLink
           to="/profile"
+          onClick={handleNavClick}
           className={({ isActive }) =>
             `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors border-l-[3px] ${
               isActive
@@ -124,5 +137,6 @@ export default function Sidebar({ open, onShortcutsOpen }: SidebarProps) {
         </div>
       </div>
     </aside>
+    </>
   )
 }

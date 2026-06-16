@@ -194,9 +194,9 @@ export default function WorkLogPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('worklog.title')}</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
             <button
               onClick={() => setViewMode('list')}
@@ -232,31 +232,31 @@ export default function WorkLogPage() {
       </div>
 
       <div className="flex gap-3 flex-wrap">
-        <div>
+        <div className="flex-1 min-w-[140px]">
           <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('worklog.date_from')}</label>
           <input
             type="date"
             value={dateFrom}
             onChange={(e) => handleDateFrom(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
-        <div>
+        <div className="flex-1 min-w-[140px]">
           <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('worklog.date_to')}</label>
           <input
             type="date"
             value={dateTo}
             onChange={(e) => handleDateTo(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
         {canFilterByUser && (
-          <div>
+          <div className="flex-1 min-w-[160px]">
             <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('worklog.person')}</label>
             <select
               value={selectedUserId}
               onChange={(e) => handleUserFilter(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               <option value="">{t('worklog.filter_all_users')}</option>
               {usersData?.items.map((u) => (
@@ -280,95 +280,172 @@ export default function WorkLogPage() {
       {viewMode === 'calendar' ? (
         <CalendarView logs={data?.items ?? []} locale={locale} />
       ) : (
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
-          <div className="overflow-x-auto">
-          <table className="w-full text-sm min-w-[640px]">
-            <thead>
-              <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-                <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('worklog.date')}</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('worklog.person')}</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('worklog.work_type')}</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('worklog.duration')}</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('worklog.description')}</th>
-                <th className="text-right px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('common.actions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr><td colSpan={6} className="text-center py-8 text-gray-400">{t('common.loading')}</td></tr>
-              ) : data?.items.length === 0 ? (
-                <tr><td colSpan={6} className="text-center py-8 text-gray-400">{t('worklog.no_records')}</td></tr>
-              ) : data?.items.map((log) => {
-                const editable = canEditLog(log, user?.id || '', user?.role || '')
-                const ageDays = Math.floor((Date.now() - new Date(log.log_date).getTime()) / 86400000)
-                const isOld = ageDays > 3 && log.user_id === user?.id && user?.role === 'user'
-
-                return (
-                  <tr key={log.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30">
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                      {format(new Date(log.log_date + 'T12:00:00'), 'dd MMM yyyy', { locale })}
-                    </td>
-                    <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{log.user.full_name}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white"
-                        style={{ backgroundColor: log.work_type.color }}
-                      >
-                        {resolveName(t, log.work_type.name, log.work_type.name_key)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="flex items-center gap-1 text-gray-700 dark:text-gray-300">
-                        <Clock className="h-3.5 w-3.5 text-gray-400" />
-                        {log.duration_hours}{t('worklog.hours_abbr')}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-400 max-w-xs truncate" title={log.description}>
-                      {log.description}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        {isOld && (
-                          <span title={t('worklog.old_record_warning')}>
-                            <AlertTriangle className="h-4 w-4 text-amber-400" />
-                          </span>
-                        )}
-                        {log.user_id === user?.id && (
+        <>
+          {/* Mobile card list — hidden on md+ */}
+          <div className="md:hidden bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 divide-y divide-gray-100 dark:divide-gray-800">
+            {isLoading ? (
+              <p className="text-center py-8 text-gray-400 text-sm">{t('common.loading')}</p>
+            ) : data?.items.length === 0 ? (
+              <p className="text-center py-8 text-gray-400 text-sm">{t('worklog.no_records')}</p>
+            ) : data?.items.map((log) => {
+              const editable = canEditLog(log, user?.id || '', user?.role || '')
+              const ageDays = Math.floor((Date.now() - new Date(log.log_date).getTime()) / 86400000)
+              const isOld = ageDays > 3 && log.user_id === user?.id && user?.role === 'user'
+              return (
+                <div key={log.id} className="p-4 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {format(new Date(log.log_date + 'T12:00:00'), 'dd MMM yyyy', { locale })}
+                      </p>
+                      <p className="text-sm font-medium text-gray-800 dark:text-gray-200 truncate">{log.user.full_name}</p>
+                    </div>
+                    <span className="flex items-center gap-1 text-sm font-semibold text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                      <Clock className="h-3.5 w-3.5 text-gray-400" />
+                      {log.duration_hours}{t('worklog.hours_abbr')}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white"
+                      style={{ backgroundColor: log.work_type.color }}
+                    >
+                      {resolveName(t, log.work_type.name, log.work_type.name_key)}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      {isOld && (
+                        <span title={t('worklog.old_record_warning')}>
+                          <AlertTriangle className="h-4 w-4 text-amber-400" />
+                        </span>
+                      )}
+                      {log.user_id === user?.id && (
+                        <button
+                          onClick={() => setDuplicateLog(log)}
+                          className="p-1.5 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                          title={t('worklog.duplicate')}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
+                      )}
+                      {editable && (
+                        <>
                           <button
-                            onClick={() => setDuplicateLog(log)}
-                            className="p-1.5 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
-                            title={t('worklog.duplicate')}
+                            onClick={() => setEditLog(log)}
+                            className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                            title={t('common.edit')}
                           >
-                            <Copy className="h-4 w-4" />
+                            <Pencil className="h-4 w-4" />
                           </button>
-                        )}
-                        {editable && (
-                          <>
-                            <button
-                              onClick={() => setEditLog(log)}
-                              className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                              title={t('common.edit')}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDelete(log)}
-                              className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-                              title={t('common.delete')}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+                          <button
+                            onClick={() => handleDelete(log)}
+                            className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                            title={t('common.delete')}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  {log.description && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">{log.description}</p>
+                  )}
+                </div>
+              )
+            })}
           </div>
-        </div>
+
+          {/* Desktop table — hidden on mobile */}
+          <div className="hidden md:block bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[640px]">
+              <thead>
+                <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
+                  <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('worklog.date')}</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('worklog.person')}</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('worklog.work_type')}</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('worklog.duration')}</th>
+                  <th className="text-left px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('worklog.description')}</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-600 dark:text-gray-400">{t('common.actions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  <tr><td colSpan={6} className="text-center py-8 text-gray-400">{t('common.loading')}</td></tr>
+                ) : data?.items.length === 0 ? (
+                  <tr><td colSpan={6} className="text-center py-8 text-gray-400">{t('worklog.no_records')}</td></tr>
+                ) : data?.items.map((log) => {
+                  const editable = canEditLog(log, user?.id || '', user?.role || '')
+                  const ageDays = Math.floor((Date.now() - new Date(log.log_date).getTime()) / 86400000)
+                  const isOld = ageDays > 3 && log.user_id === user?.id && user?.role === 'user'
+
+                  return (
+                    <tr key={log.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                        {format(new Date(log.log_date + 'T12:00:00'), 'dd MMM yyyy', { locale })}
+                      </td>
+                      <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{log.user.full_name}</td>
+                      <td className="px-4 py-3">
+                        <span
+                          className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-white"
+                          style={{ backgroundColor: log.work_type.color }}
+                        >
+                          {resolveName(t, log.work_type.name, log.work_type.name_key)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="flex items-center gap-1 text-gray-700 dark:text-gray-300">
+                          <Clock className="h-3.5 w-3.5 text-gray-400" />
+                          {log.duration_hours}{t('worklog.hours_abbr')}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400 max-w-xs truncate" title={log.description}>
+                        {log.description}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-1">
+                          {isOld && (
+                            <span title={t('worklog.old_record_warning')}>
+                              <AlertTriangle className="h-4 w-4 text-amber-400" />
+                            </span>
+                          )}
+                          {log.user_id === user?.id && (
+                            <button
+                              onClick={() => setDuplicateLog(log)}
+                              className="p-1.5 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                              title={t('worklog.duplicate')}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </button>
+                          )}
+                          {editable && (
+                            <>
+                              <button
+                                onClick={() => setEditLog(log)}
+                                className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                title={t('common.edit')}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(log)}
+                                className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                title={t('common.delete')}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            </div>
+          </div>
+        </>
       )}
 
       {viewMode === 'list' && data && (
