@@ -78,6 +78,18 @@ async def activate_cert(
     return await svc.activate_certificate(cert_id)
 
 
+@router.post("/ssl/reload", response_model=MessageResponse)
+async def reload_ssl(
+    _: Annotated[User, Depends(require_superadmin)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = SslService(db)
+    written = await svc.sync_active_certificate()
+    if not written:
+        return {"message": "Aktif sertifika bulunamadı."}
+    return {"message": "Sertifika dosyaları güncellendi, nginx yeniden yükleniyor."}
+
+
 @router.delete("/ssl/{cert_id}", response_model=MessageResponse)
 async def delete_cert(
     cert_id: uuid.UUID,

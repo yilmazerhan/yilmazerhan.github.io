@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format } from 'date-fns'
 import { tr, enUS } from 'date-fns/locale'
-import { Plus, Pencil, Trash2, CheckCircle, XCircle, Loader2, ShieldCheck, Upload, Building2, MessageSquare, Mail, Layers, Tag } from 'lucide-react'
+import { Plus, Pencil, Trash2, CheckCircle, XCircle, Loader2, ShieldCheck, Upload, Building2, MessageSquare, Mail, Layers, Tag, RefreshCw } from 'lucide-react'
 import { resolveName } from '@/utils/i18nName'
 import {
   useWorkTypes,
@@ -38,6 +38,7 @@ import {
   useUploadJks,
   useActivateCertificate,
   useDeleteCertificate,
+  useReloadSsl,
   useBranding,
   useUpdateBranding,
   useUploadLogo,
@@ -122,6 +123,8 @@ export default function SettingsPage() {
   const { data: branding } = useBranding()
   const activateCert = useActivateCertificate()
   const deleteCert = useDeleteCertificate()
+  const reloadSsl = useReloadSsl()
+  const [sslReloadMsg, setSslReloadMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const uploadPem = useUploadPem()
   const uploadJks = useUploadJks()
   const updateBranding = useUpdateBranding()
@@ -179,6 +182,16 @@ export default function SettingsPage() {
       }
       setSslName(''); setCertFile(null); setKeyFile(null); setJksFile(null); setJksPassword('')
     } catch (err: any) { setSslError(err.response?.data?.detail || t('settings.upload_failed')) }
+  }
+
+  async function handleSslReload() {
+    setSslReloadMsg(null)
+    try {
+      await reloadSsl.mutateAsync()
+      setSslReloadMsg({ ok: true, text: t('settings.ssl_reload_success') })
+    } catch (err: any) {
+      setSslReloadMsg({ ok: false, text: err.response?.data?.detail || t('settings.ssl_reload_error') })
+    }
   }
 
   async function handleBrandingSave(e: React.FormEvent) {
@@ -605,13 +618,31 @@ export default function SettingsPage() {
 
       {/* SSL */}
       <section>
-        <div className="flex items-center gap-2 mb-4">
-          <ShieldCheck className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('settings.ssl_title')}</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{t('settings.ssl_description')}</p>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('settings.ssl_title')}</h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">{t('settings.ssl_description')}</p>
+            </div>
           </div>
+          {sslCerts.some((c) => c.is_active) && (
+            <button
+              onClick={handleSslReload}
+              disabled={reloadSsl.isPending}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
+            >
+              {reloadSsl.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+              {t('settings.ssl_reload')}
+            </button>
+          )}
         </div>
+        {sslReloadMsg && (
+          <div className={`mb-3 flex items-center gap-1.5 text-sm p-2 rounded ${sslReloadMsg.ok ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300' : 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400'}`}>
+            {sslReloadMsg.ok ? <CheckCircle className="h-4 w-4 shrink-0" /> : <XCircle className="h-4 w-4 shrink-0" />}
+            {sslReloadMsg.text}
+          </div>
+        )}
 
         {sslCerts.length > 0 && (
           <div className="space-y-2 mb-4">

@@ -132,6 +132,12 @@ export function useDeleteCertificate() {
   })
 }
 
+export function useReloadSsl() {
+  return useMutation({
+    mutationFn: () => apiClient.post<{ message: string }>('/admin/ssl/reload').then((r) => r.data),
+  })
+}
+
 export function useBranding() {
   return useQuery({
     queryKey: adminKeys.branding,
