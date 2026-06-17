@@ -9,6 +9,11 @@
 CERT=/ssl/current.crt
 KEY=/ssl/current.key
 
+# Allow the (non-root) backend container to replace the cert files on activation.
+# The ssl_certs volume is internal and only mounted into nginx + backend.
+mkdir -p /ssl
+chmod 0777 /ssl
+
 if [ -f "$CERT" ] && [ -f "$KEY" ]; then
   echo "SSL certificate already exists, skipping generation."
   exit 0

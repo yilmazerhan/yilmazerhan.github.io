@@ -5,7 +5,6 @@ Writes active certificate to disk and reloads nginx.
 """
 import uuid
 import hashlib
-import subprocess
 from datetime import datetime, timezone
 from typing import Optional
 from pathlib import Path
@@ -85,13 +84,17 @@ class SslService:
         cert.is_active = True
         await self.db.flush()
 
-        # Write to disk and reload nginx
+        # Write to the shared ssl_certs volume; the nginx-side watcher reloads.
+        # Unlink first so the non-root backend user can replace files that were
+        # created by root (ssl_init / a previous activation) in the shared volume.
         key_pem = decrypt_field(cert.key_pem_encrypted, settings.SSL_ENCRYPTION_KEY)
         SSL_CERT_PATH.parent.mkdir(parents=True, exist_ok=True)
+        SSL_CERT_PATH.unlink(missing_ok=True)
+        SSL_KEY_PATH.unlink(missing_ok=True)
         SSL_CERT_PATH.write_bytes(cert.cert_pem)
         SSL_KEY_PATH.write_text(key_pem)
+        SSL_CERT_PATH.chmod(0o644)
         SSL_KEY_PATH.chmod(0o600)
-        self._reload_nginx()
 
         return cert
 
@@ -221,9 +224,6 @@ class SslService:
             length = int.from_bytes(data[off:off + n], "big"); off += n
         return tag, data[off:off + length], off + length
 
-    @staticmethod
-    def _reload_nginx() -> None:
-        try:
-            subprocess.run(["nginx", "-s", "reload"], check=True, timeout=10, capture_output=True)
-        except (subprocess.SubprocessError, FileNotFoundError):
-            pass  # nginx not available in dev environment
+    # NOTE: nginx runs in a separate container and reloads itself via the
+    # reload-watcher script when the shared cert files change, so the backend
+    # no longer attempts an (always-failing) in-container `nginx -s reload`.

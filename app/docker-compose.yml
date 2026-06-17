@@ -26,6 +26,7 @@ services:
       - "host.docker.internal:host-gateway"
     volumes:
       - backup_data:/app/backups
+      - ssl_certs:/app/ssl          # activated certs land where nginx reads them
     depends_on:
       redis:
         condition: service_healthy
@@ -100,11 +101,14 @@ services:
   nginx:
     image: nginx:1.25-alpine
     restart: unless-stopped
+    # Run the cert reload-watcher in the background, then nginx in the foreground.
+    command: sh -c "sh /reload-watcher.sh & exec nginx -g 'daemon off;'"
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/reload-watcher.sh:/reload-watcher.sh:ro
       - ssl_certs:/etc/nginx/ssl
     depends_on:
       ssl_init:
