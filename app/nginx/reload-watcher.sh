@@ -9,7 +9,8 @@
 CERT=/etc/nginx/ssl/current.crt
 
 # Wait for the nginx master to be up (it writes its pid file on startup).
-while [ ! -f /var/run/nginx.pid ]; do
+# nginx.conf sets: pid /tmp/nginx.pid
+while [ ! -f /tmp/nginx.pid ]; do
   sleep 1
 done
 
