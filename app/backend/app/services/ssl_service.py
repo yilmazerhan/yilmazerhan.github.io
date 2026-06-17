@@ -84,6 +84,25 @@ class SslService:
         cert.is_active = True
         await self.db.flush()
 
+        self._write_cert_files(cert)
+        return cert
+
+    async def sync_active_certificate(self) -> bool:
+        """Write the DB's active certificate to the shared volume.
+
+        Called on backend startup so that a certificate activated before this
+        wiring existed (or any redeploy) reaches nginx without re-clicking
+        activate. Returns True if an active certificate was written."""
+        result = await self.db.execute(
+            select(SslCertificate).where(SslCertificate.is_active.is_(True))
+        )
+        cert = result.scalar_one_or_none()
+        if not cert:
+            return False
+        self._write_cert_files(cert)
+        return True
+
+    def _write_cert_files(self, cert: SslCertificate) -> None:
         # Write to the shared ssl_certs volume; the nginx-side watcher reloads.
         # Unlink first so the non-root backend user can replace files that were
         # created by root (ssl_init / a previous activation) in the shared volume.
@@ -95,8 +114,6 @@ class SslService:
         SSL_KEY_PATH.write_text(key_pem)
         SSL_CERT_PATH.chmod(0o644)
         SSL_KEY_PATH.chmod(0o600)
-
-        return cert
 
     async def delete_certificate(self, cert_id: uuid.UUID) -> None:
         cert = await self.get_certificate(cert_id)

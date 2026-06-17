@@ -131,6 +131,17 @@ async def lifespan(app: FastAPI):
         # persist instead of being rolled back when the session closes.
         await db.commit()
 
+    # Materialize the active SSL certificate from the DB onto the shared volume
+    # so a redeploy / restart makes nginx pick it up (the nginx-side watcher
+    # reloads on the file change). No-op if no certificate is active.
+    from app.services.ssl_service import SslService
+    async with AsyncSessionLocal() as db:
+        try:
+            if await SslService(db).sync_active_certificate():
+                logger.info("Active SSL certificate written to shared volume.")
+        except Exception as exc:
+            logger.warning("Active SSL certificate sync failed: %s", exc)
+
     # Start in-process scheduler loops. These complement Celery Beat: if Celery
     # containers are not running, scheduled backups and workflow evaluations still
     # happen. If Celery IS running, the dedup/heartbeat logic is idempotent.
