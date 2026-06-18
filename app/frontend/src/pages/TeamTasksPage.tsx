@@ -42,7 +42,7 @@ function TaskModal({ task, onClose }: TaskModalProps) {
   const { t } = useTranslation()
   const createTask = useCreateTeamTask()
   const updateTask = useUpdateTeamTask()
-  const { data: usersData } = useUsers({ is_active: true, limit: 500 })
+  const { data: usersData, isLoading: usersLoading } = useUsers({ is_active: true, limit: 200 })
   const users = usersData?.items ?? []
 
   const [title, setTitle] = useState(task?.title ?? '')
@@ -149,7 +149,7 @@ function TaskModal({ task, onClose }: TaskModalProps) {
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('team_tasks.assignees')}</label>
             <div className="border border-gray-200 dark:border-gray-700 rounded-lg max-h-48 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
-              {users.length === 0 ? (
+              {usersLoading ? (
                 <p className="text-sm text-gray-400 p-3">{t('common.loading')}</p>
               ) : users.map((u) => (
                 <label key={u.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
