@@ -1130,6 +1130,9 @@
     "popup_title": "Atanmış Görevleriniz",
     "popup_subtitle": "Tamamlanmamış ve son tarihi geçmemiş görevleriniz aşağıda listelenmiştir.",
     "popup_no_tasks": "Tamamlanmamış atanmış göreviniz yok.",
-    "go_to_tasks": "Görev Listesine Git"
+    "go_to_tasks": "Görev Listesine Git",
+    "mark_done": "Tamamlandı",
+    "mark_undone": "Geri Al",
+    "completed_count": "{{done}} / {{total}} tamamlandı"
   }
 }

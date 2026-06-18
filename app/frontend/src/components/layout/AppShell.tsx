@@ -24,12 +24,15 @@ function TeamTasksPopup({ userId }: { userId: string }) {
 
   const today = new Date()
   today.setHours(0, 0, 0, 0)
-  const myTasks = tasks.filter(
-    (task) =>
+  const myTasks = tasks.filter((task) => {
+    const myRecord = task.assignees.find((a) => a.id === userId)
+    return (
+      myRecord !== undefined &&
+      myRecord.completed_at === null &&
       task.status !== 'done' &&
-      task.assignees.some((a) => a.id === userId) &&
-      new Date(task.deadline) >= today,
-  )
+      new Date(task.deadline) >= today
+    )
+  })
 
   useEffect(() => {
     if (myTasks.length > 0 && !_popupShownThisLoad) {

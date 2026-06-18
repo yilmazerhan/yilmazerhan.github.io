@@ -14,6 +14,14 @@ class UserBasic(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class TeamTaskAssigneeInfo(BaseModel):
+    id: uuid.UUID
+    full_name: str
+    email: str
+    completed_at: Optional[datetime] = None
+    model_config = {"from_attributes": True}
+
+
 class TeamTaskCreate(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = Field(None, max_length=10000)
@@ -52,7 +60,7 @@ class TeamTaskResponse(BaseModel):
     status: str
     created_by: Optional[uuid.UUID]
     creator: Optional[UserBasic]
-    assignees: List[UserBasic]
+    assignees: List[TeamTaskAssigneeInfo]
     created_at: datetime
     updated_at: datetime
     model_config = {"from_attributes": True}

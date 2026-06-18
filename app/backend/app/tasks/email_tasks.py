@@ -928,12 +928,16 @@ async def _send_team_task_reminders_async():
                     continue
 
                 for assignee in task.assignees:
+                    # Skip assignees who already marked this task done for themselves
+                    if assignee.completed_at is not None:
+                        continue
+
                     # Dedup: check if already sent today for this task+user
                     today_start = datetime.combine(today, datetime.min.time()).replace(tzinfo=timezone.utc)
                     sent_count = (await db.execute(
                         select(func.count()).where(
                             EmailLog.team_task_id == task.id,
-                            EmailLog.recipient_id == assignee.id,
+                            EmailLog.recipient_id == assignee.user_id,
                             EmailLog.status.in_(["sent", "pending"]),
                             EmailLog.created_at >= today_start,
                         )
@@ -953,7 +957,7 @@ async def _send_team_task_reminders_async():
                         to_email=assignee.email,
                         subject=subject,
                         template_id=template.id,
-                        recipient_id=assignee.id,
+                        recipient_id=assignee.user_id,
                         team_task_id=task.id,
                     )
                     await db.commit()
@@ -962,7 +966,7 @@ async def _send_team_task_reminders_async():
                     await db.commit()
                     logger.info(
                         "_send_team_task_reminders_async: sent reminder for task %s to %s",
-                        task.id, assignee.email,
+                        task.id, assignee.user.email,
                     )
 
             logger.info("_send_team_task_reminders_async: done for %s", today)

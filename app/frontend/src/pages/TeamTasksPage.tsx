@@ -2,13 +2,14 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format } from 'date-fns'
 import { tr, enUS } from 'date-fns/locale'
-import { Plus, Pencil, Trash2, Loader2, CheckCircle2, Clock, AlertCircle, Users, Search } from 'lucide-react'
+import { Plus, Pencil, Trash2, Loader2, CheckCircle2, Clock, AlertCircle, Users, Search, Check, RotateCcw } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import {
   useTeamTasks,
   useCreateTeamTask,
   useUpdateTeamTask,
   useDeleteTeamTask,
+  useCompleteTeamTask,
   type TeamTask,
 } from '@/api/teamTasks'
 import { useUsers } from '@/api/users'
@@ -204,8 +205,9 @@ export default function TeamTasksPage() {
 
   const { data: tasks = [], isLoading } = useTeamTasks()
   const deleteTask = useDeleteTeamTask()
+  const completeTask = useCompleteTeamTask()
 
-  const [modalTask, setModalTask] = useState<TeamTask | null | 'new'>('new' as any)
+  const [modalTask, setModalTask] = useState<TeamTask | null>(null)
   const [showModal, setShowModal] = useState(false)
 
   function openCreate() { setModalTask(null); setShowModal(true) }
@@ -218,10 +220,20 @@ export default function TeamTasksPage() {
     catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
   }
 
+  async function handleToggleComplete(taskId: string) {
+    try { await completeTask.mutateAsync(taskId) }
+    catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
+  }
+
   const StatusIcon = ({ status }: { status: string }) => {
     if (status === 'done') return <CheckCircle2 className="h-4 w-4 text-green-500" />
     if (status === 'in_progress') return <Clock className="h-4 w-4 text-blue-500" />
     return <AlertCircle className="h-4 w-4 text-gray-400" />
+  }
+
+  // For a given task: find current user's assignee record
+  function myAssignee(task: TeamTask) {
+    return task.assignees.find((a) => a.id === user?.id) ?? null
   }
 
   return (
@@ -267,107 +279,179 @@ export default function TeamTasksPage() {
                   <th className="px-4 py-3 text-left">{t('team_tasks.col_remaining')}</th>
                   <th className="px-4 py-3 text-left">{t('team_tasks.col_reminder')}</th>
                   <th className="px-4 py-3 text-left">{t('team_tasks.col_status')}</th>
-                  {isManager && <th className="px-4 py-3" />}
+                  <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {tasks.map((task) => (
-                  <tr key={task.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900 dark:text-white">{task.title}</div>
-                      {task.description && <div className="text-xs text-gray-400 truncate max-w-[220px]">{task.description}</div>}
-                    </td>
-                    <td className="px-4 py-3">
-                      {task.assignees.length === 0 ? (
-                        <span className="text-gray-400 text-xs">{t('team_tasks.no_assignees')}</span>
-                      ) : (
-                        <div className="flex flex-wrap gap-1">
-                          {task.assignees.map((a) => (
-                            <span key={a.id} className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">{a.full_name}</span>
-                          ))}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap">
-                      {format(new Date(task.deadline), 'dd MMM yyyy', { locale: dateLocale })}
-                    </td>
-                    <td className="px-4 py-3">
-                      {task.status !== 'done' && <DaysLeftBadge deadline={task.deadline} />}
-                    </td>
-                    <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">
-                      {t('team_tasks.reminder_days_label', { n: task.reminder_days_before })}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1.5">
-                        <StatusIcon status={task.status} />
-                        <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${STATUS_COLORS[task.status]}`}>
-                          {t(`team_tasks.status_${task.status}`)}
-                        </span>
-                      </div>
-                    </td>
-                    {isManager && (
+                {tasks.map((task) => {
+                  const me = myAssignee(task)
+                  const doneCount = task.assignees.filter((a) => a.completed_at).length
+                  return (
+                    <tr key={task.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-1 justify-end">
-                          <button onClick={() => openEdit(task)} className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button onClick={() => handleDelete(task)} className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                        <div className="font-medium text-gray-900 dark:text-white">{task.title}</div>
+                        {task.description && <div className="text-xs text-gray-400 truncate max-w-[220px]">{task.description}</div>}
+                      </td>
+                      <td className="px-4 py-3">
+                        {task.assignees.length === 0 ? (
+                          <span className="text-gray-400 text-xs">{t('team_tasks.no_assignees')}</span>
+                        ) : (
+                          <div className="flex flex-col gap-0.5">
+                            {task.assignees.map((a) => (
+                              <div key={a.id} className="flex items-center gap-1">
+                                {a.completed_at
+                                  ? <Check className="h-3 w-3 text-green-500 shrink-0" />
+                                  : <span className="h-3 w-3 rounded-full border border-gray-300 dark:border-gray-600 shrink-0 inline-block" />
+                                }
+                                <span className={`text-xs ${a.completed_at ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                                  {a.full_name}
+                                </span>
+                              </div>
+                            ))}
+                            {task.assignees.length > 1 && (
+                              <span className="text-[10px] text-gray-400 mt-0.5">
+                                {t('team_tasks.completed_count', { done: doneCount, total: task.assignees.length })}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600 dark:text-gray-300 whitespace-nowrap">
+                        {format(new Date(task.deadline), 'dd MMM yyyy', { locale: dateLocale })}
+                      </td>
+                      <td className="px-4 py-3">
+                        {task.status !== 'done' && <DaysLeftBadge deadline={task.deadline} />}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">
+                        {t('team_tasks.reminder_days_label', { n: task.reminder_days_before })}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          <StatusIcon status={task.status} />
+                          <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${STATUS_COLORS[task.status]}`}>
+                            {t(`team_tasks.status_${task.status}`)}
+                          </span>
                         </div>
                       </td>
-                    )}
-                  </tr>
-                ))}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1 justify-end">
+                          {/* Per-user completion toggle — shown if current user is an assignee */}
+                          {me && (
+                            <button
+                              onClick={() => handleToggleComplete(task.id)}
+                              disabled={completeTask.isPending}
+                              title={me.completed_at ? t('team_tasks.mark_undone') : t('team_tasks.mark_done')}
+                              className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                                me.completed_at
+                                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50'
+                                  : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                              }`}
+                            >
+                              {me.completed_at
+                                ? <><RotateCcw className="h-3 w-3" />{t('team_tasks.mark_undone')}</>
+                                : <><Check className="h-3 w-3" />{t('team_tasks.mark_done')}</>
+                              }
+                            </button>
+                          )}
+                          {isManager && (
+                            <>
+                              <button onClick={() => openEdit(task)} className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                              <button onClick={() => handleDelete(task)} className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
 
           {/* Mobile cards */}
           <div className="md:hidden space-y-3">
-            {tasks.map((task) => (
-              <div key={task.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-900 dark:text-white">{task.title}</div>
-                    {task.description && <div className="text-xs text-gray-400 mt-0.5 line-clamp-2">{task.description}</div>}
+            {tasks.map((task) => {
+              const me = myAssignee(task)
+              const doneCount = task.assignees.filter((a) => a.completed_at).length
+              return (
+                <div key={task.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-gray-900 dark:text-white">{task.title}</div>
+                      {task.description && <div className="text-xs text-gray-400 mt-0.5 line-clamp-2">{task.description}</div>}
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <StatusIcon status={task.status} />
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${STATUS_COLORS[task.status]}`}>
+                        {t(`team_tasks.status_${task.status}`)}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <StatusIcon status={task.status} />
-                    <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${STATUS_COLORS[task.status]}`}>
-                      {t(`team_tasks.status_${task.status}`)}
-                    </span>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400 mb-2">
+                    <span>{format(new Date(task.deadline), 'dd MMM yyyy', { locale: dateLocale })}</span>
+                    {task.status !== 'done' && <DaysLeftBadge deadline={task.deadline} />}
+                    <span>{t('team_tasks.reminder_days_label', { n: task.reminder_days_before })}</span>
                   </div>
-                </div>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400 mb-2">
-                  <span>{format(new Date(task.deadline), 'dd MMM yyyy', { locale: dateLocale })}</span>
-                  {task.status !== 'done' && <DaysLeftBadge deadline={task.deadline} />}
-                  <span>{t('team_tasks.reminder_days_label', { n: task.reminder_days_before })}</span>
-                </div>
-                {task.assignees.length > 0 && (
-                  <div className="flex flex-wrap gap-1 mb-2">
-                    {task.assignees.map((a) => (
-                      <span key={a.id} className="text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">{a.full_name}</span>
-                    ))}
-                  </div>
-                )}
-                {isManager && (
+                  {task.assignees.length > 0 && (
+                    <div className="flex flex-col gap-0.5 mb-2">
+                      {task.assignees.map((a) => (
+                        <div key={a.id} className="flex items-center gap-1">
+                          {a.completed_at
+                            ? <Check className="h-3 w-3 text-green-500 shrink-0" />
+                            : <span className="h-3 w-3 rounded-full border border-gray-300 dark:border-gray-600 shrink-0 inline-block" />
+                          }
+                          <span className={`text-xs ${a.completed_at ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                            {a.full_name}
+                          </span>
+                        </div>
+                      ))}
+                      {task.assignees.length > 1 && (
+                        <span className="text-[10px] text-gray-400">
+                          {t('team_tasks.completed_count', { done: doneCount, total: task.assignees.length })}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <div className="flex gap-1 justify-end pt-2 border-t border-gray-100 dark:border-gray-800">
-                    <button onClick={() => openEdit(task)} className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => handleDelete(task)} className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {me && (
+                      <button
+                        onClick={() => handleToggleComplete(task.id)}
+                        disabled={completeTask.isPending}
+                        className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${
+                          me.completed_at
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                            : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300'
+                        }`}
+                      >
+                        {me.completed_at
+                          ? <><RotateCcw className="h-3 w-3" />{t('team_tasks.mark_undone')}</>
+                          : <><Check className="h-3 w-3" />{t('team_tasks.mark_done')}</>
+                        }
+                      </button>
+                    )}
+                    {isManager && (
+                      <>
+                        <button onClick={() => openEdit(task)} className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => handleDelete(task)} className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </>
+                    )}
                   </div>
-                )}
-              </div>
-            ))}
+                </div>
+              )
+            })}
           </div>
         </>
       )}
 
-      {showModal && <TaskModal task={modalTask as TeamTask | null} onClose={closeModal} />}
+      {showModal && <TaskModal task={modalTask} onClose={closeModal} />}
     </div>
   )
 }

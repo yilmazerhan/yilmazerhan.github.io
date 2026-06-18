@@ -1130,6 +1130,9 @@
     "popup_title": "Your Assigned Tasks",
     "popup_subtitle": "The following tasks are assigned to you and not yet completed.",
     "popup_no_tasks": "You have no pending assigned tasks.",
-    "go_to_tasks": "Go to Task List"
+    "go_to_tasks": "Go to Task List",
+    "mark_done": "Mark Done",
+    "mark_undone": "Undo",
+    "completed_count": "{{done}} / {{total}} completed"
   }
 }

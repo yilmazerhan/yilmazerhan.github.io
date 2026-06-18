@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 from typing import List, Optional
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,8 +40,7 @@ class TeamTaskService:
         self.db.add(task)
         await self.db.flush()
         await self._set_assignees(task.id, assignee_ids)
-        await self.db.refresh(task, ["assignees", "creator"])
-        return task
+        return await self.get_task(task.id)
 
     async def update_task(self, task_id: uuid.UUID, data: dict) -> TeamTask:
         task = await self.get_task(task_id)
@@ -54,15 +54,29 @@ class TeamTaskService:
 
         if assignee_ids is not None:
             await self._set_assignees(task.id, assignee_ids)
-            await self.db.refresh(task, ["assignees"])
 
         await self.db.flush()
-        return task
+        return await self.get_task(task_id)
 
     async def delete_task(self, task_id: uuid.UUID) -> None:
         task = await self.get_task(task_id)
         await self.db.delete(task)
         await self.db.flush()
+
+    async def toggle_complete(self, task_id: uuid.UUID, user_id: uuid.UUID) -> TeamTask:
+        result = await self.db.execute(
+            select(TeamTaskAssignee).where(
+                TeamTaskAssignee.team_task_id == task_id,
+                TeamTaskAssignee.user_id == user_id,
+            )
+        )
+        record = result.scalar_one_or_none()
+        if not record:
+            raise NotFoundError("Bu göreve atanmış değilsiniz")
+
+        record.completed_at = None if record.completed_at is not None else datetime.now(timezone.utc)
+        await self.db.flush()
+        return await self.get_task(task_id)
 
     async def _set_assignees(self, task_id: uuid.UUID, assignee_ids: List[uuid.UUID]) -> None:
         await self.db.execute(

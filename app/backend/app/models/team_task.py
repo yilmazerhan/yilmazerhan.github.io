@@ -8,6 +8,34 @@ from sqlalchemy.sql import func
 from app.database import Base
 
 
+class TeamTaskAssignee(Base):
+    __tablename__ = "team_task_assignees"
+
+    team_task_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("team_tasks.id", ondelete="CASCADE"), primary_key=True
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Loaded via JOIN so it's always available without a separate query
+    user: Mapped["User"] = relationship("User", lazy="joined")
+
+    # Properties so Pydantic can serialize this as TeamTaskAssigneeInfo
+    @property
+    def id(self) -> uuid.UUID:
+        return self.user_id
+
+    @property
+    def full_name(self) -> str:
+        return self.user.full_name
+
+    @property
+    def email(self) -> str:
+        return self.user.email
+
+
 class TeamTask(Base):
     __tablename__ = "team_tasks"
 
@@ -26,19 +54,9 @@ class TeamTask(Base):
     )
 
     creator: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by])
-    assignees: Mapped[List["User"]] = relationship(
-        "User",
-        secondary="team_task_assignees",
+    # Returns TeamTaskAssignee objects (not User objects) — includes completed_at
+    assignees: Mapped[List["TeamTaskAssignee"]] = relationship(
+        "TeamTaskAssignee",
         lazy="selectin",
-    )
-
-
-class TeamTaskAssignee(Base):
-    __tablename__ = "team_task_assignees"
-
-    team_task_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("team_tasks.id", ondelete="CASCADE"), primary_key=True
-    )
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+        cascade="all, delete-orphan",
     )

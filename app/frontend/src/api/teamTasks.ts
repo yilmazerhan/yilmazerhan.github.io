@@ -5,6 +5,7 @@ export interface TeamTaskUser {
   id: string
   full_name: string
   email: string
+  completed_at: string | null
 }
 
 export interface TeamTask {
@@ -71,6 +72,15 @@ export function useDeleteTeamTask() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => apiClient.delete(`/team-tasks/${id}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: teamTaskKeys.all }),
+  })
+}
+
+export function useCompleteTeamTask() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiClient.patch<TeamTask>(`/team-tasks/${id}/complete`).then((r) => r.data),
     onSuccess: () => qc.invalidateQueries({ queryKey: teamTaskKeys.all }),
   })
 }
