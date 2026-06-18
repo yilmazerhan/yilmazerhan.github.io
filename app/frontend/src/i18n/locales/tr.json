@@ -64,7 +64,8 @@
     "backup": "Yedek",
     "inventory": "Envanter",
     "patches": "Müşteri Yamaları",
-    "announcements": "Duyurular"
+    "announcements": "Duyurular",
+    "team_tasks": "Takım Görevleri"
   },
   "dashboard": {
     "total_tasks": "Toplam Görev",
@@ -1101,5 +1102,30 @@
     "version_placeholder": "örn. 2026.05.15.1",
     "ticket_placeholder": "örn. PROJ-123",
     "env_placeholder": "örn. production"
+  },
+  "team_tasks": {
+    "title": "Takım Görevleri",
+    "description": "Tüm ekibe atanan görevler ve son tarihleri",
+    "new_task": "Yeni Görev",
+    "edit_task": "Görevi Düzenle",
+    "deadline": "Son Tarih",
+    "reminder_days": "Hatırlatma (gün)",
+    "reminder_days_label": "{{n}} gün önce",
+    "status": "Durum",
+    "assignees": "Atananlar",
+    "no_assignees": "Atanan yok",
+    "col_title": "Görev",
+    "col_assignees": "Atananlar",
+    "col_deadline": "Son Tarih",
+    "col_remaining": "Kalan",
+    "col_reminder": "Hatırlatma",
+    "col_status": "Durum",
+    "status_pending": "Bekliyor",
+    "status_in_progress": "Devam Ediyor",
+    "status_done": "Tamamlandı",
+    "overdue": "Gecikmiş",
+    "today": "Bugün",
+    "empty": "Henüz takım görevi yok.",
+    "confirm_delete": "Bu görevi silmek istediğinize emin misiniz?"
   }
 }

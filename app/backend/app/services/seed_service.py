@@ -240,6 +240,31 @@ SYSTEM_EMAIL_TEMPLATES = [
         },
         "is_system": True,
     },
+    {
+        "name": "Takım Görevi Hatırlatıcı",
+        "slug": "team_task_reminder",
+        "subject": "Takım Görevi Hatırlatması: {{ task_title }}",
+        "html_body": """<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;">
+{% if app_name %}<p style="font-size:1.1em;font-weight:bold;color:#1d4ed8;">{{ app_name }}</p>{% endif %}
+<h2 style="color:#111827;">Merhaba {{ assignee_name }},</h2>
+<p><strong>{{ task_title }}</strong> görevi için son tarihe <strong>{{ days_left }} gün</strong> kaldı.</p>
+<table style="border-collapse:collapse;margin:16px 0;">
+  <tr><td style="padding:4px 12px 4px 0;font-weight:bold;">Son Tarih:</td><td style="padding:4px 0;">{{ deadline }}</td></tr>
+  {% if description %}<tr><td style="padding:4px 12px 4px 0;font-weight:bold;vertical-align:top;">Açıklama:</td><td style="padding:4px 0;">{{ description }}</td></tr>{% endif %}
+</table>
+{% if app_url %}<p style="color:#6b7280;font-size:0.9em;">Detaylar için: <a href="{{ app_url }}" style="color:#3b82f6;">{{ app_url }}</a></p>{% endif %}
+</div>""",
+        "available_vars": {
+            "task_title": "Görev başlığı",
+            "assignee_name": "Atanan kişi adı",
+            "deadline": "Son tarih",
+            "days_left": "Kalan gün sayısı",
+            "description": "Görev açıklaması (isteğe bağlı)",
+            "app_name": "Uygulama adı (otomatik)",
+            "app_url": "Uygulama URL (otomatik)",
+        },
+        "is_system": True,
+    },
 ]
 
 

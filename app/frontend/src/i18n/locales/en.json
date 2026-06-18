@@ -64,7 +64,8 @@
     "backup": "Backup",
     "inventory": "Inventory",
     "patches": "Customer Patches",
-    "announcements": "Announcements"
+    "announcements": "Announcements",
+    "team_tasks": "Team Tasks"
   },
   "dashboard": {
     "total_tasks": "Total Tasks",
@@ -1101,5 +1102,30 @@
     "version_placeholder": "e.g. 2026.05.15.1",
     "ticket_placeholder": "e.g. PROJ-123",
     "env_placeholder": "e.g. production"
+  },
+  "team_tasks": {
+    "title": "Team Tasks",
+    "description": "Tasks assigned to the whole team with deadlines",
+    "new_task": "New Task",
+    "edit_task": "Edit Task",
+    "deadline": "Deadline",
+    "reminder_days": "Reminder (days)",
+    "reminder_days_label": "{{n}} days before",
+    "status": "Status",
+    "assignees": "Assignees",
+    "no_assignees": "No assignees",
+    "col_title": "Task",
+    "col_assignees": "Assignees",
+    "col_deadline": "Deadline",
+    "col_remaining": "Remaining",
+    "col_reminder": "Reminder",
+    "col_status": "Status",
+    "status_pending": "Pending",
+    "status_in_progress": "In Progress",
+    "status_done": "Done",
+    "overdue": "Overdue",
+    "today": "Today",
+    "empty": "No team tasks yet.",
+    "confirm_delete": "Are you sure you want to delete this task?"
   }
 }

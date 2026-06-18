@@ -341,6 +341,7 @@ class EmailService:
         workflow_id: Optional[uuid.UUID] = None,
         template_id: Optional[uuid.UUID] = None,
         recipient_id: Optional[uuid.UUID] = None,
+        team_task_id: Optional[uuid.UUID] = None,
     ) -> EmailLog:
         log = EmailLog(
             workflow_id=workflow_id,
@@ -349,6 +350,7 @@ class EmailService:
             to_email=to_email,
             subject=subject,
             status="pending",
+            team_task_id=team_task_id,
         )
         self.db.add(log)
         await self.db.flush()

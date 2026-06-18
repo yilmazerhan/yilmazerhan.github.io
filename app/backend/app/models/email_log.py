@@ -32,6 +32,9 @@ class EmailLog(Base):
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
+    team_task_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("team_tasks.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     workflow: Mapped[Optional["EmailWorkflow"]] = relationship("EmailWorkflow", back_populates="logs")
     template: Mapped[Optional["EmailTemplate"]] = relationship("EmailTemplate", back_populates="logs")

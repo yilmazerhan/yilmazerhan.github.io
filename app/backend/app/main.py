@@ -18,6 +18,7 @@ from app.routers.export import router as export_router
 from app.routers.inventory import router as inventory_router
 from app.routers.announcements import router as announcements_router
 from app.routers.patch import router as patch_router
+from app.routers.team_tasks import router as team_tasks_router
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +90,7 @@ async def _run_email_jobs() -> None:
     """Run every scheduled email job once. Each is isolated so one failure
     does not prevent the others from running."""
     from app.database import AsyncSessionLocal
-    from app.tasks.email_tasks import _evaluate_workflows_async, _send_worklog_reminders_async
+    from app.tasks.email_tasks import _evaluate_workflows_async, _send_worklog_reminders_async, _send_team_task_reminders_async
     from app.services.inventory_service import run_due_inventory_schedules
     from app.services.report_schedule_service import run_due_report_schedules
 
@@ -117,6 +118,12 @@ async def _run_email_jobs() -> None:
         await _send_worklog_reminders_async()
     except Exception as exc:
         logger.warning("In-process scheduler: worklog reminders failed: %s", exc)
+
+    try:
+        # Self-gated to 09:00 Europe/Istanbul; a no-op at other times.
+        await _send_team_task_reminders_async()
+    except Exception as exc:
+        logger.warning("In-process scheduler: team task reminders failed: %s", exc)
 
 
 @asynccontextmanager
@@ -218,6 +225,7 @@ app.include_router(export_router, prefix="/api/v1")
 app.include_router(inventory_router, prefix="/api/v1")
 app.include_router(announcements_router, prefix="/api/v1")
 app.include_router(patch_router, prefix="/api/v1")
+app.include_router(team_tasks_router, prefix="/api/v1")
 
 
 # ─── Health check ─────────────────────────────────────────────────────────

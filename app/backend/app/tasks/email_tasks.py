@@ -871,3 +871,100 @@ async def _send_worklog_reminders_async():
             logger.info("send_worklog_reminders: done for %s", today)
     finally:
         await engine.dispose()
+
+
+_TEAM_TASK_REMINDER_HOUR = 9  # 09:00 Europe/Istanbul
+
+
+async def _send_team_task_reminders_async():
+    """Send daily deadline reminders for team tasks.
+
+    For each team task where status != 'done' and today <= deadline and
+    today >= deadline - reminder_days_before, sends one email per assignee.
+    Gated to 09:00 Europe/Istanbul; safe to call every 15 min due to
+    per-task/per-user EmailLog dedup.
+    """
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+    from sqlalchemy import select, func
+    from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+    from sqlalchemy.pool import NullPool
+    from sqlalchemy.orm import selectinload
+    from app.models.team_task import TeamTask
+    from app.models.email_log import EmailLog
+    from app.services.email_service import EmailService
+    from app.config import settings
+
+    now_ist = datetime.now(ZoneInfo("Europe/Istanbul"))
+    if now_ist.hour != _TEAM_TASK_REMINDER_HOUR:
+        return
+
+    today = now_ist.date()
+
+    engine = create_async_engine(settings.DATABASE_URL, poolclass=NullPool)
+    Session = async_sessionmaker(engine, expire_on_commit=False)
+    try:
+        async with Session() as db:
+            svc = EmailService(db)
+
+            template = await svc.get_template_by_slug("team_task_reminder")
+            if not template:
+                logger.warning("_send_team_task_reminders_async: template 'team_task_reminder' not found")
+                return
+
+            result = await db.execute(
+                select(TeamTask)
+                .options(selectinload(TeamTask.assignees))
+                .where(
+                    TeamTask.status != "done",
+                    TeamTask.deadline >= today,
+                )
+            )
+            tasks = result.scalars().all()
+
+            for task in tasks:
+                days_left = (task.deadline - today).days
+                if days_left > task.reminder_days_before:
+                    continue
+
+                for assignee in task.assignees:
+                    # Dedup: check if already sent today for this task+user
+                    today_start = datetime.combine(today, datetime.min.time()).replace(tzinfo=timezone.utc)
+                    sent_count = (await db.execute(
+                        select(func.count()).where(
+                            EmailLog.team_task_id == task.id,
+                            EmailLog.recipient_id == assignee.id,
+                            EmailLog.status.in_(["sent", "pending"]),
+                            EmailLog.created_at >= today_start,
+                        )
+                    )).scalar_one()
+                    if sent_count > 0:
+                        continue
+
+                    subject, html = svc.render_template(template, {
+                        "task_title": task.title,
+                        "assignee_name": assignee.full_name,
+                        "deadline": str(task.deadline),
+                        "days_left": days_left,
+                        "description": task.description or "",
+                    })
+
+                    log = await svc.create_log_entry(
+                        to_email=assignee.email,
+                        subject=subject,
+                        template_id=template.id,
+                        recipient_id=assignee.id,
+                        team_task_id=task.id,
+                    )
+                    await db.commit()
+
+                    await _dispatch_email_inline(db, assignee.email, subject, html, str(log.id))
+                    await db.commit()
+                    logger.info(
+                        "_send_team_task_reminders_async: sent reminder for task %s to %s",
+                        task.id, assignee.email,
+                    )
+
+            logger.info("_send_team_task_reminders_async: done for %s", today)
+    finally:
+        await engine.dispose()
