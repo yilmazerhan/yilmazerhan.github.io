@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format } from 'date-fns'
 import { tr, enUS } from 'date-fns/locale'
-import { Plus, Pencil, Trash2, Loader2, CheckCircle2, Clock, AlertCircle, Users } from 'lucide-react'
+import { Plus, Pencil, Trash2, Loader2, CheckCircle2, Clock, AlertCircle, Users, Search } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import {
   useTeamTasks,
@@ -51,6 +51,7 @@ function TaskModal({ task, onClose }: TaskModalProps) {
   const [reminderDays, setReminderDays] = useState(task?.reminder_days_before ?? 3)
   const [status, setStatus] = useState(task?.status ?? 'pending')
   const [assigneeIds, setAssigneeIds] = useState<string[]>(task?.assignees.map((a) => a.id) ?? [])
+  const [assigneeSearch, setAssigneeSearch] = useState('')
   const [error, setError] = useState('')
 
   function toggleAssignee(id: string) {
@@ -148,21 +149,38 @@ function TaskModal({ task, onClose }: TaskModalProps) {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('team_tasks.assignees')}</label>
-            <div className="border border-gray-200 dark:border-gray-700 rounded-lg max-h-48 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
-              {usersLoading ? (
-                <p className="text-sm text-gray-400 p-3">{t('common.loading')}</p>
-              ) : users.map((u) => (
-                <label key={u.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
-                  <input
-                    type="checkbox"
-                    checked={assigneeIds.includes(u.id)}
-                    onChange={() => toggleAssignee(u.id)}
-                    className="rounded"
-                  />
-                  <span className="text-sm text-gray-900 dark:text-white">{u.full_name}</span>
-                  <span className="text-xs text-gray-400 ml-auto">{u.email}</span>
-                </label>
-              ))}
+            <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+              <div className="relative border-b border-gray-200 dark:border-gray-700">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                <input
+                  type="text"
+                  value={assigneeSearch}
+                  onChange={(e) => setAssigneeSearch(e.target.value)}
+                  placeholder={t('common.search')}
+                  className="w-full pl-8 pr-3 py-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none"
+                />
+              </div>
+              <div className="max-h-44 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-800">
+                {usersLoading ? (
+                  <p className="text-sm text-gray-400 p-3">{t('common.loading')}</p>
+                ) : users
+                    .filter((u) => {
+                      const q = assigneeSearch.toLowerCase()
+                      return !q || u.full_name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
+                    })
+                    .map((u) => (
+                      <label key={u.id} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
+                        <input
+                          type="checkbox"
+                          checked={assigneeIds.includes(u.id)}
+                          onChange={() => toggleAssignee(u.id)}
+                          className="rounded"
+                        />
+                        <span className="text-sm text-gray-900 dark:text-white">{u.full_name}</span>
+                        <span className="text-xs text-gray-400 ml-auto">{u.email}</span>
+                      </label>
+                    ))}
+              </div>
             </div>
           </div>
 
