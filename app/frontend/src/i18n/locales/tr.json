@@ -1126,6 +1126,10 @@
     "overdue": "Gecikmiş",
     "today": "Bugün",
     "empty": "Henüz takım görevi yok.",
-    "confirm_delete": "Bu görevi silmek istediğinize emin misiniz?"
+    "confirm_delete": "Bu görevi silmek istediğinize emin misiniz?",
+    "popup_title": "Atanmış Görevleriniz",
+    "popup_subtitle": "Tamamlanmamış ve son tarihi geçmemiş görevleriniz aşağıda listelenmiştir.",
+    "popup_no_tasks": "Tamamlanmamış atanmış göreviniz yok.",
+    "go_to_tasks": "Görev Listesine Git"
   }
 }

@@ -241,7 +241,7 @@ export default function TeamTasksPage() {
           {/* Desktop table */}
           <div className="hidden md:block bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 dark:bg-gray-800 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+              <thead className="bg-gray-50 dark:bg-gray-800 text-xs font-medium text-gray-500 dark:text-gray-400 tracking-wide">
                 <tr>
                   <th className="px-4 py-3 text-left">{t('team_tasks.col_title')}</th>
                   <th className="px-4 py-3 text-left">{t('team_tasks.col_assignees')}</th>
