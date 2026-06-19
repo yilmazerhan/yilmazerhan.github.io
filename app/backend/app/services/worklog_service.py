@@ -8,7 +8,6 @@ from sqlalchemy.orm import selectinload
 
 from app.models.worklog import WorkLog, WorkType
 from app.models.user import User
-from app.core.permissions import can_edit_worklog, can_delete_worklog
 from app.core.exceptions import (
     NotFoundError, ForbiddenError, ValidationError
 )
@@ -17,6 +16,31 @@ from app.core.exceptions import (
 class WorkLogService:
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    async def _manager_shares_team_with_log_owner(self, requester: User, log: WorkLog) -> bool:
+        """Return True if the team_manager shares at least one team with the log's owner.
+
+        Uses the junction table (user_teams) — the authoritative source of team membership —
+        instead of the denormalized team_id FK on the User model which may lag behind.
+        """
+        from app.models.user_team import user_teams
+        shared = await self.db.execute(
+            select(user_teams.c.team_id).where(
+                user_teams.c.user_id == requester.id,
+                user_teams.c.team_id.in_(
+                    select(user_teams.c.team_id).where(user_teams.c.user_id == log.user_id)
+                ),
+            ).limit(1)
+        )
+        return shared.scalar_one_or_none() is not None
+
+    async def _can_edit_log(self, requester: User, log: WorkLog) -> bool:
+        if requester.role == "superadmin":
+            return True
+        if requester.role == "team_manager":
+            return await self._manager_shares_team_with_log_owner(requester, log)
+        age_days = (date.today() - log.log_date).days
+        return requester.id == log.user_id and age_days <= 3
 
     # ─── Work Types ──────────────────────────────────────────────────────────
     async def list_work_types(self, active_only: bool = True) -> list[WorkType]:
@@ -196,7 +220,7 @@ class WorkLogService:
     ) -> WorkLog:
         log = await self._get_log_with_user(log_id)
 
-        if not can_edit_worklog(requester, log):
+        if not await self._can_edit_log(requester, log):
             age = (date.today() - log.log_date).days
             if age > 3:
                 raise ForbiddenError("3 günden eski kayıtları yalnızca ekip yöneticisi veya superadmin düzenleyebilir.")
@@ -224,7 +248,7 @@ class WorkLogService:
 
     async def delete_log(self, log_id: uuid.UUID, requester: User) -> None:
         log = await self._get_log_with_user(log_id)
-        if not can_delete_worklog(requester, log):
+        if not await self._can_edit_log(requester, log):
             raise ForbiddenError("Bu kaydı silme yetkiniz yok.")
         await self.db.delete(log)
         await self.db.flush()

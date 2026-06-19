@@ -101,9 +101,20 @@ async def create_log(
             raise ForbiddenError("Başkası adına kayıt oluşturma yetkiniz yok.")
         if current_user.role == "team_manager":
             from app.models.user import User as UserModel
-            result = await db.execute(sa_select(UserModel).where(UserModel.id == body.target_user_id, UserModel.is_deleted == False))
-            target_user = result.scalar_one_or_none()
-            if not target_user or target_user.team_id != current_user.team_id:
+            from app.models.user_team import user_teams as ut
+            target_exists = await db.execute(sa_select(UserModel.id).where(UserModel.id == body.target_user_id, UserModel.is_deleted == False))
+            if not target_exists.scalar_one_or_none():
+                raise ForbiddenError("Bu kullanıcı sizin takımınızda değil.")
+            # Use the junction table (authoritative) instead of the stale team_id FK
+            shared = await db.execute(
+                sa_select(ut.c.team_id).where(
+                    ut.c.user_id == current_user.id,
+                    ut.c.team_id.in_(
+                        sa_select(ut.c.team_id).where(ut.c.user_id == body.target_user_id)
+                    ),
+                ).limit(1)
+            )
+            if not shared.scalar_one_or_none():
                 raise ForbiddenError("Bu kullanıcı sizin takımınızda değil.")
         target_id = body.target_user_id
     svc = WorkLogService(db)
