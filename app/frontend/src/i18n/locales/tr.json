@@ -1133,6 +1133,11 @@
     "go_to_tasks": "Görev Listesine Git",
     "mark_done": "Tamamlandı",
     "mark_undone": "Geri Al",
-    "completed_count": "{{done}} / {{total}} tamamlandı"
+    "completed_count": "{{done}} / {{total}} tamamlandı",
+    "filter_title": "Görev adı ara...",
+    "filter_from": "Başlangıç tarihi",
+    "filter_to": "Bitiş tarihi",
+    "clear_filters": "Filtreleri Temizle",
+    "no_results": "Arama kriterlerine uygun görev bulunamadı."
   }
 }

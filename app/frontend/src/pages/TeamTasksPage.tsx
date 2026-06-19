@@ -209,6 +209,18 @@ export default function TeamTasksPage() {
 
   const [modalTask, setModalTask] = useState<TeamTask | null>(null)
   const [showModal, setShowModal] = useState(false)
+  const [filterTitle, setFilterTitle] = useState('')
+  const [filterFrom, setFilterFrom] = useState('')
+  const [filterTo, setFilterTo] = useState('')
+
+  const filtered = tasks.filter((task) => {
+    if (filterTitle && !task.title.toLowerCase().includes(filterTitle.toLowerCase())) return false
+    if (filterFrom && task.deadline < filterFrom) return false
+    if (filterTo && task.deadline > filterTo) return false
+    return true
+  })
+
+  const hasFilter = filterTitle || filterFrom || filterTo
 
   function openCreate() { setModalTask(null); setShowModal(true) }
   function openEdit(task: TeamTask) { setModalTask(task); setShowModal(true) }
@@ -254,6 +266,45 @@ export default function TeamTasksPage() {
         )}
       </div>
 
+      {/* Filter bar */}
+      <div className="flex flex-wrap gap-3 items-end">
+        <div className="relative flex-1 min-w-48">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            value={filterTitle}
+            onChange={(e) => setFilterTitle(e.target.value)}
+            placeholder={t('team_tasks.filter_title')}
+            className="w-full pl-9 pr-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={filterFrom}
+            onChange={(e) => setFilterFrom(e.target.value)}
+            title={t('team_tasks.filter_from')}
+            className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+          <span className="text-gray-400 text-sm">–</span>
+          <input
+            type="date"
+            value={filterTo}
+            onChange={(e) => setFilterTo(e.target.value)}
+            title={t('team_tasks.filter_to')}
+            className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+        </div>
+        {hasFilter && (
+          <button
+            onClick={() => { setFilterTitle(''); setFilterFrom(''); setFilterTo('') }}
+            className="px-3 py-2 rounded-lg text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 border border-gray-300 dark:border-gray-700"
+          >
+            {t('team_tasks.clear_filters')}
+          </button>
+        )}
+      </div>
+
       {isLoading ? (
         <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-gray-400" /></div>
       ) : tasks.length === 0 ? (
@@ -265,6 +316,11 @@ export default function TeamTasksPage() {
               {t('team_tasks.new_task')}
             </button>
           )}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="border border-dashed border-gray-300 dark:border-gray-700 rounded-xl p-12 text-center">
+          <Search className="h-10 w-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+          <p className="text-gray-400 dark:text-gray-500">{t('team_tasks.no_results')}</p>
         </div>
       ) : (
         <>
@@ -283,7 +339,7 @@ export default function TeamTasksPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                {tasks.map((task) => {
+                {filtered.map((task) => {
                   const me = myAssignee(task)
                   const doneCount = task.assignees.filter((a) => a.completed_at).length
                   return (

@@ -1133,6 +1133,11 @@
     "go_to_tasks": "Go to Task List",
     "mark_done": "Mark Done",
     "mark_undone": "Undo",
-    "completed_count": "{{done}} / {{total}} completed"
+    "completed_count": "{{done}} / {{total}} completed",
+    "filter_title": "Search by task name...",
+    "filter_from": "Deadline from",
+    "filter_to": "Deadline to",
+    "clear_filters": "Clear Filters",
+    "no_results": "No tasks match the search criteria."
   }
 }
