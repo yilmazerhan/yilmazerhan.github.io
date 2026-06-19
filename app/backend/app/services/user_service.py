@@ -386,11 +386,19 @@ class UserService:
         if requester.role == "superadmin":
             pass  # full access
         elif requester.role == "team_manager":
-            if (
-                target.team_id is None
-                or target.team_id != requester.team_id
-                or target.role in ("superadmin", "team_manager")
-            ):
+            # Reject attempts to change another manager's or admin's password
+            if target.role in ("superadmin", "team_manager"):
+                raise ForbiddenError("Bu kullanıcının şifresini değiştirme yetkiniz yok.")
+            # Use the junction table (authoritative) instead of the stale team_id FK
+            shared = await self.db.execute(
+                select(user_teams.c.team_id).where(
+                    user_teams.c.user_id == requester.id,
+                    user_teams.c.team_id.in_(
+                        select(user_teams.c.team_id).where(user_teams.c.user_id == target_user_id)
+                    ),
+                ).limit(1)
+            )
+            if not shared.scalar_one_or_none():
                 raise ForbiddenError("Bu kullanıcının şifresini değiştirme yetkiniz yok.")
         else:
             raise ForbiddenError("Bu işlem için yetkiniz yok.")
