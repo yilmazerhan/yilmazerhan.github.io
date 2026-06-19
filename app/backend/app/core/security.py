@@ -14,6 +14,10 @@ from app.config import settings
 
 _ph = PasswordHasher(time_cost=3, memory_cost=65536, parallelism=2, hash_len=32, salt_len=16)
 
+# Pre-computed dummy hash used during login to run verify_password even when
+# the username does not exist, preventing timing-based user enumeration.
+DUMMY_PASSWORD_HASH = _ph.hash("__dummy_constant_password_for_timing_protection__")
+
 
 # ─── Password ──────────────────────────────────────────────────────────────
 def hash_password(password: str) -> str:

@@ -12,6 +12,7 @@ from app.core.security import (
     hash_password, verify_password, needs_rehash,
     create_access_token, generate_refresh_token, hash_token,
     generate_secure_token, password_reset_expire, activation_token_expire,
+    DUMMY_PASSWORD_HASH,
 )
 from app.core.exceptions import (
     AuthenticationError, ForbiddenError, ConflictError, NotFoundError, ValidationError
@@ -125,7 +126,10 @@ class AuthService:
             select(User).where(User.username == username.lower(), User.is_deleted == False)
         )
         user = result.scalar_one_or_none()
-        if not user or not verify_password(password, user.hashed_password):
+        # Always run verify_password (against a dummy hash if user not found) so
+        # the response time does not reveal whether the username exists.
+        password_ok = verify_password(password, user.hashed_password if user else DUMMY_PASSWORD_HASH)
+        if not user or not password_ok:
             raise AuthenticationError("Kullanıcı adı veya şifre hatalı.")
         if not user.is_active:
             raise ForbiddenError("Hesabınız aktif değil. Lütfen yöneticinizle iletişime geçin.")
@@ -211,12 +215,23 @@ class AuthService:
             asyncio.ensure_future(_write_auth_audit(user_id, "logout", ip, user_agent))
 
     async def forgot_password(self, email: str) -> Optional[tuple[User, str]]:
-        """Returns (user, raw_token) or None if user not found (silently succeed for security)."""
+        """Returns (user, raw_token) or None if user not found (silently succeed for security).
+
+        A minimum constant delay is applied regardless of whether the user exists so that
+        timing differences cannot be used to enumerate valid email addresses.
+        """
+        import time
+        _start = time.monotonic()
+        _MIN_RESPONSE_TIME = 0.1  # seconds — enough to mask DB + token-gen variance
+
         result = await self.db.execute(
             select(User).where(User.email == email.lower(), User.is_deleted == False, User.is_active == True)
         )
         user = result.scalar_one_or_none()
         if not user:
+            elapsed = time.monotonic() - _start
+            if elapsed < _MIN_RESPONSE_TIME:
+                await asyncio.sleep(_MIN_RESPONSE_TIME - elapsed)
             return None
 
         raw_token, token_hash = generate_secure_token()
@@ -227,6 +242,10 @@ class AuthService:
         )
         self.db.add(record)
         await self.db.flush()
+
+        elapsed = time.monotonic() - _start
+        if elapsed < _MIN_RESPONSE_TIME:
+            await asyncio.sleep(_MIN_RESPONSE_TIME - elapsed)
         return user, raw_token
 
     async def reset_password(self, raw_token: str, new_password: str) -> User:

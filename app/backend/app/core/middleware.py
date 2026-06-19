@@ -114,7 +114,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "form-action 'self';"
         )
         if request.url.scheme == "https":
-            response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
+            response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
         return response
 
 
@@ -165,7 +165,8 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
 
             user_id = _extract_user_id(request)
             action = _method_to_action(request.method)
-            ip = request.client.host if request.client else None
+            from app.core.rate_limit import _get_real_ip
+            ip = _get_real_ip(request)
             user_agent = request.headers.get("user-agent")
 
             asyncio.ensure_future(

@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -15,6 +15,7 @@ from app.services.user_service import UserService
 from app.core.dependencies import (
     get_current_user, require_superadmin, require_manager_or_above
 )
+from app.core.rate_limit import limiter
 from app.tasks.email_tasks import send_auth_email_direct
 from app.config import settings
 
@@ -103,7 +104,9 @@ async def update_my_profile(
 
 
 @router.post("/me/change-password", response_model=MessageResponse)
+@limiter.limit("5/hour")
 async def change_password(
+    request: Request,
     body: ChangePasswordRequest,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
@@ -173,7 +176,9 @@ async def delete_user(
 
 
 @router.post("/{user_id}/set-password", response_model=MessageResponse)
+@limiter.limit("10/hour")
 async def admin_set_password(
+    request: Request,
     user_id: uuid.UUID,
     body: AdminSetPasswordRequest,
     current_user: Annotated[User, Depends(require_manager_or_above)],

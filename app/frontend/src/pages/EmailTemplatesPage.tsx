@@ -206,7 +206,7 @@ export default function EmailTemplatesPage() {
               <iframe
                 srcDoc={previewHtml}
                 className="flex-1 w-full bg-white"
-                sandbox="allow-same-origin"
+                sandbox=""
                 title="template-preview"
               />
             ) : (

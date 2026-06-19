@@ -54,10 +54,10 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":
         if self.ENVIRONMENT == "production":
-            if self.SECRET_KEY == _DEFAULT_SECRET or len(self.SECRET_KEY) < 32:
+            if self.SECRET_KEY == _DEFAULT_SECRET or len(self.SECRET_KEY) < 64:
                 raise ValueError(
-                    "SECRET_KEY must be a strong random value (≥32 chars) in production. "
-                    "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+                    "SECRET_KEY must be a strong random value (≥64 chars) in production. "
+                    "Generate one with: python -c \"import secrets; print(secrets.token_hex(64))\""
                 )
             if not self.SUPERADMIN_PASSWORD:
                 raise ValueError("SUPERADMIN_PASSWORD must be set in production.")

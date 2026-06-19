@@ -1,3 +1,5 @@
+import ipaddress
+
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from fastapi import Request
@@ -15,11 +17,26 @@ def _get_real_ip(request: Request) -> str:
 
     Explicitly NOT reading X-Forwarded-For so that attackers cannot bypass
     per-IP rate limits by spoofing that header.
+
+    X-Real-IP is only trusted in production: in development/testing the app
+    may be directly exposed (no nginx), so clients could forge the header to
+    bypass their own rate limits or cause rate-limiting of other IPs.
+
+    The X-Real-IP value is validated as a proper IP address before use to
+    prevent header injection attacks from a misconfigured upstream.
     """
-    # nginx sets X-Real-IP from the socket-level IP (not forwardable by client)
-    real_ip = request.headers.get("X-Real-IP")
-    if real_ip:
-        return real_ip.split(",")[0].strip()
+    from app.config import settings
+    # Only trust the nginx-set X-Real-IP header when running in production
+    # (i.e., behind an actual reverse-proxy that controls this header).
+    if settings.ENVIRONMENT == "production":
+        real_ip = request.headers.get("X-Real-IP", "").strip()
+        if real_ip:
+            try:
+                # Validate it's a proper IP address (rejects injected garbage)
+                ipaddress.ip_address(real_ip)
+                return real_ip
+            except ValueError:
+                pass  # Fall through to direct connection address
     # Direct connection (no proxy, or proxy is on localhost)
     if request.client:
         return request.client.host
