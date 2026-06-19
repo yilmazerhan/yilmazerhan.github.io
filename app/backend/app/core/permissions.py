@@ -93,15 +93,16 @@ def can_delete_worklog(current_user: User, log: WorkLog) -> bool:
 
 # ─── Kanban ───────────────────────────────────────────────────────────────
 def can_edit_task(current_user: User, task: Task) -> bool:
+    """Synchronous permission check for kanban task edits.
+
+    NOTE: The team_manager branch is intentionally omitted here.
+    Managers are verified asynchronously via the junction table in
+    KanbanService._can_manager_edit_task() before this function is called.
+    """
     if current_user.role == "superadmin":
         return True
     if current_user.id == task.assignee_id or current_user.id == task.created_by:
         return True
-    if current_user.role == "team_manager":
-        # Manager can edit tasks of their team members
-        assignee = task.assignee
-        if assignee and assignee.team_id == current_user.team_id:
-            return True
     return False
 
 

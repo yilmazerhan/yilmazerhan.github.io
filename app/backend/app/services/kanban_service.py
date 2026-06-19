@@ -56,6 +56,25 @@ class KanbanService:
         )
         return result.scalar_one() > 0
 
+    async def _can_manager_edit_task(self, requester: User, task: Task) -> bool:
+        """Async junction-table check: can this team_manager edit/move/delete the task?
+
+        A manager may edit a task if the assignee (or creator, if unassigned) belongs
+        to any team the manager manages, verified via the user_teams junction table.
+        """
+        target_uid = task.assignee_id or task.created_by
+        if target_uid is None:
+            return False
+        result = await self.db.execute(
+            select(user_teams.c.team_id).where(
+                user_teams.c.user_id == requester.id,
+                user_teams.c.team_id.in_(
+                    select(user_teams.c.team_id).where(user_teams.c.user_id == target_uid)
+                ),
+            ).limit(1)
+        )
+        return result.scalar_one_or_none() is not None
+
     async def _can_see_board(self, board: KanbanBoard, requester: User) -> bool:
         """Check if requester can see the given board."""
         if not board.is_personal:
@@ -573,7 +592,8 @@ class KanbanService:
     ) -> Task:
         task = await self._get_task(task_id)
         if not can_edit_task(requester, task):
-            raise ForbiddenError("Bu görevi düzenleme yetkiniz yok.")
+            if requester.role != "team_manager" or not await self._can_manager_edit_task(requester, task):
+                raise ForbiddenError("Bu görevi düzenleme yetkiniz yok.")
 
         changes: list[dict] = []
 
@@ -682,7 +702,8 @@ class KanbanService:
     ) -> Task:
         task = await self._get_task(task_id)
         if not can_edit_task(requester, task):
-            raise ForbiddenError("Bu görevi taşıma yetkiniz yok.")
+            if requester.role != "team_manager" or not await self._can_manager_edit_task(requester, task):
+                raise ForbiddenError("Bu görevi taşıma yetkiniz yok.")
 
         col = await self.db.execute(select(KanbanColumn).where(KanbanColumn.id == column_id))
         if not col.scalar_one_or_none():
@@ -757,7 +778,8 @@ class KanbanService:
     async def delete_task(self, task_id: uuid.UUID, requester: User) -> None:
         task = await self._get_task(task_id)
         if not can_delete_task(requester, task):
-            raise ForbiddenError("Bu görevi silme yetkiniz yok.")
+            if requester.role != "team_manager" or not await self._can_manager_edit_task(requester, task):
+                raise ForbiddenError("Bu görevi silme yetkiniz yok.")
         task.is_archived = True
         await self._write_history(task.id, requester.id, "archived")
         await self.db.flush()
