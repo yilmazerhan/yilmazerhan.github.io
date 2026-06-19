@@ -41,6 +41,9 @@ async def list_ssl_certs(
     return await svc.list_certificates()
 
 
+_SSL_MAX_BYTES = 1 * 1024 * 1024  # 1 MB — a real cert/key is always tiny
+
+
 @router.post("/ssl/upload-pem", response_model=SslCertificateResponse, status_code=201)
 async def upload_pem(
     current_user: Annotated[User, Depends(require_superadmin)],
@@ -49,8 +52,13 @@ async def upload_pem(
     cert_file: UploadFile = File(...),
     key_file: UploadFile = File(...),
 ):
-    cert_bytes = await cert_file.read()
-    key_bytes = await key_file.read()
+    from fastapi import HTTPException
+    cert_bytes = await cert_file.read(_SSL_MAX_BYTES + 1)
+    if len(cert_bytes) > _SSL_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Sertifika dosyası 1 MB sınırını aşıyor.")
+    key_bytes = await key_file.read(_SSL_MAX_BYTES + 1)
+    if len(key_bytes) > _SSL_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Anahtar dosyası 1 MB sınırını aşıyor.")
     svc = SslService(db)
     return await svc.upload_pem(name, cert_bytes, key_bytes, current_user.id)
 
@@ -63,7 +71,10 @@ async def upload_jks(
     password: str = Form(...),
     jks_file: UploadFile = File(...),
 ):
-    jks_bytes = await jks_file.read()
+    from fastapi import HTTPException
+    jks_bytes = await jks_file.read(_SSL_MAX_BYTES + 1)
+    if len(jks_bytes) > _SSL_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="JKS dosyası 1 MB sınırını aşıyor.")
     svc = SslService(db)
     return await svc.upload_jks(name, jks_bytes, password, current_user.id)
 
@@ -395,19 +406,19 @@ async def download_backup(
     import os
     import asyncio
     from datetime import datetime
-    from urllib.parse import urlparse
+    from urllib.parse import urlparse, unquote
     from fastapi import HTTPException
     from fastapi.responses import Response as FastAPIResponse
     from app.config import settings
-
-    # Parse DATABASE_URL (strip async driver prefix)
     raw_url = settings.DATABASE_URL.replace("+asyncpg", "")
     parsed = urlparse(raw_url)
 
-    env = {**os.environ, "PGPASSWORD": parsed.password or ""}
+    # urlparse does NOT percent-decode credentials — apply unquote so that passwords
+    # containing URL-special characters (e.g. %40 → @) are passed correctly to pg_dump.
+    env = {**os.environ, "PGPASSWORD": unquote(parsed.password) if parsed.password else ""}
     host = parsed.hostname or "localhost"
     port = str(parsed.port or 5432)
-    user = parsed.username or "postgres"
+    user = unquote(parsed.username) if parsed.username else "postgres"
     dbname = (parsed.path or "").lstrip("/")
 
     try:
