@@ -254,7 +254,10 @@
     "personal_board_note": "This board is private to you. It cannot be shared or deleted.",
     "my_personal_board": "My Personal Board",
     "no_personal_board_for_user": "No personal board found for this user.",
-    "me": "Me"
+    "me": "Me",
+    "view_personal_board": "View {{name}}'s Personal Board",
+    "view_personal_board_tooltip": "Navigate to this user's personal kanban board",
+    "viewing_personal_board_of": "Viewing {{name}}'s personal board (read-only view as admin)"
   },
   "teams": {
     "title": "Teams",

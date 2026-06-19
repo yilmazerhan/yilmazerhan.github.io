@@ -108,10 +108,11 @@ export const kanbanKeys = {
 
 // ─── Board hooks ──────────────────────────────────────────────────────────────
 
-export function useBoards(params?: { include_archived?: boolean; personal_owner_id?: string }) {
+export function useBoards(params?: { include_archived?: boolean; personal_owner_id?: string }, enabled = true) {
   return useQuery({
     queryKey: [...kanbanKeys.boards(), params],
     queryFn: () => apiClient.get<KanbanBoard[]>('/kanban/boards', { params }).then((r) => r.data),
+    enabled,
   })
 }
 

@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, Link } from 'react-router-dom'
-import { Plus, Search, CheckSquare, X, ChevronLeft, Tag } from 'lucide-react'
+import { Plus, Search, CheckSquare, X, ChevronLeft, Tag, ExternalLink } from 'lucide-react'
 import KanbanBoard from '@/components/kanban/KanbanBoard'
 import TaskModal from '@/components/kanban/TaskModal'
-import { useColumns, useBulkUpdateTasks, useBoard, useLabels } from '@/api/kanban'
+import { useColumns, useBulkUpdateTasks, useBoard, useLabels, useBoards } from '@/api/kanban'
 import { useTeams } from '@/api/teams'
 import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
@@ -52,6 +52,18 @@ export default function KanbanPage() {
   )
   const teamUsers = usersData?.items ?? []
 
+  // When superadmin/manager selects a user, find their personal board so we can link to it
+  const shouldFetchPersonalBoard = canFilterUsers && !!selectedUserId
+  const { data: selectedUserBoards = [] } = useBoards(
+    { personal_owner_id: selectedUserId },
+    shouldFetchPersonalBoard,
+  )
+  const selectedUserPersonalBoard = shouldFetchPersonalBoard
+    ? selectedUserBoards.find((b) => b.is_personal && b.created_by === selectedUserId)
+    : undefined
+  // Don't show the link if we're already on that personal board
+  const showPersonalBoardLink = selectedUserPersonalBoard && selectedUserPersonalBoard.id !== boardId
+
   // Build task params — always include board_id to scope to this board
   const taskParams: { team_id?: string; assignee_id?: string; priority?: string; search?: string; board_id?: string; label_id?: string } = {}
   if (boardId) taskParams.board_id = boardId
@@ -90,6 +102,13 @@ export default function KanbanPage() {
   }
 
   const hasFilters = selectedTeamId || selectedUserId || selectedPriority || searchText || selectedLabelId
+
+  // Banner: show when viewing another user's personal board
+  const isViewingOthersPersonalBoard =
+    board?.is_personal && board.created_by && board.created_by !== user?.id
+  const boardOwnerName = isViewingOthersPersonalBoard
+    ? (teamUsers.find((u) => u.id === board.created_by)?.full_name ?? null)
+    : null
 
   return (
     <div className="space-y-4">
@@ -141,6 +160,14 @@ export default function KanbanPage() {
         </div>
       </div>
 
+      {/* Banner: viewing another user's personal board */}
+      {boardOwnerName && (
+        <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-700 text-sm text-violet-700 dark:text-violet-300">
+          <ExternalLink className="h-4 w-4 flex-shrink-0" />
+          <span>{t('kanban.viewing_personal_board_of', { name: boardOwnerName })}</span>
+        </div>
+      )}
+
       {/* Filter bar */}
       <div className="flex items-center gap-3 flex-wrap">
         {/* Search */}
@@ -179,6 +206,19 @@ export default function KanbanPage() {
               <option key={u.id} value={u.id}>{u.full_name}</option>
             ))}
           </select>
+        )}
+
+        {showPersonalBoardLink && (
+          <Link
+            to={`/kanban/${selectedUserPersonalBoard.id}`}
+            title={t('kanban.view_personal_board_tooltip')}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg border border-violet-300 dark:border-violet-700 text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-900/20 hover:bg-violet-100 dark:hover:bg-violet-800/30 font-medium"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            {t('kanban.view_personal_board', {
+              name: teamUsers.find((u) => u.id === selectedUserId)?.full_name ?? '',
+            })}
+          </Link>
         )}
 
         <select

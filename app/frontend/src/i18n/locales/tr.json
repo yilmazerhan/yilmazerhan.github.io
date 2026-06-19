@@ -254,7 +254,10 @@
     "personal_board_note": "Bu pano yalnızca size özeldir. Paylaşılamaz ve silinemez.",
     "my_personal_board": "Kendi Kişisel Panom",
     "no_personal_board_for_user": "Bu kullanıcının kişisel panosu bulunamadı.",
-    "me": "Ben"
+    "me": "Ben",
+    "view_personal_board": "{{name}}'in Kişisel Panosunu Görüntüle",
+    "view_personal_board_tooltip": "Bu kullanıcının kişisel kanban panosuna git",
+    "viewing_personal_board_of": "{{name}}'in kişisel panosu görüntüleniyor (yönetici görünümü)"
   },
   "teams": {
     "title": "Takımlar",
