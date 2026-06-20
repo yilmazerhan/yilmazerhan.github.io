@@ -48,6 +48,7 @@ import {
   useTeamsWebhooks,
   useCreateTeamsWebhook,
   useDeleteTeamsWebhook,
+  useTestTeamsWebhook,
   useSmtpConfigs,
   useCreateSmtpConfig,
   useUpdateSmtpConfig,
@@ -136,9 +137,21 @@ export default function SettingsPage() {
   const { data: teamsWebhooks = [] } = useTeamsWebhooks()
   const createWebhook = useCreateTeamsWebhook()
   const deleteWebhook = useDeleteTeamsWebhook()
+  const testWebhook = useTestTeamsWebhook()
   const [webhookName, setWebhookName] = useState('')
   const [webhookUrl, setWebhookUrl] = useState('')
   const [webhookError, setWebhookError] = useState('')
+  const [webhookTestResult, setWebhookTestResult] = useState<Record<string, { success: boolean; error: string | null }>>({})
+
+  async function handleWebhookTest(id: string) {
+    setWebhookTestResult((prev) => ({ ...prev, [id]: { success: false, error: null } }))
+    try {
+      const result = await testWebhook.mutateAsync(id)
+      setWebhookTestResult((prev) => ({ ...prev, [id]: result }))
+    } catch (err: any) {
+      setWebhookTestResult((prev) => ({ ...prev, [id]: { success: false, error: err.response?.data?.detail || t('common.error') } }))
+    }
+  }
 
   async function handleWebhookCreate(e: React.FormEvent) {
     e.preventDefault(); setWebhookError('')
@@ -747,12 +760,28 @@ export default function SettingsPage() {
                     {format(new Date(wh.created_at), 'dd MMM yyyy', { locale: dateLocale })}
                   </p>
                 </div>
-                <button
-                  onClick={() => { if (confirm(t('settings.confirm_delete_webhook'))) deleteWebhook.mutate(wh.id) }}
-                  className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                <div className="flex items-center gap-2">
+                  {webhookTestResult[wh.id] !== undefined && (
+                    <span className={`text-xs font-medium ${webhookTestResult[wh.id].success ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                      {webhookTestResult[wh.id].success
+                        ? t('settings.webhook_test_ok')
+                        : t('settings.webhook_test_fail', { error: webhookTestResult[wh.id].error ?? '' })}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => handleWebhookTest(wh.id)}
+                    disabled={testWebhook.isPending}
+                    className="px-2.5 py-1 rounded text-xs font-medium text-blue-600 dark:text-blue-400 border border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-50"
+                  >
+                    {t('settings.test_webhook')}
+                  </button>
+                  <button
+                    onClick={() => { if (confirm(t('settings.confirm_delete_webhook'))) deleteWebhook.mutate(wh.id) }}
+                    className="p-1.5 rounded text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>

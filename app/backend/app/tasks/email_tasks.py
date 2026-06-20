@@ -416,8 +416,10 @@ async def _send_teams_async(webhook_id: str, title: str, body: str, action_url: 
     try:
         async with Session() as db:
             svc = TeamsService(db)
-            await svc.send_message(uuid.UUID(webhook_id), title, body, action_url)
+            success = await svc.send_message(uuid.UUID(webhook_id), title, body, action_url)
             await db.commit()
+        if not success:
+            raise RuntimeError(f"Teams message failed for webhook {webhook_id} — check server logs for details")
     finally:
         await engine.dispose()
 
@@ -622,6 +624,13 @@ async def _handle_task_overdue(db, workflow, today: date):
 
         await _dispatch_email_inline(db, task.assignee.email, subject, html, str(log.id))
 
+        if workflow.send_teams and workflow.teams_webhook_id:
+            send_teams_message_task.delay(
+                webhook_id=str(workflow.teams_webhook_id),
+                title=f"Gecikmiş Görev: {task.title}",
+                body=f"Görev {str(task.due_date)} tarihinde bitimeliydi.\nAtanan: {task.assignee.full_name}",
+            )
+
 
 async def _handle_worklog_reminder(db, workflow, today: date):
     from sqlalchemy import select, func
@@ -662,6 +671,13 @@ async def _handle_worklog_reminder(db, workflow, today: date):
         await db.flush()
 
         await _dispatch_email_inline(db, user.email, subject, html, str(log.id))
+
+        if workflow.send_teams and workflow.teams_webhook_id:
+            send_teams_message_task.delay(
+                webhook_id=str(workflow.teams_webhook_id),
+                title="İş Günlüğü Hatırlatması",
+                body=f"{user.full_name}, bugün ({str(today)}) henüz iş günlüğü girmedi.",
+            )
 
 
 async def _handle_dashboard_report(db, workflow, today: date):

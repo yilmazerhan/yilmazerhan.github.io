@@ -1,4 +1,5 @@
 import uuid
+import logging
 from typing import Optional
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +9,8 @@ from app.models.teams_webhook import TeamsWebhookConfig
 from app.core.security import encrypt_field, decrypt_field
 from app.config import settings
 from app.core.exceptions import NotFoundError
+
+logger = logging.getLogger(__name__)
 
 
 class TeamsService:
@@ -67,16 +70,18 @@ class TeamsService:
             "attachments": [
                 {
                     "contentType": "application/vnd.microsoft.card.adaptive",
+                    "contentUrl": None,
                     "content": {
                         "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
                         "type": "AdaptiveCard",
-                        "version": "1.4",
+                        "version": "1.2",
                         "body": [
                             {
                                 "type": "TextBlock",
                                 "size": "Medium",
                                 "weight": "Bolder",
                                 "text": title,
+                                "wrap": True,
                             },
                             {
                                 "type": "TextBlock",
@@ -99,23 +104,42 @@ class TeamsService:
             ]
         return card
 
-    async def send_message(self, webhook_id: uuid.UUID, title: str, body: str, action_url: Optional[str] = None) -> bool:
+    async def send_message(
+        self,
+        webhook_id: uuid.UUID,
+        title: str,
+        body: str,
+        action_url: Optional[str] = None,
+    ) -> bool:
         wh = await self.get_webhook(webhook_id)
         if not wh.is_active:
+            logger.info("Teams webhook '%s' (%s) is inactive — skipping", wh.name, webhook_id)
             return False
         url = decrypt_field(wh.webhook_url_encrypted, settings.SMTP_ENCRYPTION_KEY)
         payload = self.build_adaptive_card(title, body, action_url)
         try:
-            async with httpx.AsyncClient(timeout=10) as client:
+            async with httpx.AsyncClient(timeout=15) as client:
                 resp = await client.post(url, json=payload)
-            return resp.status_code in (200, 202)
-        except Exception:
+            if resp.status_code in (200, 202):
+                logger.info("Teams message sent via webhook '%s': %r", wh.name, title)
+                return True
+            logger.error(
+                "Teams webhook '%s' returned HTTP %d — body: %s",
+                wh.name, resp.status_code, resp.text[:500],
+            )
+            return False
+        except Exception as exc:
+            logger.error("Teams webhook '%s' request failed: %s", wh.name, exc)
             return False
 
     async def test_webhook(self, webhook_id: uuid.UUID) -> dict:
-        success = await self.send_message(
-            webhook_id,
-            "Test Mesajı",
-            "Bu bir test mesajıdır. Webhook başarıyla yapılandırıldı.",
-        )
-        return {"success": success}
+        try:
+            success = await self.send_message(
+                webhook_id,
+                "Test Mesajı",
+                "Bu bir test mesajıdır. Webhook başarıyla yapılandırıldı.",
+            )
+            return {"success": success, "error": None if success else "Mesaj gönderilemedi — loglara bakın."}
+        except Exception as exc:
+            logger.error("Teams test_webhook failed for %s: %s", webhook_id, exc)
+            return {"success": False, "error": str(exc)}

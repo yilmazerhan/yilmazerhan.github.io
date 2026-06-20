@@ -259,6 +259,7 @@ export function useDeleteTeamsWebhook() {
 
 export function useTestTeamsWebhook() {
   return useMutation({
-    mutationFn: (id: string) => apiClient.post<{ success: boolean }>(`/email/teams-webhooks/${id}/test`).then((r) => r.data),
+    mutationFn: (id: string) =>
+      apiClient.post<{ success: boolean; error: string | null }>(`/email/teams-webhooks/${id}/test`).then((r) => r.data),
   })
 }
