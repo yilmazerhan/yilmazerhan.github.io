@@ -12,6 +12,7 @@ import { exportWorklogs } from '@/api/export'
 import {
   useReportSchedules, useCreateReportSchedule, useUpdateReportSchedule,
   useDeleteReportSchedule, useRunReportSchedule, useUserActivitySummary, type ReportSchedule,
+  type UserActivitySummary,
 } from '@/api/admin'
 import { resolveName } from '@/utils/i18nName'
 
@@ -160,25 +161,26 @@ function ProgressRing({ pct }: { pct: number }) {
 
 function TodayWorklogStatus({
   users,
-  todayLogs,
+  activitySummary,
 }: {
   users: Array<{ id: string; full_name: string }>
-  todayLogs: WorkLog[]
+  activitySummary: UserActivitySummary[] | undefined
 }) {
   const { t } = useTranslation()
-  const hourAbbr = t('worklog.hours_abbr')
 
   const { logged, missing, pct } = useMemo(() => {
-    const hours: Record<string, number> = {}
-    for (const log of todayLogs) hours[log.user_id] = (hours[log.user_id] ?? 0) + log.duration_hours
-    const logged = users
-      .filter(u => (hours[u.id] ?? 0) > 0)
-      .map(u => ({ ...u, hours: hours[u.id] }))
-      .sort((a, b) => b.hours - a.hours)
-    const missing = users.filter(u => !((hours[u.id] ?? 0) > 0))
+    // Compare against UTC date — last_login_at is stored as UTC in the DB
+    const todayUTC = new Date().toISOString().slice(0, 10)
+    const loggedIds = new Set(
+      (activitySummary ?? [])
+        .filter(u => u.last_login_at?.slice(0, 10) === todayUTC)
+        .map(u => u.user_id)
+    )
+    const logged = users.filter(u => loggedIds.has(u.id))
+    const missing = users.filter(u => !loggedIds.has(u.id))
     const pct = users.length ? Math.round((logged.length / users.length) * 100) : 0
     return { logged, missing, pct }
-  }, [users, todayLogs])
+  }, [users, activitySummary])
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
@@ -229,7 +231,6 @@ function TodayWorklogStatus({
                   <span key={u.id} className="inline-flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 text-xs">
                     <span className="w-5 h-5 rounded-full bg-green-200 dark:bg-green-800/60 text-green-900 dark:text-green-200 flex items-center justify-center text-[10px] font-bold flex-shrink-0">{userInitials(u.full_name)}</span>
                     {u.full_name}
-                    <span className="font-semibold">{u.hours.toFixed(1)}{hourAbbr}</span>
                   </span>
                 ))}
               </div>
@@ -701,10 +702,6 @@ export default function ReportsPage() {
     [usersData]
   )
 
-  // Today's status: always current day regardless of which week is viewed
-  const { data: todayData } = useWorkLogs({ date_from: today, date_to: today, limit: 1000 })
-  const todayLogs = todayData?.items ?? []
-
   // Month-range pivot (drives the pivot table + summary): user → workType → hours
   const pivot = useMemo(() => buildPivot(logs), [logs])
 
@@ -857,7 +854,7 @@ export default function ReportsPage() {
 
       {/* Today's Worklog Status — who has / hasn't logged today */}
       {canFilterByUser && weekUsers.length > 0 && (
-        <TodayWorklogStatus users={weekUsers} todayLogs={todayLogs} />
+        <TodayWorklogStatus users={weekUsers} activitySummary={activitySummary} />
       )}
 
       {/* Weekly Activity Matrix — calendar weeks Mon–Sun, navigable */}
