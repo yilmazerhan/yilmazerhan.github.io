@@ -674,7 +674,7 @@ export default function ReportsPage() {
     date_from: dateFrom,
     date_to: dateTo,
     user_id: selectedUserId || undefined,
-    limit: 500,
+    limit: 5000,
   })
 
   const logs = data?.items ?? []
@@ -694,7 +694,7 @@ export default function ReportsPage() {
   const weekStart = weekDates[0]
   const weekEnd = weekDates[6]
 
-  const { data: weekData } = useWorkLogs({ date_from: weekStart, date_to: weekEnd, limit: 500 })
+  const { data: weekData } = useWorkLogs({ date_from: weekStart, date_to: weekEnd, limit: 5000 })
   const weekLogs = weekData?.items ?? []
   const weekUsers = useMemo(
     () => (usersData?.items ?? []).filter(u => u.is_active),
@@ -702,7 +702,7 @@ export default function ReportsPage() {
   )
 
   // Today's status: always current day regardless of which week is viewed
-  const { data: todayData } = useWorkLogs({ date_from: today, date_to: today, limit: 200 })
+  const { data: todayData } = useWorkLogs({ date_from: today, date_to: today, limit: 1000 })
   const todayLogs = todayData?.items ?? []
 
   // Month-range pivot (drives the pivot table + summary): user → workType → hours
@@ -712,11 +712,13 @@ export default function ReportsPage() {
   // selected Mon–Sun week via weekLogs (shares weekOffset with the matrix).
   const weekPivot = useMemo(() => buildPivot(weekLogs), [weekLogs])
 
+  const isTruncated = (data?.total ?? 0) > logs.length
+
   const summaryStats = useMemo(() => {
     const totalHours = logs.reduce((s, l) => s + l.duration_hours, 0)
     const uniqueUsers = new Set(logs.map((l) => l.user_id)).size
-    return { totalHours, uniqueUsers, entries: logs.length }
-  }, [logs])
+    return { totalHours, uniqueUsers, entries: data?.total ?? logs.length }
+  }, [logs, data?.total])
 
   // Per-user daily sparkline data
   const userSparklines = useMemo(() => {
@@ -814,6 +816,13 @@ export default function ReportsPage() {
           </button>
         )}
       </div>
+
+      {/* Data truncation warning */}
+      {isTruncated && (
+        <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-4 py-2 text-sm text-amber-700 dark:text-amber-300">
+          {t('reports.truncation_warning', { total: data?.total })}
+        </div>
+      )}
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4">

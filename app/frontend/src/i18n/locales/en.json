@@ -637,7 +637,8 @@
     "today_missing": "Not Logged",
     "today_all_logged": "Everyone logged work today 🎉",
     "today_none_logged": "No one has logged work today yet",
-    "today_completion": "users logged today"
+    "today_completion": "users logged work today",
+    "truncation_warning": "{{total}} entries found in the selected date range. Some charts and totals may be affected."
   },
   "history": {
     "title": "History",

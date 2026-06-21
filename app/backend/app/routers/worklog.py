@@ -73,7 +73,7 @@ async def list_logs(
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=500),
+    limit: int = Query(100, ge=1, le=5000),
 ):
     svc = WorkLogService(db)
     items, total = await svc.list_logs(

@@ -637,7 +637,8 @@
     "today_missing": "Girmeyenler",
     "today_all_logged": "Bugün herkes iş günlüğü girdi 🎉",
     "today_none_logged": "Bugün henüz kimse iş günlüğü girmedi",
-    "today_completion": "kullanıcı bugün giriş yaptı"
+    "today_completion": "kullanıcı bugün iş günlüğü girdi",
+    "truncation_warning": "Seçili tarih aralığında {{total}} kayıt bulunuyor. Bazı grafikler ve hesaplamalar etkilenmiş olabilir."
   },
   "history": {
     "title": "Geçmiş",
