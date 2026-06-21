@@ -8,7 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.models.leave_request import LeaveRequest
-from app.models.user import User, user_teams
+from app.models.user import User
+from app.models.user_team import user_teams
 
 MANAGER_STATUSES = {"approved", "rejected", "cancelled"}
 USER_STATUSES = {"cancelled"}

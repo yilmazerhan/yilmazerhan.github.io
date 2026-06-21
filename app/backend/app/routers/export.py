@@ -12,7 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.models.user import User, user_teams
+from app.models.user import User
+from app.models.user_team import user_teams
 from app.models.worklog import WorkLog
 from app.models.kanban import Task, KanbanColumn
 from app.models.task_label import task_label_assignments, TaskLabel

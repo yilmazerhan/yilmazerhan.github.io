@@ -19,7 +19,7 @@ from app.schemas.kanban import (
     AttachmentResponse,
     LabelCreate, LabelUpdate, LabelResponse,
 )
-from pydantic import BaseModel as _BaseModel
+from pydantic import BaseModel as _BaseModel, Field
 from app.schemas.auth import MessageResponse
 from app.services.kanban_service import KanbanService
 from app.core.dependencies import get_current_user, require_superadmin, require_manager_or_above

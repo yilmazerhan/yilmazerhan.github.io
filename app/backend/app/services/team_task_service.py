@@ -6,7 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.team_task import TeamTask, TeamTaskAssignee
-from app.models.user import User, user_teams
+from app.models.user import User
+from app.models.user_team import user_teams
 from app.core.exceptions import NotFoundError, ValidationError
 
 _VALID_STATUSES = ("pending", "in_progress", "done")
