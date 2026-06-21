@@ -1,14 +1,14 @@
 """add teams_webhook_id to inventory_email_schedules
 
 Revision ID: 0033
-Revises: 0032
+Revises: 0032_team_task_completion
 Create Date: 2026-06-21
 """
 from alembic import op
 import sqlalchemy as sa
 
 revision = "0033"
-down_revision = "0032"
+down_revision = "0032_team_task_completion"
 branch_labels = None
 depends_on = None
 
