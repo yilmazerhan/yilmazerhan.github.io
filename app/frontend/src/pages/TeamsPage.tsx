@@ -49,8 +49,12 @@ function AddMemberRow({ teamId, existingMemberIds }: { teamId: string; existingM
 
   async function handleAdd() {
     if (!selectedUserId) return
-    await addMember.mutateAsync(selectedUserId)
-    setSelectedUserId('')
+    try {
+      await addMember.mutateAsync(selectedUserId)
+      setSelectedUserId('')
+    } catch (err: any) {
+      alert(err.response?.data?.detail || t('common.error'))
+    }
   }
 
   return (

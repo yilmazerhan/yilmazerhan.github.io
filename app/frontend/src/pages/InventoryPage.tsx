@@ -919,19 +919,24 @@ export default function InventoryPage() {
 
   async function confirmDelete() {
     if (!deleteTarget) return
-    await deleteItem.mutateAsync(deleteTarget.id)
-    setDeleteTarget(null)
+    try {
+      await deleteItem.mutateAsync(deleteTarget.id)
+      setDeleteTarget(null)
+    } catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
   }
 
   async function handleDeleteGroup(group: InventoryGroup) {
     if (!confirm(t('inventory.groups.delete_confirm'))) return
-    await deleteGroup.mutateAsync(group.id)
-    if (groupFilter === group.id) setGroupFilter('')
+    try {
+      await deleteGroup.mutateAsync(group.id)
+      if (groupFilter === group.id) setGroupFilter('')
+    } catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
   }
 
   async function handleDeleteSchedule(sch: InventorySchedule) {
     if (!confirm(t('inventory.schedule_delete_confirm'))) return
-    await deleteSchedule.mutateAsync(sch.id)
+    try { await deleteSchedule.mutateAsync(sch.id) }
+    catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
   }
 
   async function handleExport(format: 'excel' | 'csv', scope: 'all' | 'visible') {

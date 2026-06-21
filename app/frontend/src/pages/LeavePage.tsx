@@ -65,22 +65,26 @@ export default function LeavePage() {
 
   async function handleCancel(leave: LeaveRequest) {
     if (!confirm(t('leave.cancel_confirm'))) return
-    await updateLeave.mutateAsync({ id: leave.id, status: 'cancelled' })
+    try { await updateLeave.mutateAsync({ id: leave.id, status: 'cancelled' }) }
+    catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
   }
 
   async function handleApprove(leave: LeaveRequest) {
-    await updateLeave.mutateAsync({ id: leave.id, status: 'approved' })
+    try { await updateLeave.mutateAsync({ id: leave.id, status: 'approved' }) }
+    catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
   }
 
   async function handleReject(leave: LeaveRequest) {
     const note = prompt(t('leave.review_note'))
     if (note === null) return
-    await updateLeave.mutateAsync({ id: leave.id, status: 'rejected', review_note: note.trim() || undefined })
+    try { await updateLeave.mutateAsync({ id: leave.id, status: 'rejected', review_note: note.trim() || undefined }) }
+    catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
   }
 
   async function handleDelete(id: string) {
     if (!confirm(t('leave.delete_confirm'))) return
-    await deleteLeave.mutateAsync(id)
+    try { await deleteLeave.mutateAsync(id) }
+    catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
   }
 
   // "Active" tab shows pending + approved; "All statuses" tab shows everything.

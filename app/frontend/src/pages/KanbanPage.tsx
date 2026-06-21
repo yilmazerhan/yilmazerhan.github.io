@@ -91,14 +91,18 @@ export default function KanbanPage() {
 
   async function handleBulkMove(columnId: string) {
     if (selectedTaskIds.size === 0) return
-    await bulkUpdate.mutateAsync({ task_ids: [...selectedTaskIds], column_id: columnId })
-    clearSelection()
+    try {
+      await bulkUpdate.mutateAsync({ task_ids: [...selectedTaskIds], column_id: columnId })
+      clearSelection()
+    } catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
   }
 
   async function handleBulkArchive() {
     if (selectedTaskIds.size === 0) return
-    await bulkUpdate.mutateAsync({ task_ids: [...selectedTaskIds], is_archived: true })
-    clearSelection()
+    try {
+      await bulkUpdate.mutateAsync({ task_ids: [...selectedTaskIds], is_archived: true })
+      clearSelection()
+    } catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
   }
 
   const hasFilters = selectedTeamId || selectedUserId || selectedPriority || searchText || selectedLabelId

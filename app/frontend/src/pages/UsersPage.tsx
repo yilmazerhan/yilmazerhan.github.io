@@ -53,17 +53,20 @@ export default function UsersPage() {
 
   async function handleDelete(user: User) {
     if (!confirm(t('common.confirm_delete'))) return
-    await deleteUser.mutateAsync(user.id)
+    try { await deleteUser.mutateAsync(user.id) }
+    catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
   }
 
   async function handleRestore(user: User) {
     if (!confirm(t('users.confirm_restore'))) return
-    await restoreUser.mutateAsync(user.id)
+    try { await restoreUser.mutateAsync(user.id) }
+    catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
   }
 
   async function handleHardDelete(user: User) {
     if (!confirm(t('users.confirm_hard_delete'))) return
-    await hardDeleteUser.mutateAsync(user.id)
+    try { await hardDeleteUser.mutateAsync(user.id) }
+    catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
   }
 
   const roleLabel = (role: string) => {

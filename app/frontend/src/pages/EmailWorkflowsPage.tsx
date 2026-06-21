@@ -135,9 +135,7 @@ export default function EmailWorkflowsPage() {
   const TRIGGER_TYPES = [
     { value: 'task_due_soon', label: t('email.trigger_task_due_soon') },
     { value: 'task_overdue', label: t('email.trigger_task_overdue') },
-    { value: 'task_status_changed', label: t('email.trigger_task_status_changed') },
     { value: 'worklog_reminder', label: t('email.trigger_worklog_reminder') },
-    { value: 'task_assigned', label: t('email.trigger_task_assigned') },
     { value: 'account_activation', label: t('email.trigger_account_activation') },
     { value: 'password_reset', label: t('email.trigger_password_reset') },
     { value: 'dashboard_report', label: t('email.trigger_dashboard_report') },
@@ -233,6 +231,11 @@ export default function EmailWorkflowsPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+
+    if (triggerType === 'worklog_reminder' && sendDays.length === 0) {
+      setError(i18n.language === 'tr' ? 'En az bir gün seçilmelidir.' : 'At least one day must be selected.')
+      return
+    }
 
     let triggerConfig: Record<string, unknown> | null = null
     if (triggerType === 'task_due_soon') {

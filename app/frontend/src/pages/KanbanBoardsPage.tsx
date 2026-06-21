@@ -158,25 +158,32 @@ export default function KanbanBoardsPage() {
   }
 
   async function handleCreate(data: BoardFormData) {
-    const board = await createBoard.mutateAsync({ ...data, description: data.description || null })
-    setShowCreate(false)
-    navigate(`/kanban/${board.id}`)
+    try {
+      const board = await createBoard.mutateAsync({ ...data, description: data.description || null })
+      setShowCreate(false)
+      navigate(`/kanban/${board.id}`)
+    } catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
   }
 
   async function handleEdit(data: BoardFormData) {
     if (!editBoard) return
-    await updateBoard.mutateAsync({ id: editBoard.id, ...data, description: data.description || null })
-    setEditBoard(null)
+    try {
+      await updateBoard.mutateAsync({ id: editBoard.id, ...data, description: data.description || null })
+      setEditBoard(null)
+    } catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
   }
 
   async function handleArchive(board: KanbanBoard) {
-    await updateBoard.mutateAsync({ id: board.id, is_archived: !board.is_archived })
+    try { await updateBoard.mutateAsync({ id: board.id, is_archived: !board.is_archived }) }
+    catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
   }
 
   async function handleDelete() {
     if (!confirmDelete) return
-    await deleteBoard.mutateAsync(confirmDelete.id)
-    setConfirmDelete(null)
+    try {
+      await deleteBoard.mutateAsync(confirmDelete.id)
+      setConfirmDelete(null)
+    } catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
   }
 
   // Separate personal boards from shared

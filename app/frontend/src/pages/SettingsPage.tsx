@@ -372,7 +372,8 @@ export default function SettingsPage() {
 
   async function handleDelete(id: string) {
     if (!confirm(t('common.confirm_delete'))) return
-    await deleteConfig.mutateAsync(id)
+    try { await deleteConfig.mutateAsync(id) }
+    catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
   }
 
   async function handleTest(id: string) {

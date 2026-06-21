@@ -157,6 +157,20 @@ async def save_schedule(
     db: AsyncSession = Depends(get_db),
     _: Any = Depends(require_superadmin),
 ) -> dict:
+    if "backup_hour" in data:
+        try:
+            h = int(data["backup_hour"])
+        except (ValueError, TypeError):
+            h = -1
+        if not (0 <= h <= 23):
+            raise HTTPException(status_code=422, detail="backup_hour must be 0–23")
+    if "backup_minute" in data:
+        try:
+            m = int(data["backup_minute"])
+        except (ValueError, TypeError):
+            m = -1
+        if not (0 <= m <= 59):
+            raise HTTPException(status_code=422, detail="backup_minute must be 0–59")
     return await backup_service.save_schedule(db, data)
 
 
