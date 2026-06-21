@@ -77,16 +77,23 @@ function scheduleSummary(wf: EmailWorkflow, lang: string): string | null {
     const freq = (cfg.frequency as string) || 'daily'
     const dow = typeof cfg.day_of_week === 'number' ? cfg.day_of_week : 0
     const dayLabels = lang === 'tr' ? DAY_LABELS_TR : DAY_LABELS_EN
-    const dayName = dayLabels[dow] ?? dow
     const hourStr = `${String(hour).padStart(2, '0')}:00`
     if (freq === 'weekly') {
+      const dayName = dayLabels[dow] ?? dow
       return lang === 'tr'
         ? `Her ${dayName} saat ${hourStr} (${tz})`
         : `Every ${dayName} at ${hourStr} (${tz})`
     }
+    const sendDays = Array.isArray(cfg.send_days) ? (cfg.send_days as number[]).sort((a, b) => a - b) : null
+    if (!sendDays || sendDays.length === 7) {
+      return lang === 'tr'
+        ? `Her gün saat ${hourStr} (${tz})`
+        : `Every day at ${hourStr} (${tz})`
+    }
+    const dayNames = sendDays.map((d) => dayLabels[d] ?? d).join(', ')
     return lang === 'tr'
-      ? `Her gün saat ${hourStr} (${tz})`
-      : `Every day at ${hourStr} (${tz})`
+      ? `${dayNames} saat ${hourStr} (${tz})`
+      : `${dayNames} at ${hourStr} (${tz})`
   }
 
   return null
@@ -232,7 +239,7 @@ export default function EmailWorkflowsPage() {
     e.preventDefault()
     setError('')
 
-    if (triggerType === 'worklog_reminder' && sendDays.length === 0) {
+    if ((triggerType === 'worklog_reminder' || (triggerType === 'dashboard_report' && frequency === 'daily')) && sendDays.length === 0) {
       setError(i18n.language === 'tr' ? 'En az bir gün seçilmelidir.' : 'At least one day must be selected.')
       return
     }
@@ -243,7 +250,9 @@ export default function EmailWorkflowsPage() {
     } else if (triggerType === 'worklog_reminder') {
       triggerConfig = { send_hour: sendHour, timezone, send_days: sendDays }
     } else if (triggerType === 'dashboard_report') {
-      triggerConfig = { send_hour: sendHour, timezone, frequency, day_of_week: dayOfWeek }
+      triggerConfig = frequency === 'daily'
+        ? { send_hour: sendHour, timezone, frequency, send_days: sendDays }
+        : { send_hour: sendHour, timezone, frequency, day_of_week: dayOfWeek }
     }
 
     let recipientUsers: string[] | undefined
@@ -514,6 +523,29 @@ export default function EmailWorkflowsPage() {
                           <option value="weekly">{t('email.frequency_weekly')}</option>
                         </select>
                       </div>
+                      {frequency === 'daily' && (
+                        <div>
+                          <label className={labelCls}>{t('email.send_days')}</label>
+                          <div className="flex flex-wrap gap-1.5 mt-1">
+                            {(i18n.language === 'tr' ? DAY_LABELS_TR : DAY_LABELS_EN).map((dayName, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => setSendDays((prev) =>
+                                  prev.includes(idx) ? prev.filter((d) => d !== idx) : [...prev, idx].sort((a, b) => a - b)
+                                )}
+                                className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
+                                  sendDays.includes(idx)
+                                    ? 'bg-primary-500 border-primary-500 text-white'
+                                    : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-primary-400'
+                                }`}
+                              >
+                                {dayName.slice(0, 3)}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       {frequency === 'weekly' && (
                         <div>
                           <label className={labelCls}>{t('email.day_of_week')}</label>

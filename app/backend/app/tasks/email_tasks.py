@@ -510,7 +510,13 @@ async def _evaluate_workflows_async():
                             else:
                                 frequency = (wf.trigger_config or {}).get("frequency", "daily")
                                 day_of_week = (wf.trigger_config or {}).get("day_of_week", 0)
-                                if frequency == "daily" or (frequency == "weekly" and today_local.weekday() == day_of_week):
+                                send_days = (wf.trigger_config or {}).get("send_days")
+                                if frequency == "weekly":
+                                    should_run = today_local.weekday() == day_of_week
+                                else:
+                                    # send_days absent/null/empty → all days; otherwise check weekday
+                                    should_run = not send_days or today_local.weekday() in send_days
+                                if should_run:
                                     await _handle_dashboard_report(db, wf, today_local)
 
                     wf.last_run_at = now
