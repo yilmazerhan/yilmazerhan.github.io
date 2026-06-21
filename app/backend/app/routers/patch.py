@@ -13,7 +13,7 @@ from app.schemas.patch import (
 )
 from app.schemas.auth import MessageResponse
 from app.services.patch_service import PatchService
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, require_manager_or_above
 
 router = APIRouter(prefix="/patches", tags=["patches"])
 
@@ -32,7 +32,7 @@ async def list_customers(
 @router.post("/customers", response_model=CustomerResponse, status_code=201)
 async def create_customer(
     body: CustomerCreate,
-    _: Annotated[User, Depends(get_current_user)],
+    _: Annotated[User, Depends(require_manager_or_above)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = PatchService(db)

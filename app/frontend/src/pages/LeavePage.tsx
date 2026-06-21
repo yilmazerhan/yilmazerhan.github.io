@@ -70,6 +70,7 @@ export default function LeavePage() {
   }
 
   async function handleApprove(leave: LeaveRequest) {
+    if (!confirm(t('leave.approve_confirm'))) return
     try { await updateLeave.mutateAsync({ id: leave.id, status: 'approved' }) }
     catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
   }

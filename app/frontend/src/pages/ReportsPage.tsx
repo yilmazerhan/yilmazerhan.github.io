@@ -430,6 +430,7 @@ function ReportScheduleSection({ t }: { t: (k: string) => string }) {
   const runSchedule = useRunReportSchedule()
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState<ScheduleForm>(emptyForm())
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   function openNew() { setForm(emptyForm()); setShowForm(true) }
   function openEdit(s: ReportSchedule) {
@@ -443,6 +444,7 @@ function ReportScheduleSection({ t }: { t: (k: string) => string }) {
   }
 
   async function handleSave() {
+    setSaveError(null)
     const payload = {
       name: form.name,
       frequency: form.frequency,
@@ -460,7 +462,9 @@ function ReportScheduleSection({ t }: { t: (k: string) => string }) {
         await createSchedule.mutateAsync(payload)
       }
       setShowForm(false)
-    } catch { /* ignore */ }
+    } catch (err: any) {
+      setSaveError(err.response?.data?.detail || t('common.error'))
+    }
   }
 
   return (
@@ -497,13 +501,13 @@ function ReportScheduleSection({ t }: { t: (k: string) => string }) {
               <span className={`text-xs px-2 py-0.5 rounded-full ${s.is_active ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-gray-200 text-gray-500 dark:bg-gray-700 dark:text-gray-400'}`}>
                 {s.is_active ? 'Active' : 'Inactive'}
               </span>
-              <button onClick={() => runSchedule.mutateAsync(s.id).then(() => alert(t('report_schedule.run_success')))} className="p-1.5 rounded text-gray-400 hover:text-green-500" title={t('report_schedule.run_now')}>
+              <button onClick={async () => { try { await runSchedule.mutateAsync(s.id); alert(t('report_schedule.run_success')) } catch (err: any) { alert(err.response?.data?.detail || t('common.error')) } }} className="p-1.5 rounded text-gray-400 hover:text-green-500" title={t('report_schedule.run_now')}>
                 <Play className="h-4 w-4" />
               </button>
               <button onClick={() => openEdit(s)} className="p-1.5 rounded text-gray-400 hover:text-blue-500">
                 <Pencil className="h-4 w-4" />
               </button>
-              <button onClick={async () => { if (confirm(t('report_schedule.delete_confirm'))) await deleteSchedule.mutateAsync(s.id) }} className="p-1.5 rounded text-gray-400 hover:text-red-500">
+              <button onClick={async () => { if (confirm(t('report_schedule.delete_confirm'))) { try { await deleteSchedule.mutateAsync(s.id) } catch (err: any) { alert(err.response?.data?.detail || t('common.error')) } } }} className="p-1.5 rounded text-gray-400 hover:text-red-500">
                 <Trash2 className="h-4 w-4" />
               </button>
             </div>
@@ -514,6 +518,7 @@ function ReportScheduleSection({ t }: { t: (k: string) => string }) {
       {showForm && (
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4 space-y-3">
           <h3 className="font-semibold text-gray-800 dark:text-gray-200 text-sm">{form.id ? t('report_schedule.edit') : t('report_schedule.add')}</h3>
+          {saveError && <p className="text-sm text-red-600 dark:text-red-400">{saveError}</p>}
           <div>
             <label className="block text-xs text-gray-500 mb-1">{t('report_schedule.name')}</label>
             <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white" />

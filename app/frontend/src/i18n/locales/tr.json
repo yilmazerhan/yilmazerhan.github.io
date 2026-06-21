@@ -867,6 +867,7 @@
     "reject": "Reddet",
     "cancel": "İptal Et",
     "cancel_confirm": "Bu izin talebini iptal etmek istiyor musunuz?",
+    "approve_confirm": "Bu izin talebini onaylamak istiyor musunuz?",
     "delete": "Sil",
     "delete_confirm": "Bu izin talebini silmek istiyor musunuz?",
     "no_requests": "İzin talebi bulunamadı.",

@@ -27,7 +27,9 @@ function MemberRow({ member, teamId }: { member: { id: string; full_name: string
       <td className="px-4 py-2" />
       <td className="px-4 py-2 text-right">
         <button
-          onClick={() => remove.mutate(member.id)}
+          onClick={() => remove.mutate(member.id, {
+            onError: (err: any) => alert(err.response?.data?.detail || t('common.error')),
+          })}
           disabled={remove.isPending}
           className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-40"
           title={t('teams.remove_member')}

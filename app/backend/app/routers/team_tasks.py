@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -54,6 +54,10 @@ async def update_team_task(
 ):
     svc = TeamTaskService(db)
     old_task = await svc.get_task(task_id)
+
+    if current_user.role != 'superadmin' and old_task.created_by != current_user.id:
+        raise HTTPException(status_code=403, detail="Bu görevi düzenlemek için yetkiniz yok.")
+
     old_assignee_ids = {a.user_id for a in old_task.assignees}
 
     body_dict = body.model_dump(exclude_none=True)
@@ -89,9 +93,12 @@ async def toggle_my_completion(
 @router.delete("/{task_id}", response_model=MessageResponse)
 async def delete_team_task(
     task_id: uuid.UUID,
-    _: Annotated[User, Depends(require_manager_or_above)],
+    current_user: Annotated[User, Depends(require_manager_or_above)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = TeamTaskService(db)
+    task = await svc.get_task(task_id)
+    if current_user.role != 'superadmin' and task.created_by != current_user.id:
+        raise HTTPException(status_code=403, detail="Bu görevi silmek için yetkiniz yok.")
     await svc.delete_task(task_id)
     return {"message": "Takım görevi silindi."}

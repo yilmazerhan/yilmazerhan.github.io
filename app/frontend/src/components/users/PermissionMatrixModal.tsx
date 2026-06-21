@@ -78,9 +78,13 @@ export default function PermissionMatrixModal({ user, onClose }: Props) {
         payload.push({ module, action, is_allowed: is_allowed as boolean })
       }
     })
-    await setPermissions.mutateAsync(payload)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+    try {
+      await setPermissions.mutateAsync(payload)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } catch (err: any) {
+      alert(err.response?.data?.detail || t('common.error'))
+    }
   }
 
   const cellClass = (state: boolean | null, defaultAllow: boolean) => {

@@ -867,6 +867,7 @@
     "reject": "Reject",
     "cancel": "Cancel",
     "cancel_confirm": "Cancel this leave request?",
+    "approve_confirm": "Approve this leave request?",
     "delete": "Delete",
     "delete_confirm": "Delete this leave request?",
     "no_requests": "No leave requests found.",

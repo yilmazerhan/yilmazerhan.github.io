@@ -149,7 +149,9 @@ export default function TimelinePage() {
       {!isLoading && (
         <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400">
           <span>
-            {skip + 1}–{Math.min(skip + PAGE_SIZE, total)} / {total}
+            {filterAction
+              ? `${filtered.length} / ${total}`
+              : `${skip + 1}–${Math.min(skip + PAGE_SIZE, total)} / ${total}`}
           </span>
           <div className="flex gap-2">
             {skip > 0 && (
