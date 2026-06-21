@@ -402,6 +402,15 @@ class UserService:
                 raise ForbiddenError("Bu kullanıcının şifresini değiştirme yetkiniz yok.")
         else:
             raise ForbiddenError("Bu işlem için yetkiniz yok.")
+        import re as _re
+        if len(new_password) < 8:
+            raise ValidationError("Şifre en az 8 karakter olmalıdır.")
+        if not _re.search(r"[A-Z]", new_password):
+            raise ValidationError("Şifre en az bir büyük harf içermelidir.")
+        if not _re.search(r"[a-z]", new_password):
+            raise ValidationError("Şifre en az bir küçük harf içermelidir.")
+        if not _re.search(r"\d", new_password):
+            raise ValidationError("Şifre en az bir rakam içermelidir.")
         target.hashed_password = hash_password(new_password)
         from sqlalchemy import update as sa_update
         from app.models.user import RefreshToken

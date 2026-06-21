@@ -19,7 +19,7 @@ from app.tasks.email_tasks import send_auth_email_direct
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 REFRESH_COOKIE = "refresh_token"
-COOKIE_MAX_AGE = settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400
+COOKIE_MAX_AGE = settings.SESSION_MAX_DURATION_HOURS * 3600  # matches actual session lifetime
 
 
 def _set_refresh_cookie(response: Response, token: str) -> None:

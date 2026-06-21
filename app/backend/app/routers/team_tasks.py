@@ -17,11 +17,11 @@ router = APIRouter(prefix="/team-tasks", tags=["team-tasks"])
 
 @router.get("", response_model=list[TeamTaskResponse])
 async def list_team_tasks(
-    _: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = TeamTaskService(db)
-    return await svc.list_tasks()
+    return await svc.list_tasks(current_user)
 
 
 @router.post("", response_model=TeamTaskResponse, status_code=201)

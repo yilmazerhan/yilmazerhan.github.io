@@ -2,7 +2,7 @@ import ipaddress
 import uuid
 from datetime import datetime
 from typing import Literal, Optional
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 
 VALID_ITEM_TYPES = ["server", "database", "email_account", "cloud_account", "generic"]
@@ -47,7 +47,7 @@ class InventoryGroupResponse(BaseModel):
 
 
 class InventoryGroupAssign(BaseModel):
-    item_ids: list[uuid.UUID]
+    item_ids: list[uuid.UUID] = Field(..., min_length=1, max_length=1000)
 
 
 # ── Item schemas ──────────────────────────────────────────────────────────────
@@ -231,7 +231,7 @@ class InventoryScheduleCreate(BaseModel):
     day_of_week: Optional[int] = Field(None, ge=0, le=6)
     day_of_month: Optional[int] = Field(None, ge=1, le=31)
     hour: int = Field(8, ge=0, le=23)
-    recipient_emails: list[str] = Field(..., min_length=1)
+    recipient_emails: list[EmailStr] = Field(..., min_length=1)
     is_active: bool = True
     teams_webhook_id: Optional[uuid.UUID] = None
 
@@ -250,7 +250,7 @@ class InventoryScheduleUpdate(BaseModel):
     day_of_week: Optional[int] = Field(None, ge=0, le=6)
     day_of_month: Optional[int] = Field(None, ge=1, le=31)
     hour: Optional[int] = Field(None, ge=0, le=23)
-    recipient_emails: Optional[list[str]] = None
+    recipient_emails: Optional[list[EmailStr]] = None
     is_active: Optional[bool] = None
     teams_webhook_id: Optional[uuid.UUID] = None
 
@@ -262,7 +262,7 @@ class InventoryScheduleResponse(BaseModel):
     day_of_week: Optional[int] = None
     day_of_month: Optional[int] = None
     hour: int
-    recipient_emails: list[str]
+    recipient_emails: list[EmailStr]
     is_active: bool
     teams_webhook_id: Optional[uuid.UUID] = None
     created_by: Optional[uuid.UUID] = None

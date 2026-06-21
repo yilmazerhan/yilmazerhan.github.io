@@ -260,7 +260,7 @@ async def create_task(
 
 
 class BulkUpdateRequest(_BaseModel):
-    task_ids: list[uuid.UUID]
+    task_ids: list[uuid.UUID] = Field(..., min_length=1, max_length=500)
     column_id: Optional[uuid.UUID] = None
     assignee_id: Optional[uuid.UUID] = None
     priority: Optional[str] = None
@@ -502,10 +502,11 @@ async def list_activity(
 @router.get("/tasks/{task_id}/attachments", response_model=list[AttachmentResponse])
 async def list_attachments(
     task_id: uuid.UUID,
-    _: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = KanbanService(db)
+    await svc.get_task(task_id, current_user)  # raises 403/404 if inaccessible
     return await svc.list_attachments(task_id)
 
 
@@ -556,12 +557,13 @@ async def upload_attachment(
 
     # ── Persist record ────────────────────────────────────────────────────────
     safe_original = os.path.basename(file.filename or stored_name)[:255]
+    # Never trust client-supplied MIME type — always serve as binary to prevent XSS via MIME confusion
     return await svc.create_attachment(
         task_id=task_id,
         filename=stored_name,
         original_filename=safe_original,
         file_size=len(content),
-        mime_type=file.content_type or "application/octet-stream",
+        mime_type="application/octet-stream",
         uploaded_by=current_user.id,
     )
 

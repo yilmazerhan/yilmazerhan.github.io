@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.team_task import TeamTask, TeamTaskAssignee
+from app.models.user import User, user_teams
 from app.core.exceptions import NotFoundError, ValidationError
 
 _VALID_STATUSES = ("pending", "in_progress", "done")
@@ -15,12 +16,32 @@ class TeamTaskService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def list_tasks(self) -> List[TeamTask]:
-        result = await self.db.execute(
+    async def list_tasks(self, requester: User) -> List[TeamTask]:
+        q = (
             select(TeamTask)
             .options(selectinload(TeamTask.assignees), selectinload(TeamTask.creator))
             .order_by(TeamTask.deadline.asc())
         )
+        if requester.role == "superadmin":
+            pass  # see everything
+        elif requester.role == "team_manager":
+            # See tasks assigned to members of their teams OR created by themselves
+            my_team_ids = select(user_teams.c.team_id).where(user_teams.c.user_id == requester.id)
+            team_member_ids = select(user_teams.c.user_id).where(user_teams.c.team_id.in_(my_team_ids))
+            q = q.where(
+                (TeamTask.created_by == requester.id) |
+                TeamTask.id.in_(
+                    select(TeamTaskAssignee.team_task_id).where(TeamTaskAssignee.user_id.in_(team_member_ids))
+                )
+            )
+        else:
+            # Regular user: only tasks assigned to them
+            q = q.where(
+                TeamTask.id.in_(
+                    select(TeamTaskAssignee.team_task_id).where(TeamTaskAssignee.user_id == requester.id)
+                )
+            )
+        result = await self.db.execute(q)
         return list(result.scalars().all())
 
     async def get_task(self, task_id: uuid.UUID) -> TeamTask:

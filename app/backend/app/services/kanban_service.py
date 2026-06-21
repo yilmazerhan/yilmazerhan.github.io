@@ -430,7 +430,8 @@ class KanbanService:
         if due_before:
             q = q.where(Task.due_date <= due_before)
         if search:
-            q = q.where(Task.title.ilike(f"%{search}%"))
+            _safe_search = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            q = q.where(Task.title.ilike(f"%{_safe_search}%"))
         if label_id:
             from app.models.task_label import task_label_assignments
             q = q.join(task_label_assignments, Task.id == task_label_assignments.c.task_id).where(

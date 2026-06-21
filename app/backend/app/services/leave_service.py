@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.models.leave_request import LeaveRequest
-from app.models.user import User
+from app.models.user import User, user_teams
 
 MANAGER_STATUSES = {"approved", "rejected", "cancelled"}
 USER_STATUSES = {"cancelled"}
@@ -61,7 +61,14 @@ class LeaveService:
             selectinload(LeaveRequest.reviewer),
         )
 
-        if self._is_manager_or_admin(requester):
+        if requester.role == "superadmin":
+            if user_id is not None:
+                query = query.where(LeaveRequest.user_id == user_id)
+        elif requester.role == "team_manager":
+            # Scope to users in the manager's teams (junction table is authoritative)
+            my_team_ids = select(user_teams.c.team_id).where(user_teams.c.user_id == requester.id)
+            team_member_ids = select(user_teams.c.user_id).where(user_teams.c.team_id.in_(my_team_ids))
+            query = query.where(LeaveRequest.user_id.in_(team_member_ids))
             if user_id is not None:
                 query = query.where(LeaveRequest.user_id == user_id)
         else:
@@ -108,6 +115,17 @@ class LeaveService:
             raise HTTPException(status_code=404, detail="İzin talebi bulunamadı.")
 
         if self._is_manager_or_admin(requester):
+            # team_manager: verify the leave owner is in one of their teams
+            if requester.role == "team_manager":
+                my_team_ids = select(user_teams.c.team_id).where(user_teams.c.user_id == requester.id)
+                shared = await self.db.execute(
+                    select(user_teams.c.team_id).where(
+                        user_teams.c.user_id == leave.user_id,
+                        user_teams.c.team_id.in_(my_team_ids),
+                    ).limit(1)
+                )
+                if not shared.scalar_one_or_none():
+                    raise HTTPException(status_code=403, detail="Bu izin talebini güncelleme yetkiniz yok.")
             # Managers / admins: can approve, reject, or cancel any leave
             if status is not None:
                 if status not in MANAGER_STATUSES:

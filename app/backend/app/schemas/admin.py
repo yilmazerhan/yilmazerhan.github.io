@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class SslCertificateResponse(BaseModel):
@@ -74,7 +74,7 @@ class ReportScheduleCreate(BaseModel):
     day_of_week: Optional[int] = None
     day_of_month: Optional[int] = None
     hour: int = 8
-    recipient_emails: list[str] = []
+    recipient_emails: list[EmailStr] = []
     team_id: Optional[uuid.UUID] = None
     user_id: Optional[uuid.UUID] = None
     date_range_days: int = 7

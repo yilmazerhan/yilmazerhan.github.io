@@ -12,13 +12,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.models.user import User
+from app.models.user import User, user_teams
 from app.models.worklog import WorkLog
 from app.models.kanban import Task, KanbanColumn
 from app.models.task_label import task_label_assignments, TaskLabel
 from app.core.dependencies import get_current_user
 
 router = APIRouter(prefix="/export", tags=["export"])
+
+_FORMULA_CHARS = ('=', '+', '-', '@', '\t', '\r')
+
+
+def _csv_safe(value: str) -> str:
+    """Prevent CSV formula injection by prefixing formula-like values."""
+    if value and value[0] in _FORMULA_CHARS:
+        return "'" + value
+    return value
 
 
 def _csv_response(filename: str, rows: list[list], headers: list[str]) -> StreamingResponse:
@@ -62,11 +71,10 @@ async def export_worklogs(
         if user_id:
             q = q.where(WorkLog.user_id == user_id)
     elif current_user.role == "team_manager":
-        # Manager sees their team's logs
-        from app.models.user import User as UserModel
-        q = q.join(UserModel, WorkLog.user_id == UserModel.id).where(
-            UserModel.team_id == current_user.team_id
-        )
+        # Scope to users in the manager's teams (use junction table — authoritative)
+        my_team_ids = select(user_teams.c.team_id).where(user_teams.c.user_id == current_user.id)
+        team_member_ids = select(user_teams.c.user_id).where(user_teams.c.team_id.in_(my_team_ids))
+        q = q.where(WorkLog.user_id.in_(team_member_ids))
         if user_id:
             q = q.where(WorkLog.user_id == user_id)
     else:
@@ -86,10 +94,10 @@ async def export_worklogs(
     rows = [
         [
             log.log_date.isoformat() if log.log_date else "",
-            log.user.full_name if log.user else "",
-            log.work_type.name if log.work_type else "",
+            _csv_safe(log.user.full_name if log.user else ""),
+            _csv_safe(log.work_type.name if log.work_type else ""),
             str(log.duration_hours),
-            log.description or "",
+            _csv_safe(log.description or ""),
         ]
         for log in logs
     ]
@@ -160,13 +168,13 @@ async def export_tasks(
     headers = ["Title", "Column", "Assignee", "Priority", "Due Date", "Status", "Labels", "Jira Ticket", "Created At"]
     rows = [
         [
-            task.title,
-            task.column.name if task.column else "",
-            task.assignee.full_name if task.assignee else "",
+            _csv_safe(task.title),
+            _csv_safe(task.column.name if task.column else ""),
+            _csv_safe(task.assignee.full_name if task.assignee else ""),
             task.priority,
             task.due_date.isoformat() if task.due_date else "",
             "Archived" if task.is_archived else "Active",
-            ", ".join(label.name for label in task.labels) if task.labels else "",
+            _csv_safe(", ".join(label.name for label in task.labels) if task.labels else ""),
             task.jira_ticket or "",
             task.created_at.strftime("%Y-%m-%d %H:%M") if task.created_at else "",
         ]

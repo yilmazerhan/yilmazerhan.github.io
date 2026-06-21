@@ -2,15 +2,24 @@ import uuid
 import logging
 from typing import Optional
 import httpx
+from urllib.parse import urlparse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.models.teams_webhook import TeamsWebhookConfig
 from app.core.security import encrypt_field, decrypt_field
 from app.config import settings
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import NotFoundError, ValidationError
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_webhook_url(url: str) -> None:
+    parsed = urlparse(url)
+    if parsed.scheme != "https":
+        raise ValidationError("Webhook URL yalnızca HTTPS kullanmalıdır.")
+    if not parsed.netloc:
+        raise ValidationError("Geçersiz webhook URL formatı.")
 
 
 class TeamsService:
@@ -34,6 +43,7 @@ class TeamsService:
         webhook_url: str,
         created_by: uuid.UUID,
     ) -> TeamsWebhookConfig:
+        _validate_webhook_url(webhook_url)
         wh = TeamsWebhookConfig(
             name=name,
             webhook_url_encrypted=encrypt_field(webhook_url, settings.SMTP_ENCRYPTION_KEY),
@@ -53,6 +63,7 @@ class TeamsService:
         wh = await self.get_webhook(webhook_id)
         if name is not None: wh.name = name
         if webhook_url is not None:
+            _validate_webhook_url(webhook_url)
             wh.webhook_url_encrypted = encrypt_field(webhook_url, settings.SMTP_ENCRYPTION_KEY)
         if is_active is not None: wh.is_active = is_active
         await self.db.flush()

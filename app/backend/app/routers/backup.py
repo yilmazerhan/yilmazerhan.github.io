@@ -2,11 +2,19 @@
 Backup router: manual backup, list, download, restore, delete, schedule management.
 """
 import uuid
-from typing import Any
+from typing import Any, Optional, Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
+
+
+class BackupScheduleUpdate(BaseModel):
+    enabled: Optional[bool] = None
+    backup_hour: Optional[int] = Field(None, ge=0, le=23)
+    backup_minute: Optional[int] = Field(None, ge=0, le=59)
+    retention_days: Optional[int] = Field(None, ge=1, le=365)
 
 from app.core.dependencies import get_current_user, require_superadmin
 from app.database import get_db
@@ -43,7 +51,7 @@ async def list_backups(
 
 @router.post("/create")
 async def create_backup(
-    notes: str | None = None,
+    notes: Annotated[str | None, Query(max_length=2000)] = None,
     db: AsyncSession = Depends(get_db),
     _: Any = Depends(require_superadmin),
 ) -> dict:
@@ -153,25 +161,11 @@ async def get_schedule(
 
 @router.put("/schedule")
 async def save_schedule(
-    data: dict,
+    data: BackupScheduleUpdate,
     db: AsyncSession = Depends(get_db),
     _: Any = Depends(require_superadmin),
 ) -> dict:
-    if "backup_hour" in data:
-        try:
-            h = int(data["backup_hour"])
-        except (ValueError, TypeError):
-            h = -1
-        if not (0 <= h <= 23):
-            raise HTTPException(status_code=422, detail="backup_hour must be 0–23")
-    if "backup_minute" in data:
-        try:
-            m = int(data["backup_minute"])
-        except (ValueError, TypeError):
-            m = -1
-        if not (0 <= m <= 59):
-            raise HTTPException(status_code=422, detail="backup_minute must be 0–59")
-    return await backup_service.save_schedule(db, data)
+    return await backup_service.save_schedule(db, data.model_dump(exclude_none=True))
 
 
 # ── Next scheduled run info ───────────────────────────────────────────────────

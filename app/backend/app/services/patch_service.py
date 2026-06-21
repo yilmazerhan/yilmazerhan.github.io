@@ -51,7 +51,8 @@ class PatchService:
         q = select(CustomerPatch).options(selectinload(CustomerPatch.created_by_user))
 
         if search:
-            pattern = f"%{search}%"
+            _safe = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            pattern = f"%{_safe}%"
             q = q.where(
                 or_(
                     cast(CustomerPatch.customers, Text).ilike(pattern),

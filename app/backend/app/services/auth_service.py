@@ -234,6 +234,12 @@ class AuthService:
                 await asyncio.sleep(_MIN_RESPONSE_TIME - elapsed)
             return None
 
+        # Revoke any existing unused reset tokens for this user before creating a new one
+        await self.db.execute(
+            update(PasswordResetToken)
+            .where(PasswordResetToken.user_id == user.id, PasswordResetToken.used == False)
+            .values(used=True)
+        )
         raw_token, token_hash = generate_secure_token()
         record = PasswordResetToken(
             user_id=user.id,

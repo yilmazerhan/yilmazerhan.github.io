@@ -88,7 +88,8 @@ class InventoryService:
         if item_type:
             q = q.where(InventoryItem.item_type == item_type)
         if search:
-            term = f"%{search}%"
+            _safe = search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+            term = f"%{_safe}%"
             q = q.where(
                 or_(
                     InventoryItem.display_name.ilike(term),

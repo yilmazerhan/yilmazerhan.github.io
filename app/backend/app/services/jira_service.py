@@ -3,6 +3,7 @@ import base64
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 import httpx
+from urllib.parse import urlparse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -11,6 +12,14 @@ from app.models.kanban import Task
 from app.core.security import encrypt_field, decrypt_field
 from app.config import settings
 from app.core.exceptions import NotFoundError, ForbiddenError, ServiceUnavailableError, ValidationError
+
+
+def _validate_jira_url(url: str) -> None:
+    parsed = urlparse(url)
+    if parsed.scheme not in ("https", "http"):
+        raise ValidationError("Jira URL geçerli bir HTTP/HTTPS adresi olmalıdır.")
+    if not parsed.netloc:
+        raise ValidationError("Geçersiz Jira URL formatı.")
 
 
 JIRA_CACHE_TTL_MINUTES = 30
@@ -42,6 +51,7 @@ class JiraService:
         project_key: str,
         created_by: uuid.UUID,
     ) -> JiraConfig:
+        _validate_jira_url(base_url)
         encrypted_token = encrypt_field(api_token, settings.JIRA_ENCRYPTION_KEY)
         cfg = JiraConfig(
             name=name,
@@ -69,6 +79,7 @@ class JiraService:
         if name is not None:
             cfg.name = name
         if base_url is not None:
+            _validate_jira_url(base_url)
             cfg.base_url = base_url.rstrip("/")
         if email is not None:
             cfg.email = email

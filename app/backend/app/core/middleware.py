@@ -50,7 +50,7 @@ AUDIT_TABLE_MAP = {
 }
 
 # Never store secret values in audit data.
-_SENSITIVE_KEY_RE = re.compile(r"password|token|secret|api_key|webhook_url|_pem", re.I)
+_SENSITIVE_KEY_RE = re.compile(r"password|token|secret|api_key|webhook_url|_pem|^value$", re.I)
 
 # Don't try to parse/store unreasonably large payloads.
 _MAX_AUDIT_BODY = 100_000
@@ -113,7 +113,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "base-uri 'self'; "
             "form-action 'self';"
         )
-        if request.url.scheme == "https":
+        # Set HSTS in production unconditionally (backend may be behind nginx terminating TLS)
+        from app.config import settings as _settings
+        if _settings.ENVIRONMENT == "production" or request.url.scheme == "https":
             response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
         return response
 

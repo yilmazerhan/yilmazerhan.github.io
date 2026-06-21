@@ -235,7 +235,8 @@ async def list_audit_logs(
     if action:
         q = q.where(AuditLog.action == action)
     if table_name:
-        q = q.where(AuditLog.table_name.ilike(f"%{table_name}%"))
+        _safe_table = table_name.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        q = q.where(AuditLog.table_name.ilike(f"%{_safe_table}%"))
     if date_from:
         q = q.where(AuditLog.created_at >= date_from)
     if date_to:
@@ -352,7 +353,9 @@ async def system_health(
         await db.execute(text("SELECT 1"))
     except Exception as exc:
         db_status = "error"
-        db_error = str(exc)
+        db_error = "connection failed"
+        import logging as _logging
+        _logging.getLogger(__name__).error("DB health check failed: %s", exc)
 
     # Redis check
     redis_status = "ok"
@@ -363,7 +366,9 @@ async def system_health(
         await r.aclose()
     except Exception as exc:
         redis_status = "error"
-        redis_error = str(exc)
+        redis_error = "connection failed"
+        import logging as _logging
+        _logging.getLogger(__name__).error("Redis health check failed: %s", exc)
 
     # Celery worker check (run blocking call in thread executor)
     celery_status = "degraded"
@@ -451,7 +456,7 @@ async def download_backup(
         content=stdout,
         media_type="application/octet-stream",
         # Plain ASCII filename — no injection risk, no RFC 5987 encoding needed
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -686,15 +691,18 @@ async def export_user_report_csv(
     )
     logs = (await db.execute(wl_q)).scalars().all()
 
+    def _csv_safe(v: str) -> str:
+        return ("'" + v) if v and v[0] in ("=", "+", "-", "@", "\t", "\r") else v
+
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["Date", "Work Type", "Duration (h)", "Description"])
     for log in logs:
         writer.writerow([
             log.log_date.isoformat(),
-            log.work_type.name if log.work_type else "",
+            _csv_safe(log.work_type.name if log.work_type else ""),
             float(log.duration_hours),
-            log.description or "",
+            _csv_safe(log.description or ""),
         ])
 
     output.seek(0)
@@ -702,7 +710,7 @@ async def export_user_report_csv(
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
