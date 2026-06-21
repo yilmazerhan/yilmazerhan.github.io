@@ -44,9 +44,14 @@ class TeamsService:
         created_by: uuid.UUID,
     ) -> TeamsWebhookConfig:
         _validate_webhook_url(webhook_url)
+        try:
+            encrypted_url = encrypt_field(webhook_url, settings.SMTP_ENCRYPTION_KEY)
+        except Exception as exc:
+            logger.error("Teams webhook URL encryption failed: %s", exc)
+            raise ValidationError("Webhook URL şifrelenemedi. Sunucu yapılandırmasını kontrol edin.")
         wh = TeamsWebhookConfig(
             name=name,
-            webhook_url_encrypted=encrypt_field(webhook_url, settings.SMTP_ENCRYPTION_KEY),
+            webhook_url_encrypted=encrypted_url,
             created_by=created_by,
         )
         self.db.add(wh)
@@ -64,7 +69,11 @@ class TeamsService:
         if name is not None: wh.name = name
         if webhook_url is not None:
             _validate_webhook_url(webhook_url)
-            wh.webhook_url_encrypted = encrypt_field(webhook_url, settings.SMTP_ENCRYPTION_KEY)
+            try:
+                wh.webhook_url_encrypted = encrypt_field(webhook_url, settings.SMTP_ENCRYPTION_KEY)
+            except Exception as exc:
+                logger.error("Teams webhook URL encryption failed: %s", exc)
+                raise ValidationError("Webhook URL şifrelenemedi. Sunucu yapılandırmasını kontrol edin.")
         if is_active is not None: wh.is_active = is_active
         await self.db.flush()
         return wh
@@ -126,9 +135,9 @@ class TeamsService:
         if not wh.is_active:
             logger.info("Teams webhook '%s' (%s) is inactive — skipping", wh.name, webhook_id)
             return False
-        url = decrypt_field(wh.webhook_url_encrypted, settings.SMTP_ENCRYPTION_KEY)
         payload = self.build_adaptive_card(title, body, action_url)
         try:
+            url = decrypt_field(wh.webhook_url_encrypted, settings.SMTP_ENCRYPTION_KEY)
             async with httpx.AsyncClient(timeout=15) as client:
                 resp = await client.post(url, json=payload)
             if resp.status_code in (200, 202):
@@ -145,12 +154,27 @@ class TeamsService:
 
     async def test_webhook(self, webhook_id: uuid.UUID) -> dict:
         try:
-            success = await self.send_message(
-                webhook_id,
-                "Test Mesajı",
-                "Bu bir test mesajıdır. Webhook başarıyla yapılandırıldı.",
-            )
-            return {"success": success, "error": None if success else "Mesaj gönderilemedi — loglara bakın."}
+            wh = await self.get_webhook(webhook_id)
+            if not wh.is_active:
+                return {"success": False, "error": "Webhook aktif değil."}
+            # Verify decryption works before making the HTTP call
+            try:
+                decrypt_field(wh.webhook_url_encrypted, settings.SMTP_ENCRYPTION_KEY)
+            except Exception:
+                return {"success": False, "error": "Webhook URL şifresi çözülemiyor. Şifreleme anahtarı değişmiş olabilir."}
+            payload = self.build_adaptive_card("Test Mesajı", "Bu bir test mesajıdır. Webhook başarıyla yapılandırıldı.")
+            try:
+                url = decrypt_field(wh.webhook_url_encrypted, settings.SMTP_ENCRYPTION_KEY)
+                async with httpx.AsyncClient(timeout=15) as client:
+                    resp = await client.post(url, json=payload)
+                if resp.status_code in (200, 202):
+                    logger.info("Teams test message sent via webhook '%s'", wh.name)
+                    return {"success": True, "error": None}
+                logger.error("Teams webhook '%s' test returned HTTP %d — body: %s", wh.name, resp.status_code, resp.text[:500])
+                return {"success": False, "error": f"Teams HTTP {resp.status_code}: {resp.text[:200]}"}
+            except Exception as exc:
+                logger.error("Teams webhook '%s' test request failed: %s", wh.name, exc)
+                return {"success": False, "error": f"Bağlantı hatası: {exc}"}
         except Exception as exc:
             logger.error("Teams test_webhook failed for %s: %s", webhook_id, exc)
             return {"success": False, "error": str(exc)}

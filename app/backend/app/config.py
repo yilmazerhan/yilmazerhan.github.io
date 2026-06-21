@@ -60,6 +60,27 @@ class Settings(BaseSettings):
         return v
 
     @model_validator(mode="after")
+    def fill_dev_encryption_keys(self) -> "Settings":
+        """Derive stable Fernet keys from SECRET_KEY in development/testing so
+        encryption-dependent features work without manual .env configuration.
+        In production, keys must be set explicitly (enforced by validate_production_secrets)."""
+        if self.ENVIRONMENT in ("development", "testing"):
+            import base64
+            import hashlib
+            for label, attr in [
+                ("jira", "JIRA_ENCRYPTION_KEY"),
+                ("smtp", "SMTP_ENCRYPTION_KEY"),
+                ("ssl", "SSL_ENCRYPTION_KEY"),
+                ("inventory", "INVENTORY_ENCRYPTION_KEY"),
+            ]:
+                if not getattr(self, attr):
+                    key = base64.urlsafe_b64encode(
+                        hashlib.sha256(f"{label}:{self.SECRET_KEY}".encode()).digest()
+                    ).decode()
+                    object.__setattr__(self, attr, key)
+        return self
+
+    @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":
         if self.ENVIRONMENT == "production":
             if self.SECRET_KEY == _DEFAULT_SECRET or len(self.SECRET_KEY) < 64:
