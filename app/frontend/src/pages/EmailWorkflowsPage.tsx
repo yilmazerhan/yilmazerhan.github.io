@@ -59,9 +59,18 @@ function scheduleSummary(wf: EmailWorkflow, lang: string): string | null {
   const hour = typeof cfg.send_hour === 'number' ? cfg.send_hour : null
 
   if (wf.trigger_type === 'worklog_reminder' && hour !== null) {
+    const hourStr = `${String(hour).padStart(2, '0')}:00`
+    const dayLabels = lang === 'tr' ? DAY_LABELS_TR : DAY_LABELS_EN
+    const sendDays = Array.isArray(cfg.send_days) ? (cfg.send_days as number[]).sort((a, b) => a - b) : null
+    if (!sendDays || sendDays.length === 7) {
+      return lang === 'tr'
+        ? `Her gün saat ${hourStr} (${tz})`
+        : `Every day at ${hourStr} (${tz})`
+    }
+    const dayNames = sendDays.map((d) => dayLabels[d] ?? d).join(', ')
     return lang === 'tr'
-      ? `Her gün saat ${String(hour).padStart(2, '0')}:00 (${tz})`
-      : `Every day at ${String(hour).padStart(2, '0')}:00 (${tz})`
+      ? `${dayNames} saat ${hourStr} (${tz})`
+      : `${dayNames} at ${hourStr} (${tz})`
   }
 
   if (wf.trigger_type === 'dashboard_report' && hour !== null) {
@@ -169,6 +178,7 @@ export default function EmailWorkflowsPage() {
   const [timezone, setTimezone] = useState(detectBrowserTimezone())
   const [frequency, setFrequency] = useState('daily')
   const [dayOfWeek, setDayOfWeek] = useState(0)
+  const [sendDays, setSendDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6])
   const [error, setError] = useState('')
 
   function resetForm() {
@@ -184,6 +194,7 @@ export default function EmailWorkflowsPage() {
     setTimezone(detectBrowserTimezone())
     setFrequency('daily')
     setDayOfWeek(0)
+    setSendDays([0, 1, 2, 3, 4, 5, 6])
     setError('')
   }
 
@@ -207,6 +218,7 @@ export default function EmailWorkflowsPage() {
     setTimezone((cfg.timezone as string) || detectBrowserTimezone())
     setFrequency((cfg.frequency as string) || 'daily')
     setDayOfWeek(typeof cfg.day_of_week === 'number' ? cfg.day_of_week : 0)
+    setSendDays(Array.isArray(cfg.send_days) ? (cfg.send_days as number[]) : [0, 1, 2, 3, 4, 5, 6])
     if (wf.recipient_type === 'specific_emails' && Array.isArray(wf.recipient_users)) {
       setRecipientEmailsInput((wf.recipient_users as string[]).join(', '))
     } else {
@@ -226,7 +238,7 @@ export default function EmailWorkflowsPage() {
     if (triggerType === 'task_due_soon') {
       triggerConfig = { days_before: daysBefore }
     } else if (triggerType === 'worklog_reminder') {
-      triggerConfig = { send_hour: sendHour, timezone }
+      triggerConfig = { send_hour: sendHour, timezone, send_days: sendDays }
     } else if (triggerType === 'dashboard_report') {
       triggerConfig = { send_hour: sendHour, timezone, frequency, day_of_week: dayOfWeek }
     }
@@ -464,6 +476,31 @@ export default function EmailWorkflowsPage() {
                     </div>
                   </div>
 
+                  {/* Day-of-week selector — only for worklog_reminder */}
+                  {triggerType === 'worklog_reminder' && (
+                    <div>
+                      <label className={labelCls}>{t('email.send_days')}</label>
+                      <div className="flex flex-wrap gap-1.5 mt-1">
+                        {(i18n.language === 'tr' ? DAY_LABELS_TR : DAY_LABELS_EN).map((dayName, idx) => (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => setSendDays((prev) =>
+                              prev.includes(idx) ? prev.filter((d) => d !== idx) : [...prev, idx].sort((a, b) => a - b)
+                            )}
+                            className={`px-2.5 py-1 rounded-md text-xs font-medium border transition-colors ${
+                              sendDays.includes(idx)
+                                ? 'bg-primary-500 border-primary-500 text-white'
+                                : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:border-primary-400'
+                            }`}
+                          >
+                            {dayName.slice(0, 3)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Frequency — only for dashboard_report */}
                   {triggerType === 'dashboard_report' && (
                     <>
@@ -496,7 +533,7 @@ export default function EmailWorkflowsPage() {
                     {scheduleSummary(
                       {
                         trigger_type: triggerType,
-                        trigger_config: { send_hour: sendHour, timezone, frequency, day_of_week: dayOfWeek },
+                        trigger_config: { send_hour: sendHour, timezone, frequency, day_of_week: dayOfWeek, send_days: sendDays },
                       } as unknown as EmailWorkflow,
                       i18n.language,
                     )}

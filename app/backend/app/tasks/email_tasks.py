@@ -503,7 +503,10 @@ async def _evaluate_workflows_async():
 
                         if now_local.hour == hour:
                             if wf.trigger_type == "worklog_reminder":
-                                await _handle_worklog_reminder(db, wf, today_local)
+                                send_days = (wf.trigger_config or {}).get("send_days")
+                                # send_days absent/null/empty → all days; otherwise check current weekday
+                                if not send_days or today_local.weekday() in send_days:
+                                    await _handle_worklog_reminder(db, wf, today_local)
                             else:
                                 frequency = (wf.trigger_config or {}).get("frequency", "daily")
                                 day_of_week = (wf.trigger_config or {}).get("day_of_week", 0)
