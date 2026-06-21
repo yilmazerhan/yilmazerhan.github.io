@@ -991,6 +991,8 @@
     "schedule_hour": "Hour",
     "schedule_day_of_week": "Day of Week",
     "schedule_day_of_month": "Day of Month",
+    "schedule_teams_webhook": "Teams Channel (optional)",
+    "schedule_teams_webhook_none": "Do not send Teams notification",
     "recipient_emails": "Recipient Emails",
     "recipient_emails_hint": "Enter one email address per line",
     "send_now": "Send Now",

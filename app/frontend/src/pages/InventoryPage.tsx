@@ -31,6 +31,7 @@ import {
 } from '@/api/inventory'
 import { useAuthStore } from '@/store/authStore'
 import { useMyEffectivePermissions } from '@/api/users'
+import { useTeamsWebhooks } from '@/api/email'
 
 // ─── Type badge helpers ────────────────────────────────────────────────────────
 
@@ -470,6 +471,7 @@ function ScheduleModal({ schedule, onClose }: ScheduleModalProps) {
   const isEdit = !!schedule
   const create = useCreateInventorySchedule()
   const update = useUpdateInventorySchedule()
+  const { data: teamsWebhooks = [] } = useTeamsWebhooks()
 
   const [form, setForm] = useState<Partial<InventoryScheduleCreate>>({
     name: schedule?.name ?? '',
@@ -479,6 +481,7 @@ function ScheduleModal({ schedule, onClose }: ScheduleModalProps) {
     hour: schedule?.hour ?? 8,
     recipient_emails: schedule?.recipient_emails ?? [],
     is_active: schedule?.is_active ?? true,
+    teams_webhook_id: schedule?.teams_webhook_id ?? null,
   })
   const [emailsInput, setEmailsInput] = useState((schedule?.recipient_emails ?? []).join('\n'))
   const [error, setError] = useState('')
@@ -496,6 +499,7 @@ function ScheduleModal({ schedule, onClose }: ScheduleModalProps) {
       hour: form.hour ?? 8,
       recipient_emails: emails,
       is_active: form.is_active ?? true,
+      teams_webhook_id: form.teams_webhook_id ?? null,
     }
 
     try {
@@ -580,6 +584,22 @@ function ScheduleModal({ schedule, onClose }: ScheduleModalProps) {
               className={inputCls}
             />
           </div>
+
+          {teamsWebhooks.length > 0 && (
+            <div>
+              <label className={labelCls}>{t('inventory.schedule_teams_webhook')}</label>
+              <select
+                value={form.teams_webhook_id ?? ''}
+                onChange={(e) => setForm((p) => ({ ...p, teams_webhook_id: e.target.value || null }))}
+                className={inputCls}
+              >
+                <option value="">{t('inventory.schedule_teams_webhook_none')}</option>
+                {teamsWebhooks.filter((wh) => wh.is_active).map((wh) => (
+                  <option key={wh.id} value={wh.id}>{wh.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <label className="flex items-center gap-2">
             <input

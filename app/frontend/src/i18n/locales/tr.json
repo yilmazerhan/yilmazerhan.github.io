@@ -991,6 +991,8 @@
     "schedule_hour": "Saat",
     "schedule_day_of_week": "Haftanın Günü",
     "schedule_day_of_month": "Ayın Günü",
+    "schedule_teams_webhook": "Teams Kanalı (isteğe bağlı)",
+    "schedule_teams_webhook_none": "Teams bildirimi gönderme",
     "recipient_emails": "Alıcı E-posta Adresleri",
     "recipient_emails_hint": "Her satıra bir e-posta adresi girin",
     "send_now": "Şimdi Gönder",

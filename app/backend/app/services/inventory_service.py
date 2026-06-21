@@ -709,6 +709,20 @@ async def _send_inventory_email(db: AsyncSession, schedule: InventoryEmailSchedu
     except Exception as _e:
         _logger.error("inventory email: unexpected error for schedule '%s': %s", schedule.name, _e, exc_info=True)
 
+    # ── Teams notification ───────────────────────────────────────────────────
+    if schedule.teams_webhook_id and sent > 0:
+        try:
+            from app.services.teams_service import TeamsService
+            teams_svc = TeamsService(db)
+            today_str = datetime.now(timezone.utc).strftime("%d.%m.%Y")
+            await teams_svc.send_message(
+                schedule.teams_webhook_id,
+                title=f"Envanter Raporu — {schedule.name}",
+                body=f"Günlük envanter raporu {today_str} tarihinde {sent} alıcıya e-posta olarak gönderildi.",
+            )
+        except Exception as _te:
+            _logger.error("inventory Teams notification failed for schedule '%s': %s", schedule.name, _te)
+
     return sent
 
 

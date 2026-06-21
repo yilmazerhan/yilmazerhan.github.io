@@ -233,6 +233,7 @@ class InventoryScheduleCreate(BaseModel):
     hour: int = Field(8, ge=0, le=23)
     recipient_emails: list[str] = Field(..., min_length=1)
     is_active: bool = True
+    teams_webhook_id: Optional[uuid.UUID] = None
 
     @model_validator(mode="after")
     def validate_schedule(self) -> "InventoryScheduleCreate":
@@ -251,6 +252,7 @@ class InventoryScheduleUpdate(BaseModel):
     hour: Optional[int] = Field(None, ge=0, le=23)
     recipient_emails: Optional[list[str]] = None
     is_active: Optional[bool] = None
+    teams_webhook_id: Optional[uuid.UUID] = None
 
 
 class InventoryScheduleResponse(BaseModel):
@@ -262,6 +264,7 @@ class InventoryScheduleResponse(BaseModel):
     hour: int
     recipient_emails: list[str]
     is_active: bool
+    teams_webhook_id: Optional[uuid.UUID] = None
     created_by: Optional[uuid.UUID] = None
     last_run_at: Optional[datetime] = None
     next_run_at: Optional[datetime] = None

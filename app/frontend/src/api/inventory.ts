@@ -129,6 +129,7 @@ export interface InventorySchedule {
   hour: number
   recipient_emails: string[]
   is_active: boolean
+  teams_webhook_id?: string | null
   created_by?: string
   last_run_at?: string
   next_run_at?: string
@@ -144,6 +145,7 @@ export interface InventoryScheduleCreate {
   hour?: number
   recipient_emails: string[]
   is_active?: boolean
+  teams_webhook_id?: string | null
 }
 
 // ─── Query keys ──────────────────────────────────────────────────────────────
