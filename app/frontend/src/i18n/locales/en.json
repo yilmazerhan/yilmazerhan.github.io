@@ -1151,6 +1151,7 @@
     "filter_from": "Deadline from",
     "filter_to": "Deadline to",
     "clear_filters": "Clear Filters",
-    "no_results": "No tasks match the search criteria."
+    "no_results": "No tasks match the search criteria.",
+    "created_by": "Created by"
   }
 }

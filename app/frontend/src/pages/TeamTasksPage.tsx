@@ -75,6 +75,81 @@ function AssigneeTiming({ assignee, deadline }: { assignee: TeamTaskUser; deadli
   return null
 }
 
+function StatusIcon({ status }: { status: string }) {
+  if (status === 'done') return <CheckCircle2 className="h-4 w-4 text-green-500" />
+  if (status === 'in_progress') return <Clock className="h-4 w-4 text-blue-500" />
+  return <AlertCircle className="h-4 w-4 text-gray-400" />
+}
+
+function TaskDetailTooltip({ task, pos }: { task: TeamTask; pos: { top: number; left: number } }) {
+  const { t, i18n } = useTranslation()
+  const dateLocale = i18n.language === 'tr' ? tr : enUS
+
+  const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200
+  const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800
+  const tooltipWidth = 300
+  const left = pos.left + tooltipWidth > viewportWidth - 8 ? pos.left - tooltipWidth - 16 : pos.left
+  const top = Math.min(pos.top, viewportHeight - 420)
+
+  return (
+    <div
+      className="fixed z-50 w-72 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl p-4 space-y-3 pointer-events-none"
+      style={{ top, left }}
+    >
+      <div>
+        <div className="font-semibold text-gray-900 dark:text-white text-sm leading-snug">{task.title}</div>
+        {task.description && (
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 whitespace-pre-wrap">{task.description}</div>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2">
+        <StatusIcon status={task.status} />
+        <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${STATUS_COLORS[task.status]}`}>
+          {t(`team_tasks.status_${task.status}`)}
+        </span>
+      </div>
+
+      <div className="text-xs space-y-0.5">
+        <div className="flex gap-1">
+          <span className="font-medium text-gray-700 dark:text-gray-300">{t('team_tasks.deadline')}:</span>
+          <span className="text-gray-600 dark:text-gray-400">{format(new Date(task.deadline), 'dd MMM yyyy', { locale: dateLocale })}</span>
+        </div>
+        {task.creator && (
+          <div className="flex gap-1">
+            <span className="font-medium text-gray-700 dark:text-gray-300">{t('team_tasks.created_by')}:</span>
+            <span className="text-gray-600 dark:text-gray-400">{task.creator.full_name}</span>
+          </div>
+        )}
+        <div className="flex gap-1">
+          <span className="font-medium text-gray-700 dark:text-gray-300">{t('team_tasks.reminder_days')}:</span>
+          <span className="text-gray-600 dark:text-gray-400">{t('team_tasks.reminder_days_label', { n: task.reminder_days_before })}</span>
+        </div>
+      </div>
+
+      {task.assignees.length > 0 && (
+        <div>
+          <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('team_tasks.assignees')}:</div>
+          <div className="flex flex-col gap-1">
+            {task.assignees.map((a) => (
+              <div key={a.id} className="flex items-center gap-1.5">
+                {a.completed_at
+                  ? <Check className="h-3 w-3 text-green-500 shrink-0" />
+                  : <span className="h-3 w-3 rounded-full border border-gray-300 dark:border-gray-600 shrink-0 inline-block" />
+                }
+                <span className={`text-xs ${a.completed_at ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                  {a.full_name}
+                </span>
+                <AssigneeTiming assignee={a} deadline={task.deadline} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 interface TaskModalProps {
   task: TeamTask | null
   onClose: () => void
@@ -253,6 +328,9 @@ export default function TeamTasksPage() {
   const [filterTitle, setFilterTitle] = useState('')
   const [filterFrom, setFilterFrom] = useState('')
   const [filterTo, setFilterTo] = useState('')
+  const [hoveredTask, setHoveredTask] = useState<TeamTask | null>(null)
+  const [tooltipPos, setTooltipPos] = useState<{ top: number; left: number } | null>(null)
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null)
 
   const filtered = tasks.filter((task) => {
     if (filterTitle && !task.title.toLowerCase().includes(filterTitle.toLowerCase())) return false
@@ -276,12 +354,6 @@ export default function TeamTasksPage() {
   async function handleToggleComplete(taskId: string) {
     try { await completeTask.mutateAsync(taskId) }
     catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
-  }
-
-  const StatusIcon = ({ status }: { status: string }) => {
-    if (status === 'done') return <CheckCircle2 className="h-4 w-4 text-green-500" />
-    if (status === 'in_progress') return <Clock className="h-4 w-4 text-blue-500" />
-    return <AlertCircle className="h-4 w-4 text-gray-400" />
   }
 
   // For a given task: find current user's assignee record
@@ -384,7 +456,16 @@ export default function TeamTasksPage() {
                   const me = myAssignee(task)
                   const doneCount = task.assignees.filter((a) => a.completed_at).length
                   return (
-                    <tr key={task.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                    <tr
+                      key={task.id}
+                      className="hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                      onMouseEnter={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect()
+                        setTooltipPos({ top: rect.top, left: rect.right + 12 })
+                        setHoveredTask(task)
+                      }}
+                      onMouseLeave={() => { setHoveredTask(null); setTooltipPos(null) }}
+                    >
                       <td className="px-4 py-3">
                         <div className="font-medium text-gray-900 dark:text-white">{task.title}</div>
                         {task.description && <div className="text-xs text-gray-400 truncate max-w-[220px]">{task.description}</div>}
@@ -477,10 +558,17 @@ export default function TeamTasksPage() {
               const doneCount = task.assignees.filter((a) => a.completed_at).length
               return (
                 <div key={task.id} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4">
-                  <div className="flex items-start justify-between gap-2 mb-2">
+                  <div
+                    className="flex items-start justify-between gap-2 mb-2 cursor-pointer"
+                    onClick={() => setExpandedCardId(expandedCardId === task.id ? null : task.id)}
+                  >
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-gray-900 dark:text-white">{task.title}</div>
-                      {task.description && <div className="text-xs text-gray-400 mt-0.5 line-clamp-2">{task.description}</div>}
+                      {task.description && (
+                        <div className={`text-xs text-gray-400 mt-0.5 ${expandedCardId === task.id ? 'whitespace-pre-wrap' : 'line-clamp-2'}`}>
+                          {task.description}
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                       <StatusIcon status={task.status} />
@@ -513,6 +601,12 @@ export default function TeamTasksPage() {
                           {t('team_tasks.completed_count', { done: doneCount, total: task.assignees.length })}
                         </span>
                       )}
+                    </div>
+                  )}
+                  {expandedCardId === task.id && task.creator && (
+                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                      <span className="font-medium text-gray-700 dark:text-gray-300">{t('team_tasks.created_by')}: </span>
+                      {task.creator.full_name}
                     </div>
                   )}
                   <div className="flex gap-1 justify-end pt-2 border-t border-gray-100 dark:border-gray-800">
@@ -551,6 +645,7 @@ export default function TeamTasksPage() {
       )}
 
       {showModal && <TaskModal task={modalTask} onClose={closeModal} />}
+      {hoveredTask && tooltipPos && <TaskDetailTooltip task={hoveredTask} pos={tooltipPos} />}
     </div>
   )
 }

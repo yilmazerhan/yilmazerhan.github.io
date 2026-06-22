@@ -1151,6 +1151,7 @@
     "filter_from": "Başlangıç tarihi",
     "filter_to": "Bitiş tarihi",
     "clear_filters": "Filtreleri Temizle",
-    "no_results": "Arama kriterlerine uygun görev bulunamadı."
+    "no_results": "Arama kriterlerine uygun görev bulunamadı.",
+    "created_by": "Oluşturan"
   }
 }
