@@ -621,108 +621,163 @@ def _item_to_typed_row(item: InventoryItem) -> list:
         ] + tail
 
 
+async def _build_teams_inventory_body(db: AsyncSession, today_str: str) -> str:
+    """Build a readable inventory listing for the Teams Adaptive Card body."""
+    svc = InventoryService(db)
+    items = await svc.list_items(is_active=True, limit=10000)
+
+    by_type: dict[str, list] = {t: [] for t in _TYPE_ORDER}
+    for item in items:
+        if item.item_type in by_type:
+            by_type[item.item_type].append(item)
+
+    total = sum(len(v) for v in by_type.values())
+    lines: list[str] = [f"Tarih: {today_str}  |  Toplam: {total} aktif öğe"]
+
+    _LABEL = {
+        "server": "Sunucular",
+        "database": "Veritabanları",
+        "email_account": "E-posta Hesapları",
+        "cloud_account": "Bulut Hesapları",
+        "generic": "Genel",
+    }
+
+    for t in _TYPE_ORDER:
+        type_items = by_type[t]
+        if not type_items:
+            continue
+        lines.append(f"\r\n{_LABEL[t]} ({len(type_items)})")
+        for item in type_items[:50]:
+            parts: list[str] = [item.display_name]
+            if t == "server":
+                if item.hostname:
+                    parts.append(item.hostname)
+                if item.ip_address:
+                    parts.append(item.ip_address)
+                if item.operating_system:
+                    parts.append(item.operating_system)
+            elif t == "database":
+                if item.database_type:
+                    parts.append(item.database_type)
+                if item.hostname:
+                    parts.append(item.hostname)
+                if item.database_name:
+                    parts.append(item.database_name)
+            elif t == "email_account":
+                if item.email_address:
+                    parts.append(item.email_address)
+                if item.smtp_host:
+                    parts.append(item.smtp_host)
+            elif t == "cloud_account":
+                if item.provider:
+                    parts.append(item.provider)
+                if item.region:
+                    parts.append(item.region)
+            elif t == "generic":
+                if item.url:
+                    parts.append(item.url[:80])
+            lines.append("  • " + " | ".join(parts))
+        if len(type_items) > 50:
+            lines.append(f"  ... ve {len(type_items) - 50} öğe daha")
+
+    return "\r\n".join(lines)
+
+
 async def _send_inventory_email(db: AsyncSession, schedule: InventoryEmailSchedule) -> int:
     """Generate Excel and send to all schedule recipients. Returns count of sent emails."""
     import logging as _logging
     _logger = _logging.getLogger(__name__)
-    from app.models.email_config import SmtpConfig
-
-    smtp_result = await db.execute(
-        select(SmtpConfig).where(SmtpConfig.is_active == True)
-        .order_by(SmtpConfig.updated_at.desc())
-        .limit(1)
-    )
-    smtp = smtp_result.scalar_one_or_none()
-
-    if not smtp:
-        _logger.warning("inventory email: no active SMTP config — skipping schedule '%s'", schedule.name)
-        return 0
-    if not schedule.recipient_emails:
-        return 0
-
-    # Generate inventory Excel
-    svc = InventoryService(db)
-    excel_bytes = await svc.export_excel()
 
     sent = 0
-    try:
-        import asyncio
-        import smtplib
-        from email.mime.multipart import MIMEMultipart
-        from email.mime.text import MIMEText
-        from email.mime.base import MIMEBase
-        from email import encoders
-        from app.core.security import decrypt_field as _dec
-        from app.config import settings as _s
 
-        smtp_password = _dec(smtp.password_encrypted, _s.SMTP_ENCRYPTION_KEY)
+    # ── Email sending ────────────────────────────────────────────────────────
+    if schedule.recipient_emails:
+        from app.models.email_config import SmtpConfig
 
-        # Capture connection primitives so the blocking SMTP I/O can run in a
-        # worker thread (asyncio.to_thread) without blocking the event loop —
-        # this path runs from both request handlers and the scheduler loop.
-        host, port = smtp.host, smtp.port
-        use_tls, use_ssl = bool(smtp.use_tls), bool(getattr(smtp, "use_ssl", False))
-        username, from_email, from_name = smtp.username, smtp.from_email, smtp.from_name
-        today_str = datetime.now(timezone.utc).strftime("%Y%m%d")
+        smtp_result = await db.execute(
+            select(SmtpConfig).where(SmtpConfig.is_active == True)
+            .order_by(SmtpConfig.updated_at.desc())
+            .limit(1)
+        )
+        smtp = smtp_result.scalar_one_or_none()
 
-        def _send_one(recipient: str) -> None:
-            import ssl as _ssl
-            msg = MIMEMultipart()
-            msg["From"] = f"{from_name} <{from_email}>"
-            msg["To"] = recipient
-            msg["Subject"] = f"Envanter Raporu — {schedule.name}"
+        if not smtp:
+            _logger.warning("inventory email: no active SMTP config — skipping email for schedule '%s'", schedule.name)
+        else:
+            svc = InventoryService(db)
+            excel_bytes = await svc.export_excel()
 
-            body = "Ekte envanter raporu yer almaktadır.\n"
-            msg.attach(MIMEText(body, "plain", "utf-8"))
-
-            part = MIMEBase("application", "octet-stream")
-            part.set_payload(excel_bytes)
-            encoders.encode_base64(part)
-            part.add_header(
-                "Content-Disposition",
-                f'attachment; filename="inventory_{today_str}.xlsx"',
-            )
-            msg.attach(part)
-
-            _ctx = _ssl.create_default_context()
-            if use_ssl:
-                server = smtplib.SMTP_SSL(host, port, context=_ctx, timeout=15)
-            elif use_tls:
-                server = smtplib.SMTP(host, port, timeout=15)
-                server.ehlo()
-                server.starttls(context=_ctx)
-                server.ehlo()
-            else:
-                server = smtplib.SMTP(host, port, timeout=15)
-                server.ehlo()
             try:
-                server.login(username, smtp_password)
-                server.sendmail(from_email, recipient, msg.as_string())
-            finally:
-                server.quit()
+                import asyncio
+                import smtplib
+                from email.mime.multipart import MIMEMultipart
+                from email.mime.text import MIMEText
+                from email.mime.base import MIMEBase
+                from email import encoders
+                from app.core.security import decrypt_field as _dec
+                from app.config import settings as _s
 
-        for recipient in schedule.recipient_emails:
-            try:
-                await asyncio.to_thread(_send_one, recipient)
-                sent += 1
+                smtp_password = _dec(smtp.password_encrypted, _s.SMTP_ENCRYPTION_KEY)
+                host, port = smtp.host, smtp.port
+                use_tls, use_ssl = bool(smtp.use_tls), bool(getattr(smtp, "use_ssl", False))
+                username, from_email, from_name = smtp.username, smtp.from_email, smtp.from_name
+                today_str_file = datetime.now(timezone.utc).strftime("%Y%m%d")
+
+                def _send_one(recipient: str) -> None:
+                    import ssl as _ssl
+                    msg = MIMEMultipart()
+                    msg["From"] = f"{from_name} <{from_email}>"
+                    msg["To"] = recipient
+                    msg["Subject"] = f"Envanter Raporu — {schedule.name}"
+                    msg.attach(MIMEText("Ekte envanter raporu yer almaktadır.\n", "plain", "utf-8"))
+                    part = MIMEBase("application", "octet-stream")
+                    part.set_payload(excel_bytes)
+                    encoders.encode_base64(part)
+                    part.add_header(
+                        "Content-Disposition",
+                        f'attachment; filename="inventory_{today_str_file}.xlsx"',
+                    )
+                    msg.attach(part)
+                    _ctx = _ssl.create_default_context()
+                    if use_ssl:
+                        server = smtplib.SMTP_SSL(host, port, context=_ctx, timeout=15)
+                    elif use_tls:
+                        server = smtplib.SMTP(host, port, timeout=15)
+                        server.ehlo()
+                        server.starttls(context=_ctx)
+                        server.ehlo()
+                    else:
+                        server = smtplib.SMTP(host, port, timeout=15)
+                        server.ehlo()
+                    try:
+                        server.login(username, smtp_password)
+                        server.sendmail(from_email, recipient, msg.as_string())
+                    finally:
+                        server.quit()
+
+                for recipient in schedule.recipient_emails:
+                    try:
+                        await asyncio.to_thread(_send_one, recipient)
+                        sent += 1
+                    except Exception as _e:
+                        _logger.error("inventory email: failed to send to %s: %s", recipient, _e)
             except Exception as _e:
-                _logger.error("inventory email: failed to send to %s: %s", recipient, _e)
-    except Exception as _e:
-        _logger.error("inventory email: unexpected error for schedule '%s': %s", schedule.name, _e, exc_info=True)
+                _logger.error("inventory email: unexpected error for schedule '%s': %s", schedule.name, _e, exc_info=True)
 
-    # ── Teams notification ───────────────────────────────────────────────────
-    if schedule.teams_webhook_id and sent > 0:
+    # ── Teams message with actual inventory content ──────────────────────────
+    if schedule.teams_webhook_id:
         try:
             from app.services.teams_service import TeamsService
             teams_svc = TeamsService(db)
             today_str = datetime.now(timezone.utc).strftime("%d.%m.%Y")
+            body = await _build_teams_inventory_body(db, today_str)
             await teams_svc.send_message(
                 schedule.teams_webhook_id,
                 title=f"Envanter Raporu — {schedule.name}",
-                body=f"Günlük envanter raporu {today_str} tarihinde {sent} alıcıya e-posta olarak gönderildi.",
+                body=body,
             )
         except Exception as _te:
-            _logger.error("inventory Teams notification failed for schedule '%s': %s", schedule.name, _te)
+            _logger.error("inventory Teams message failed for schedule '%s': %s", schedule.name, _te)
 
     return sent
 
