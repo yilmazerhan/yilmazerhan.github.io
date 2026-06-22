@@ -1152,6 +1152,9 @@
     "filter_to": "Bitiş tarihi",
     "clear_filters": "Filtreleri Temizle",
     "no_results": "Arama kriterlerine uygun görev bulunamadı.",
-    "created_by": "Oluşturan"
+    "created_by": "Oluşturan",
+    "column_empty": "Bu sütunda görev yok",
+    "view_table": "Tablo görünümü",
+    "view_kanban": "Kanban görünümü"
   }
 }

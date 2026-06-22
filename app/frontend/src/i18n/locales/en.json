@@ -1152,6 +1152,9 @@
     "filter_to": "Deadline to",
     "clear_filters": "Clear Filters",
     "no_results": "No tasks match the search criteria.",
-    "created_by": "Created by"
+    "created_by": "Created by",
+    "column_empty": "No tasks in this column",
+    "view_table": "Table view",
+    "view_kanban": "Kanban view"
   }
 }

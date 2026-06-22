@@ -2,7 +2,18 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { format } from 'date-fns'
 import { tr, enUS } from 'date-fns/locale'
-import { Plus, Pencil, Trash2, Loader2, CheckCircle2, Clock, AlertCircle, Users, Search, Check, RotateCcw } from 'lucide-react'
+import { Plus, Pencil, Trash2, Loader2, CheckCircle2, Clock, AlertCircle, Users, Search, Check, RotateCcw, LayoutGrid, List } from 'lucide-react'
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core'
 import { useAuthStore } from '@/store/authStore'
 import {
   useTeamTasks,
@@ -21,6 +32,38 @@ const STATUS_COLORS = {
   done: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
 }
 
+const COLUMN_CONFIG: Record<TeamTask['status'], {
+  labelKey: string
+  border: string
+  header: string
+  dot: string
+  icon: React.ReactNode
+}> = {
+  pending: {
+    labelKey: 'team_tasks.status_pending',
+    border: 'border-gray-200 dark:border-gray-700',
+    header: 'bg-gray-50 dark:bg-gray-800',
+    dot: 'bg-gray-400',
+    icon: <AlertCircle className="h-4 w-4 text-gray-400" />,
+  },
+  in_progress: {
+    labelKey: 'team_tasks.status_in_progress',
+    border: 'border-blue-200 dark:border-blue-800',
+    header: 'bg-blue-50 dark:bg-blue-900/20',
+    dot: 'bg-blue-500',
+    icon: <Clock className="h-4 w-4 text-blue-500" />,
+  },
+  done: {
+    labelKey: 'team_tasks.status_done',
+    border: 'border-green-200 dark:border-green-800',
+    header: 'bg-green-50 dark:bg-green-900/20',
+    dot: 'bg-green-500',
+    icon: <CheckCircle2 className="h-4 w-4 text-green-500" />,
+  },
+}
+
+// ─── Small shared components ─────────────────────────────────────────────────
+
 function DaysLeftBadge({ deadline }: { deadline: string }) {
   const { t } = useTranslation()
   const today = new Date()
@@ -35,11 +78,9 @@ function DaysLeftBadge({ deadline }: { deadline: string }) {
   return <span className="text-xs text-gray-500 dark:text-gray-400">{t('settings.days_left', { n: diff })}</span>
 }
 
-// Per-assignee timing: when they completed (and how late), or how overdue they are.
 function AssigneeTiming({ assignee, deadline }: { assignee: TeamTaskUser; deadline: string }) {
   const { t, i18n } = useTranslation()
   const dateLocale = i18n.language === 'tr' ? tr : enUS
-
   const dl = new Date(deadline)
   dl.setHours(0, 0, 0, 0)
 
@@ -81,6 +122,8 @@ function StatusIcon({ status }: { status: string }) {
   return <AlertCircle className="h-4 w-4 text-gray-400" />
 }
 
+// ─── Hover detail tooltip ────────────────────────────────────────────────────
+
 function TaskDetailTooltip({ task, pos }: { task: TeamTask; pos: { top: number; left: number } }) {
   const { t, i18n } = useTranslation()
   const dateLocale = i18n.language === 'tr' ? tr : enUS
@@ -102,14 +145,12 @@ function TaskDetailTooltip({ task, pos }: { task: TeamTask; pos: { top: number; 
           <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 whitespace-pre-wrap">{task.description}</div>
         )}
       </div>
-
       <div className="flex items-center gap-2">
         <StatusIcon status={task.status} />
         <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${STATUS_COLORS[task.status]}`}>
           {t(`team_tasks.status_${task.status}`)}
         </span>
       </div>
-
       <div className="text-xs space-y-0.5">
         <div className="flex gap-1">
           <span className="font-medium text-gray-700 dark:text-gray-300">{t('team_tasks.deadline')}:</span>
@@ -126,7 +167,6 @@ function TaskDetailTooltip({ task, pos }: { task: TeamTask; pos: { top: number; 
           <span className="text-gray-600 dark:text-gray-400">{t('team_tasks.reminder_days_label', { n: task.reminder_days_before })}</span>
         </div>
       </div>
-
       {task.assignees.length > 0 && (
         <div>
           <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t('team_tasks.assignees')}:</div>
@@ -149,6 +189,314 @@ function TaskDetailTooltip({ task, pos }: { task: TeamTask; pos: { top: number; 
     </div>
   )
 }
+
+// ─── Kanban components ────────────────────────────────────────────────────────
+
+interface KanbanCardProps {
+  task: TeamTask
+  isManager: boolean
+  isDraggingGlobal: boolean
+  me: TeamTaskUser | null
+  completeIsPending: boolean
+  onEdit: () => void
+  onDelete: () => void
+  onToggleComplete: () => void
+  onHoverTask: (task: TeamTask, pos: { top: number; left: number }) => void
+  onHoverEnd: () => void
+}
+
+function KanbanCard({
+  task,
+  isManager,
+  isDraggingGlobal,
+  me,
+  completeIsPending,
+  onEdit,
+  onDelete,
+  onToggleComplete,
+  onHoverTask,
+  onHoverEnd,
+}: KanbanCardProps) {
+  const { t, i18n } = useTranslation()
+  const dateLocale = i18n.language === 'tr' ? tr : enUS
+  const doneCount = task.assignees.filter((a) => a.completed_at).length
+
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: task.id,
+    data: { task },
+    disabled: !isManager,
+  })
+
+  const style: React.CSSProperties = {
+    opacity: isDragging ? 0 : 1,
+    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-3 shadow-sm select-none transition-shadow hover:shadow-md ${isManager ? 'cursor-grab active:cursor-grabbing' : ''}`}
+      onMouseEnter={(e) => {
+        if (!isDraggingGlobal) {
+          const rect = e.currentTarget.getBoundingClientRect()
+          onHoverTask(task, { top: rect.top, left: rect.right + 12 })
+        }
+      }}
+      onMouseLeave={onHoverEnd}
+      {...(isManager ? { ...listeners, ...attributes } : {})}
+    >
+      {/* Title row + action buttons */}
+      <div className="flex items-start justify-between gap-1.5 mb-2">
+        <div className="font-medium text-sm text-gray-900 dark:text-white leading-snug flex-1 min-w-0">
+          {task.title}
+        </div>
+        <div className="flex items-center gap-0.5 shrink-0">
+          {me && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggleComplete() }}
+              disabled={completeIsPending}
+              title={me.completed_at ? t('team_tasks.mark_undone') : t('team_tasks.mark_done')}
+              className={`p-1 rounded transition-colors ${
+                me.completed_at
+                  ? 'text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20'
+                  : 'text-gray-300 hover:text-green-500 hover:bg-green-50 dark:hover:bg-green-900/20'
+              }`}
+            >
+              <Check className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {isManager && (
+            <>
+              <button
+                onClick={(e) => { e.stopPropagation(); onEdit() }}
+                className="p-1 rounded text-gray-300 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); onDelete() }}
+                className="p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Description */}
+      {task.description && (
+        <p className="text-xs text-gray-400 dark:text-gray-500 mb-2 line-clamp-2 leading-relaxed">
+          {task.description}
+        </p>
+      )}
+
+      {/* Deadline + days left */}
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-xs text-gray-500 dark:text-gray-400">
+          {format(new Date(task.deadline), 'dd MMM yyyy', { locale: dateLocale })}
+        </span>
+        {task.status !== 'done' && <DaysLeftBadge deadline={task.deadline} />}
+      </div>
+
+      {/* Assignees */}
+      {task.assignees.length > 0 && (
+        <div className="flex flex-col gap-0.5 pt-2 border-t border-gray-100 dark:border-gray-800">
+          {task.assignees.map((a) => (
+            <div key={a.id} className="flex items-center gap-1.5">
+              {a.completed_at
+                ? <Check className="h-2.5 w-2.5 text-green-500 shrink-0" />
+                : <span className="h-2.5 w-2.5 rounded-full border border-gray-300 dark:border-gray-600 shrink-0 inline-block" />
+              }
+              <span className={`text-xs truncate ${a.completed_at ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                {a.full_name}
+              </span>
+              <AssigneeTiming assignee={a} deadline={task.deadline} />
+            </div>
+          ))}
+          {task.assignees.length > 1 && (
+            <span className="text-[10px] text-gray-400 mt-0.5">
+              {t('team_tasks.completed_count', { done: doneCount, total: task.assignees.length })}
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface KanbanColumnProps {
+  status: TeamTask['status']
+  tasks: TeamTask[]
+  isManager: boolean
+  isDraggingGlobal: boolean
+  completeIsPending: boolean
+  myAssignee: (task: TeamTask) => TeamTaskUser | null
+  onEdit: (task: TeamTask) => void
+  onDelete: (task: TeamTask) => void
+  onToggleComplete: (taskId: string) => void
+  onHoverTask: (task: TeamTask, pos: { top: number; left: number }) => void
+  onHoverEnd: () => void
+}
+
+function KanbanColumn({
+  status,
+  tasks,
+  isManager,
+  isDraggingGlobal,
+  completeIsPending,
+  myAssignee,
+  onEdit,
+  onDelete,
+  onToggleComplete,
+  onHoverTask,
+  onHoverEnd,
+}: KanbanColumnProps) {
+  const { t } = useTranslation()
+  const { isOver, setNodeRef } = useDroppable({ id: status })
+  const cfg = COLUMN_CONFIG[status]
+
+  return (
+    <div className={`flex flex-col rounded-xl border ${cfg.border} overflow-hidden transition-shadow ${isOver && isDraggingGlobal ? 'shadow-lg ring-2 ring-primary-400 ring-offset-1' : ''}`}>
+      {/* Column header */}
+      <div className={`flex items-center justify-between px-3 py-2.5 ${cfg.header}`}>
+        <div className="flex items-center gap-2">
+          {cfg.icon}
+          <span className="font-semibold text-sm text-gray-700 dark:text-gray-200">
+            {t(cfg.labelKey)}
+          </span>
+        </div>
+        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 shadow-sm">
+          {tasks.length}
+        </span>
+      </div>
+
+      {/* Droppable card area */}
+      <div
+        ref={setNodeRef}
+        className={`flex flex-col gap-2 p-2 flex-1 min-h-[8rem] transition-colors ${
+          isOver && isDraggingGlobal ? 'bg-primary-50 dark:bg-primary-900/10' : 'bg-gray-50/50 dark:bg-gray-800/30'
+        }`}
+      >
+        {tasks.map((task) => (
+          <KanbanCard
+            key={task.id}
+            task={task}
+            isManager={isManager}
+            isDraggingGlobal={isDraggingGlobal}
+            me={myAssignee(task)}
+            completeIsPending={completeIsPending}
+            onEdit={() => onEdit(task)}
+            onDelete={() => onDelete(task)}
+            onToggleComplete={() => onToggleComplete(task.id)}
+            onHoverTask={onHoverTask}
+            onHoverEnd={onHoverEnd}
+          />
+        ))}
+        {tasks.length === 0 && !isDraggingGlobal && (
+          <div className="flex-1 flex items-center justify-center py-6">
+            <p className="text-xs text-gray-400 dark:text-gray-600 italic">{t('team_tasks.column_empty')}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+interface KanbanViewProps {
+  tasks: TeamTask[]
+  isManager: boolean
+  completeIsPending: boolean
+  myAssignee: (task: TeamTask) => TeamTaskUser | null
+  onEdit: (task: TeamTask) => void
+  onDelete: (task: TeamTask) => void
+  onToggleComplete: (taskId: string) => void
+  onHoverTask: (task: TeamTask, pos: { top: number; left: number }) => void
+  onHoverEnd: () => void
+}
+
+function KanbanView({
+  tasks,
+  isManager,
+  completeIsPending,
+  myAssignee,
+  onEdit,
+  onDelete,
+  onToggleComplete,
+  onHoverTask,
+  onHoverEnd,
+}: KanbanViewProps) {
+  const { i18n } = useTranslation()
+  const dateLocale = i18n.language === 'tr' ? tr : enUS
+  const updateTask = useUpdateTeamTask()
+  const [activeTask, setActiveTask] = useState<TeamTask | null>(null)
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
+  )
+
+  const byStatus: Record<TeamTask['status'], TeamTask[]> = {
+    pending: tasks.filter((t) => t.status === 'pending'),
+    in_progress: tasks.filter((t) => t.status === 'in_progress'),
+    done: tasks.filter((t) => t.status === 'done'),
+  }
+
+  function handleDragStart(event: DragStartEvent) {
+    setActiveTask(event.active.data.current?.task ?? null)
+    onHoverEnd()
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    setActiveTask(null)
+    const { active, over } = event
+    if (!over || !isManager) return
+    const task = active.data.current?.task as TeamTask | undefined
+    const newStatus = over.id as TeamTask['status']
+    if (task && task.status !== newStatus) {
+      updateTask.mutate({ id: task.id, status: newStatus })
+    }
+  }
+
+  return (
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {(['pending', 'in_progress', 'done'] as const).map((status) => (
+          <KanbanColumn
+            key={status}
+            status={status}
+            tasks={byStatus[status]}
+            isManager={isManager}
+            isDraggingGlobal={!!activeTask}
+            completeIsPending={completeIsPending}
+            myAssignee={myAssignee}
+            onEdit={onEdit}
+            onDelete={onDelete}
+            onToggleComplete={onToggleComplete}
+            onHoverTask={onHoverTask}
+            onHoverEnd={onHoverEnd}
+          />
+        ))}
+      </div>
+
+      <DragOverlay dropAnimation={null}>
+        {activeTask && (
+          <div className="bg-white dark:bg-gray-900 border-2 border-primary-400 rounded-xl p-3 shadow-2xl w-64 opacity-95 rotate-1">
+            <div className="font-medium text-sm text-gray-900 dark:text-white leading-snug">{activeTask.title}</div>
+            {activeTask.description && (
+              <p className="text-xs text-gray-400 mt-1 line-clamp-2">{activeTask.description}</p>
+            )}
+            <div className="text-xs text-gray-500 mt-2">
+              {format(new Date(activeTask.deadline), 'dd MMM yyyy', { locale: dateLocale })}
+            </div>
+          </div>
+        )}
+      </DragOverlay>
+    </DndContext>
+  )
+}
+
+// ─── Task create / edit modal ────────────────────────────────────────────────
 
 interface TaskModalProps {
   task: TeamTask | null
@@ -313,6 +661,8 @@ function TaskModal({ task, onClose }: TaskModalProps) {
   )
 }
 
+// ─── Main page ───────────────────────────────────────────────────────────────
+
 export default function TeamTasksPage() {
   const { t, i18n } = useTranslation()
   const dateLocale = i18n.language === 'tr' ? tr : enUS
@@ -323,6 +673,7 @@ export default function TeamTasksPage() {
   const deleteTask = useDeleteTeamTask()
   const completeTask = useCompleteTeamTask()
 
+  const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table')
   const [modalTask, setModalTask] = useState<TeamTask | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [filterTitle, setFilterTitle] = useState('')
@@ -356,13 +707,23 @@ export default function TeamTasksPage() {
     catch (err: any) { alert(err.response?.data?.detail || t('common.error')) }
   }
 
-  // For a given task: find current user's assignee record
   function myAssignee(task: TeamTask) {
     return task.assignees.find((a) => a.id === user?.id) ?? null
   }
 
+  function handleHoverTask(task: TeamTask, pos: { top: number; left: number }) {
+    setHoveredTask(task)
+    setTooltipPos(pos)
+  }
+
+  function handleHoverEnd() {
+    setHoveredTask(null)
+    setTooltipPos(null)
+  }
+
   return (
     <div className="space-y-6">
+      {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('team_tasks.title')}</h1>
@@ -379,8 +740,8 @@ export default function TeamTasksPage() {
         )}
       </div>
 
-      {/* Filter bar */}
-      <div className="flex flex-wrap gap-3 items-end">
+      {/* Filter bar + view toggle */}
+      <div className="flex flex-wrap gap-3 items-center">
         <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
@@ -416,6 +777,23 @@ export default function TeamTasksPage() {
             {t('team_tasks.clear_filters')}
           </button>
         )}
+        {/* View toggle */}
+        <div className="flex items-center rounded-lg border border-gray-300 dark:border-gray-700 overflow-hidden ml-auto">
+          <button
+            onClick={() => setViewMode('table')}
+            title={t('team_tasks.view_table')}
+            className={`p-2 transition-colors ${viewMode === 'table' ? 'bg-primary-500 text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+          >
+            <List className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => setViewMode('kanban')}
+            title={t('team_tasks.view_kanban')}
+            className={`p-2 transition-colors ${viewMode === 'kanban' ? 'bg-primary-500 text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -435,7 +813,21 @@ export default function TeamTasksPage() {
           <Search className="h-10 w-10 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
           <p className="text-gray-400 dark:text-gray-500">{t('team_tasks.no_results')}</p>
         </div>
+      ) : viewMode === 'kanban' ? (
+        // ── Kanban board ──────────────────────────────────────────────────────
+        <KanbanView
+          tasks={filtered}
+          isManager={isManager}
+          completeIsPending={completeTask.isPending}
+          myAssignee={myAssignee}
+          onEdit={openEdit}
+          onDelete={handleDelete}
+          onToggleComplete={handleToggleComplete}
+          onHoverTask={handleHoverTask}
+          onHoverEnd={handleHoverEnd}
+        />
       ) : (
+        // ── Table / mobile cards ──────────────────────────────────────────────
         <>
           {/* Desktop table */}
           <div className="hidden md:block bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
@@ -461,10 +853,9 @@ export default function TeamTasksPage() {
                       className="hover:bg-gray-50 dark:hover:bg-gray-800/50"
                       onMouseEnter={(e) => {
                         const rect = e.currentTarget.getBoundingClientRect()
-                        setTooltipPos({ top: rect.top, left: rect.right + 12 })
-                        setHoveredTask(task)
+                        handleHoverTask(task, { top: rect.top, left: rect.right + 12 })
                       }}
-                      onMouseLeave={() => { setHoveredTask(null); setTooltipPos(null) }}
+                      onMouseLeave={handleHoverEnd}
                     >
                       <td className="px-4 py-3">
                         <div className="font-medium text-gray-900 dark:text-white">{task.title}</div>
@@ -514,7 +905,6 @@ export default function TeamTasksPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1 justify-end">
-                          {/* Per-user completion toggle — shown if current user is an assignee */}
                           {me && (
                             <button
                               onClick={() => handleToggleComplete(task.id)}
@@ -553,7 +943,7 @@ export default function TeamTasksPage() {
 
           {/* Mobile cards */}
           <div className="md:hidden space-y-3">
-            {tasks.map((task) => {
+            {filtered.map((task) => {
               const me = myAssignee(task)
               const doneCount = task.assignees.filter((a) => a.completed_at).length
               return (
