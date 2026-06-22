@@ -621,66 +621,142 @@ def _item_to_typed_row(item: InventoryItem) -> list:
         ] + tail
 
 
-async def _build_teams_inventory_body(db: AsyncSession, today_str: str) -> str:
-    """Build a readable inventory listing for the Teams Adaptive Card body."""
-    svc = InventoryService(db)
-    items = await svc.list_items(is_active=True, limit=10000)
+_TEAMS_LABELS = {
+    "server": "Sunucular",
+    "database": "Veritabanları",
+    "email_account": "E-posta Hesapları",
+    "cloud_account": "Bulut Hesapları",
+    "generic": "Genel",
+}
 
-    by_type: dict[str, list] = {t: [] for t in _TYPE_ORDER}
-    for item in items:
-        if item.item_type in by_type:
-            by_type[item.item_type].append(item)
+_TEAMS_ICONS = {
+    "server": "🖥️",
+    "database": "💾",
+    "email_account": "📧",
+    "cloud_account": "☁️",
+    "generic": "📦",
+}
 
-    total = sum(len(v) for v in by_type.values())
-    lines: list[str] = [f"Tarih: {today_str}  |  Toplam: {total} aktif öğe"]
 
-    _LABEL = {
-        "server": "Sunucular",
-        "database": "Veritabanları",
-        "email_account": "E-posta Hesapları",
-        "cloud_account": "Bulut Hesapları",
-        "generic": "Genel",
-    }
+def _item_detail_text(item: InventoryItem) -> str:
+    """Return display_name plus the most useful identifying fields for an item."""
+    parts: list[str] = [item.display_name]
+    t = item.item_type
+    if t == "server":
+        if item.hostname:
+            parts.append(item.hostname)
+        if item.ip_address:
+            parts.append(item.ip_address)
+        if item.operating_system:
+            parts.append(item.operating_system)
+    elif t == "database":
+        if item.database_type:
+            parts.append(item.database_type)
+        if item.hostname:
+            parts.append(item.hostname)
+        if item.database_name:
+            parts.append(item.database_name)
+    elif t == "email_account":
+        if item.email_address and item.email_address != item.display_name:
+            parts.append(item.email_address)
+        if item.smtp_host:
+            parts.append(item.smtp_host)
+    elif t == "cloud_account":
+        if item.provider:
+            parts.append(item.provider)
+        if item.region:
+            parts.append(item.region)
+    elif t == "generic":
+        if item.url:
+            parts.append(item.url[:80])
+    return " | ".join(parts)
 
+
+def _build_teams_inventory_card(
+    title: str,
+    today_str: str,
+    by_type: dict,
+    total: int,
+) -> dict:
+    """Return a rich Adaptive Card payload for the inventory report."""
+    body: list[dict] = []
+
+    # ── Header ──────────────────────────────────────────────────────────────
+    body.append({
+        "type": "TextBlock",
+        "text": title,
+        "size": "Large",
+        "weight": "Bolder",
+        "color": "Accent",
+        "wrap": True,
+    })
+    body.append({
+        "type": "TextBlock",
+        "text": f"🗓️ {today_str}",
+        "size": "Small",
+        "isSubtle": True,
+        "spacing": "None",
+    })
+
+    # ── Summary FactSet ──────────────────────────────────────────────────────
+    facts: list[dict] = []
     for t in _TYPE_ORDER:
-        type_items = by_type[t]
-        if not type_items:
-            continue
-        lines.append(f"\r\n{_LABEL[t]} ({len(type_items)})")
-        for item in type_items[:50]:
-            parts: list[str] = [item.display_name]
-            if t == "server":
-                if item.hostname:
-                    parts.append(item.hostname)
-                if item.ip_address:
-                    parts.append(item.ip_address)
-                if item.operating_system:
-                    parts.append(item.operating_system)
-            elif t == "database":
-                if item.database_type:
-                    parts.append(item.database_type)
-                if item.hostname:
-                    parts.append(item.hostname)
-                if item.database_name:
-                    parts.append(item.database_name)
-            elif t == "email_account":
-                if item.email_address:
-                    parts.append(item.email_address)
-                if item.smtp_host:
-                    parts.append(item.smtp_host)
-            elif t == "cloud_account":
-                if item.provider:
-                    parts.append(item.provider)
-                if item.region:
-                    parts.append(item.region)
-            elif t == "generic":
-                if item.url:
-                    parts.append(item.url[:80])
-            lines.append("  • " + " | ".join(parts))
-        if len(type_items) > 50:
-            lines.append(f"  ... ve {len(type_items) - 50} öğe daha")
+        items_of_type = by_type.get(t, [])
+        if items_of_type:
+            facts.append({
+                "title": f"{_TEAMS_ICONS[t]} {_TEAMS_LABELS[t]}",
+                "value": str(len(items_of_type)),
+            })
+    facts.append({"title": "📊 Toplam", "value": str(total)})
+    body.append({
+        "type": "FactSet",
+        "facts": facts,
+        "separator": True,
+        "spacing": "Medium",
+    })
 
-    return "\r\n".join(lines)
+    # ── Per-type item sections ───────────────────────────────────────────────
+    for t in _TYPE_ORDER:
+        items_of_type = by_type.get(t, [])
+        if not items_of_type:
+            continue
+
+        body.append({
+            "type": "TextBlock",
+            "text": f"{_TEAMS_ICONS[t]} {_TEAMS_LABELS[t]} ({len(items_of_type)})",
+            "weight": "Bolder",
+            "size": "Small",
+            "separator": True,
+            "spacing": "Medium",
+            "wrap": True,
+        })
+
+        item_lines = [f"• {_item_detail_text(item)}" for item in items_of_type[:50]]
+        if len(items_of_type) > 50:
+            item_lines.append(f"… ve {len(items_of_type) - 50} öğe daha")
+
+        body.append({
+            "type": "TextBlock",
+            "text": "\n".join(item_lines),
+            "wrap": True,
+            "size": "Small",
+            "spacing": "Small",
+            "isSubtle": False,
+        })
+
+    return {
+        "type": "message",
+        "attachments": [{
+            "contentType": "application/vnd.microsoft.card.adaptive",
+            "contentUrl": None,
+            "content": {
+                "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                "type": "AdaptiveCard",
+                "version": "1.4",
+                "body": body,
+            },
+        }],
+    }
 
 
 async def _send_inventory_email(db: AsyncSession, schedule: InventoryEmailSchedule) -> int:
@@ -770,12 +846,22 @@ async def _send_inventory_email(db: AsyncSession, schedule: InventoryEmailSchedu
             from app.services.teams_service import TeamsService
             teams_svc = TeamsService(db)
             today_str = datetime.now(timezone.utc).strftime("%d.%m.%Y")
-            body = await _build_teams_inventory_body(db, today_str)
-            await teams_svc.send_message(
-                schedule.teams_webhook_id,
+
+            inv_svc = InventoryService(db)
+            items = await inv_svc.list_items(is_active=True, limit=10000)
+            by_type: dict[str, list] = {t: [] for t in _TYPE_ORDER}
+            for _item in items:
+                if _item.item_type in by_type:
+                    by_type[_item.item_type].append(_item)
+            total = sum(len(v) for v in by_type.values())
+
+            payload = _build_teams_inventory_card(
                 title=f"Envanter Raporu — {schedule.name}",
-                body=body,
+                today_str=today_str,
+                by_type=by_type,
+                total=total,
             )
+            await teams_svc.send_payload(schedule.teams_webhook_id, payload)
         except Exception as _te:
             _logger.error("inventory Teams message failed for schedule '%s': %s", schedule.name, _te)
 

@@ -152,6 +152,25 @@ class TeamsService:
             logger.error("Teams webhook '%s' request failed: %s", wh.name, exc)
             return False
 
+    async def send_payload(self, webhook_id: uuid.UUID, payload: dict) -> bool:
+        """Send a pre-built Adaptive Card payload to a webhook."""
+        wh = await self.get_webhook(webhook_id)
+        if not wh.is_active:
+            logger.info("Teams webhook '%s' (%s) is inactive — skipping", wh.name, webhook_id)
+            return False
+        try:
+            url = decrypt_field(wh.webhook_url_encrypted, settings.SMTP_ENCRYPTION_KEY)
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.post(url, json=payload)
+            if resp.status_code in (200, 202):
+                logger.info("Teams payload sent via webhook '%s'", wh.name)
+                return True
+            logger.error("Teams webhook '%s' returned HTTP %d — body: %s", wh.name, resp.status_code, resp.text[:500])
+            return False
+        except Exception as exc:
+            logger.error("Teams webhook '%s' request failed: %s", wh.name, exc)
+            return False
+
     async def test_webhook(self, webhook_id: uuid.UUID) -> dict:
         try:
             wh = await self.get_webhook(webhook_id)
