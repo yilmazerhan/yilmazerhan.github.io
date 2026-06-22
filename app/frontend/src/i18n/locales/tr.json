@@ -1145,6 +1145,8 @@
     "mark_done": "Tamamlandı",
     "mark_undone": "Geri Al",
     "completed_count": "{{done}} / {{total}} tamamlandı",
+    "days_late": "{{n}} gün geç",
+    "days_overdue": "{{n}} gün gecikti",
     "filter_title": "Görev adı ara...",
     "filter_from": "Başlangıç tarihi",
     "filter_to": "Bitiş tarihi",

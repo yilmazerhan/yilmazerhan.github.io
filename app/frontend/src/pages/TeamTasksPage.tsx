@@ -11,6 +11,7 @@ import {
   useDeleteTeamTask,
   useCompleteTeamTask,
   type TeamTask,
+  type TeamTaskUser,
 } from '@/api/teamTasks'
 import { useUsers } from '@/api/users'
 
@@ -32,6 +33,46 @@ function DaysLeftBadge({ deadline }: { deadline: string }) {
   if (diff === 0) return <span className="text-xs font-medium text-red-500">{t('team_tasks.today')}</span>
   if (diff <= 3) return <span className="text-xs font-medium text-orange-500">{t('settings.days_left', { n: diff })}</span>
   return <span className="text-xs text-gray-500 dark:text-gray-400">{t('settings.days_left', { n: diff })}</span>
+}
+
+// Per-assignee timing: when they completed (and how late), or how overdue they are.
+function AssigneeTiming({ assignee, deadline }: { assignee: TeamTaskUser; deadline: string }) {
+  const { t, i18n } = useTranslation()
+  const dateLocale = i18n.language === 'tr' ? tr : enUS
+
+  const dl = new Date(deadline)
+  dl.setHours(0, 0, 0, 0)
+
+  if (assignee.completed_at) {
+    const done = new Date(assignee.completed_at)
+    const doneDay = new Date(done)
+    doneDay.setHours(0, 0, 0, 0)
+    const lateDays = Math.round((doneDay.getTime() - dl.getTime()) / 86400000)
+    return (
+      <span className="flex items-center gap-1.5">
+        <span className="text-[10px] text-gray-400 whitespace-nowrap">
+          {format(done, 'dd MMM HH:mm', { locale: dateLocale })}
+        </span>
+        {lateDays > 0 && (
+          <span className="text-[10px] font-medium text-red-500 whitespace-nowrap">
+            {t('team_tasks.days_late', { n: lateDays })}
+          </span>
+        )}
+      </span>
+    )
+  }
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const overdueDays = Math.round((today.getTime() - dl.getTime()) / 86400000)
+  if (overdueDays > 0) {
+    return (
+      <span className="text-[10px] font-medium text-red-500 whitespace-nowrap">
+        {t('team_tasks.days_overdue', { n: overdueDays })}
+      </span>
+    )
+  }
+  return null
 }
 
 interface TaskModalProps {
@@ -354,7 +395,7 @@ export default function TeamTasksPage() {
                         ) : (
                           <div className="flex flex-col gap-0.5">
                             {task.assignees.map((a) => (
-                              <div key={a.id} className="flex items-center gap-1">
+                              <div key={a.id} className="flex items-center gap-1.5">
                                 {a.completed_at
                                   ? <Check className="h-3 w-3 text-green-500 shrink-0" />
                                   : <span className="h-3 w-3 rounded-full border border-gray-300 dark:border-gray-600 shrink-0 inline-block" />
@@ -362,6 +403,7 @@ export default function TeamTasksPage() {
                                 <span className={`text-xs ${a.completed_at ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>
                                   {a.full_name}
                                 </span>
+                                <AssigneeTiming assignee={a} deadline={task.deadline} />
                               </div>
                             ))}
                             {task.assignees.length > 1 && (
@@ -455,7 +497,7 @@ export default function TeamTasksPage() {
                   {task.assignees.length > 0 && (
                     <div className="flex flex-col gap-0.5 mb-2">
                       {task.assignees.map((a) => (
-                        <div key={a.id} className="flex items-center gap-1">
+                        <div key={a.id} className="flex items-center gap-1.5">
                           {a.completed_at
                             ? <Check className="h-3 w-3 text-green-500 shrink-0" />
                             : <span className="h-3 w-3 rounded-full border border-gray-300 dark:border-gray-600 shrink-0 inline-block" />
@@ -463,6 +505,7 @@ export default function TeamTasksPage() {
                           <span className={`text-xs ${a.completed_at ? 'line-through text-gray-400' : 'text-gray-700 dark:text-gray-300'}`}>
                             {a.full_name}
                           </span>
+                          <AssigneeTiming assignee={a} deadline={task.deadline} />
                         </div>
                       ))}
                       {task.assignees.length > 1 && (

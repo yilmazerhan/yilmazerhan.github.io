@@ -1145,6 +1145,8 @@
     "mark_done": "Mark Done",
     "mark_undone": "Undo",
     "completed_count": "{{done}} / {{total}} completed",
+    "days_late": "{{n}} days late",
+    "days_overdue": "{{n}} days overdue",
     "filter_title": "Search by task name...",
     "filter_from": "Deadline from",
     "filter_to": "Deadline to",
