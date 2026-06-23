@@ -273,7 +273,10 @@ function MemberModal({
   const [modules, setModules] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
 
-  const { data: usersData } = useUsers({ limit: 1000, is_active: true })
+  const { data: usersData, isLoading: usersLoading } = useUsers(
+    { limit: 200 },
+    isOpen && !initial,
+  )
   const availableUsers = (usersData?.items ?? []).filter(
     (u) => !u.is_deleted && (!existingUserIds.includes(u.id) || u.id === initial?.user.id),
   )
@@ -338,9 +341,12 @@ function MemberModal({
                 value={userId}
                 onChange={(e) => setUserId(e.target.value)}
                 required
-                className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none transition-shadow"
+                disabled={usersLoading}
+                className="w-full px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-primary-500 outline-none transition-shadow disabled:opacity-60"
               >
-                <option value="">{t('responsibility.select_user')}</option>
+                <option value="">
+                  {usersLoading ? t('common.loading') : t('responsibility.select_user')}
+                </option>
                 {availableUsers.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.full_name} ({u.email})
