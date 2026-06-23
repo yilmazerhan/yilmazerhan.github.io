@@ -2,6 +2,7 @@ import uuid
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.models.responsibility import ResponsibilityGroup, ResponsibilityMember
 from app.core.exceptions import NotFoundError, ConflictError
@@ -21,7 +22,9 @@ class ResponsibilityService:
 
     async def get_group(self, group_id: uuid.UUID) -> ResponsibilityGroup:
         result = await self.db.execute(
-            select(ResponsibilityGroup).where(ResponsibilityGroup.id == group_id)
+            select(ResponsibilityGroup)
+            .options(selectinload(ResponsibilityGroup.members).selectinload(ResponsibilityMember.user))
+            .where(ResponsibilityGroup.id == group_id)
         )
         group = result.scalar_one_or_none()
         if not group:
@@ -43,14 +46,14 @@ class ResponsibilityService:
         )
         self.db.add(group)
         await self.db.flush()
-        return group
+        return await self.get_group(group.id)
 
     async def update_group(self, group_id: uuid.UUID, **kwargs) -> ResponsibilityGroup:
         group = await self.get_group(group_id)
         for k, v in kwargs.items():
             setattr(group, k, v)
         await self.db.flush()
-        return group
+        return await self.get_group(group_id)
 
     async def delete_group(self, group_id: uuid.UUID) -> None:
         group = await self.get_group(group_id)
@@ -59,7 +62,9 @@ class ResponsibilityService:
 
     async def get_member(self, member_id: uuid.UUID) -> ResponsibilityMember:
         result = await self.db.execute(
-            select(ResponsibilityMember).where(ResponsibilityMember.id == member_id)
+            select(ResponsibilityMember)
+            .options(selectinload(ResponsibilityMember.user))
+            .where(ResponsibilityMember.id == member_id)
         )
         member = result.scalar_one_or_none()
         if not member:
@@ -84,13 +89,13 @@ class ResponsibilityService:
         member = ResponsibilityMember(group_id=group_id, user_id=user_id, modules=modules)
         self.db.add(member)
         await self.db.flush()
-        return member
+        return await self.get_member(member.id)
 
     async def update_member(self, member_id: uuid.UUID, modules: list[str]) -> ResponsibilityMember:
         member = await self.get_member(member_id)
         member.modules = modules
         await self.db.flush()
-        return member
+        return await self.get_member(member_id)
 
     async def remove_member(self, member_id: uuid.UUID) -> None:
         member = await self.get_member(member_id)

@@ -35,6 +35,7 @@ import AnnouncementsPage from '@/pages/AnnouncementsPage'
 import PatchesPage from '@/pages/PatchesPage'
 import TeamTasksPage from '@/pages/TeamTasksPage'
 import ResponsibilityPage from '@/pages/ResponsibilityPage'
+import ReleaseCalendarPage from '@/pages/ReleaseCalendarPage'
 
 function BrandingInit() {
   const { data: branding } = useQuery({
@@ -102,6 +103,7 @@ export default function App() {
             <Route path="/patches" element={<PatchesPage />} />
             <Route path="/team-tasks" element={<TeamTasksPage />} />
             <Route path="/responsibility" element={<ResponsibilityPage />} />
+            <Route path="/releases" element={<ReleaseCalendarPage />} />
 
             {/* Manager+ routes */}
             <Route element={<RoleRoute allow={['superadmin', 'team_manager']} />}>

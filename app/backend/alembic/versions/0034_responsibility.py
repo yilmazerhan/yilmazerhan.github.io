@@ -1,15 +1,15 @@
 """Add responsibility_groups and responsibility_members tables
 
-Revision ID: 0006_responsibility
-Revises: 0005_task_history
+Revision ID: 0034_responsibility
+Revises: 0033
 Create Date: 2026-06-23 00:00:00.000000
 """
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision = '0006_responsibility'
-down_revision = '0005_task_history'
+revision = '0034_responsibility'
+down_revision = '0033'
 branch_labels = None
 depends_on = None
 

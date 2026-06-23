@@ -6,7 +6,7 @@ import { useAuthStore } from '@/store/authStore'
 import {
   LayoutDashboard, ClipboardList, Kanban, Users, Users2,
   Mail, Settings, ScrollText, BarChart3, ShieldCheck, UserCircle, Keyboard, HardDriveDownload,
-  GanttChartSquare, Activity, CalendarDays, CalendarRange, Database, Megaphone, Layers, ListChecks, BookOpen,
+  GanttChartSquare, Activity, CalendarDays, CalendarRange, Database, Megaphone, Layers, ListChecks, BookOpen, Rocket,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -26,6 +26,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/', icon: LayoutDashboard, labelKey: 'nav.dashboard' },
   { to: '/team-tasks', icon: ListChecks, labelKey: 'nav.team_tasks' },
   { to: '/responsibility', icon: BookOpen, labelKey: 'nav.responsibility' },
+  { to: '/releases', icon: Rocket, labelKey: 'nav.releases' },
   { to: '/worklog', icon: ClipboardList, labelKey: 'nav.worklog' },
   { to: '/kanban', icon: Kanban, labelKey: 'nav.kanban' },
   { to: '/gantt', icon: GanttChartSquare, labelKey: 'nav.gantt' },

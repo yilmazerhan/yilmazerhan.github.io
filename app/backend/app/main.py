@@ -20,6 +20,7 @@ from app.routers.announcements import router as announcements_router
 from app.routers.patch import router as patch_router
 from app.routers.team_tasks import router as team_tasks_router
 from app.routers.responsibility import router as responsibility_router
+from app.routers.release import router as release_router
 
 logger = logging.getLogger(__name__)
 
@@ -228,6 +229,7 @@ app.include_router(announcements_router, prefix="/api/v1")
 app.include_router(patch_router, prefix="/api/v1")
 app.include_router(team_tasks_router, prefix="/api/v1")
 app.include_router(responsibility_router, prefix="/api/v1")
+app.include_router(release_router, prefix="/api/v1")
 
 
 # ─── Health check ─────────────────────────────────────────────────────────
