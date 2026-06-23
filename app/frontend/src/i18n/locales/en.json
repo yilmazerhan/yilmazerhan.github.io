@@ -1227,6 +1227,8 @@
     "milestone_label_placeholder": "Optional note",
     "no_releases": "No releases have been created yet.",
     "no_dates": "Add phase or milestone dates to see the roadmap.",
+    "export_success": "Export completed. Check your downloads.",
+    "export_error": "Export failed. Please try again.",
     "save": "Save",
     "cancel": "Cancel",
     "status_completed": "Completed Activity",

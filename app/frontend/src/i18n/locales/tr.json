@@ -1227,6 +1227,8 @@
     "milestone_label_placeholder": "İsteğe bağlı not",
     "no_releases": "Henüz release oluşturulmamış.",
     "no_dates": "Yol haritasını görmek için aşama veya kilometre taşı tarihleri ekleyin.",
+    "export_success": "Dışa aktarma tamamlandı. İndirmeler klasörünüzü kontrol edin.",
+    "export_error": "Dışa aktarma başarısız oldu. Lütfen tekrar deneyin.",
     "save": "Kaydet",
     "cancel": "İptal",
     "status_completed": "Tamamlanan Aktivite",

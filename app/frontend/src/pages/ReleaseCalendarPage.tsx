@@ -2,6 +2,7 @@ import { useState, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { tr, enUS } from 'date-fns/locale'
 import { jsPDF } from 'jspdf'
+import { toast } from '@/store/toastStore'
 import {
   Plus, Pencil, Trash2, Loader2, X, GanttChartSquare, List, Image as ImageIcon,
   FileText, Rocket, Flag, CalendarDays,
@@ -479,52 +480,54 @@ export default function ReleaseCalendarPage() {
 
   async function renderCanvas(): Promise<HTMLCanvasElement> {
     const svg = svgRef.current
-    if (!svg) throw new Error('no svg')
+    if (!svg) throw new Error('SVG element not found')
     const xml = new XMLSerializer().serializeToString(svg)
-    const blob = new Blob([xml], { type: 'image/svg+xml;charset=utf-8' })
-    const url = URL.createObjectURL(blob)
-    try {
-      const img = new Image()
-      await new Promise<void>((res, rej) => {
-        img.onload = () => res()
-        img.onerror = () => rej(new Error('svg image load failed'))
-        img.src = url
-      })
-      const w = Number(svg.getAttribute('width')) || img.width
-      const h = Number(svg.getAttribute('height')) || img.height
-      const scale = 2
-      const canvas = document.createElement('canvas')
-      canvas.width = Math.round(w * scale)
-      canvas.height = Math.round(h * scale)
-      const ctx = canvas.getContext('2d')!
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(0, 0, canvas.width, canvas.height)
-      ctx.scale(scale, scale)
-      ctx.drawImage(img, 0, 0, w, h)
-      return canvas
-    } finally {
-      URL.revokeObjectURL(url)
-    }
+    const dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml)
+    const w = Number(svg.getAttribute('width')) || 800
+    const h = Number(svg.getAttribute('height')) || 400
+    const img = new Image()
+    await new Promise<void>((res, rej) => {
+      img.onload = () => res()
+      img.onerror = () => rej(new Error('SVG render failed'))
+      img.src = dataUrl
+    })
+    const scale = 2
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(w * scale)
+    canvas.height = Math.round(h * scale)
+    const ctx = canvas.getContext('2d')!
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.scale(scale, scale)
+    ctx.drawImage(img, 0, 0, w, h)
+    return canvas
+  }
+
+  function triggerDownload(url: string, filename: string) {
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
 
   async function exportPng() {
     setExporting('png')
     try {
       const canvas = await renderCanvas()
-      await new Promise<void>((res) => {
+      await new Promise<void>((res, rej) => {
         canvas.toBlob((b) => {
-          if (b) {
-            const a = document.createElement('a')
-            a.href = URL.createObjectURL(b)
-            a.download = 'release-takvimi.png'
-            a.click()
-            URL.revokeObjectURL(a.href)
-          }
+          if (!b) { rej(new Error('Canvas toBlob failed')); return }
+          triggerDownload(URL.createObjectURL(b), 'release-takvimi.png')
           res()
         }, 'image/png')
       })
+      toast.success(t('releases.export_success'))
     } catch (e) {
-      console.error(e)
+      console.error('PNG export error:', e)
+      toast.error(t('releases.export_error'))
     } finally {
       setExporting(null)
     }
@@ -547,8 +550,10 @@ export default function ReleaseCalendarPage() {
       const drawH = hPx * ratio
       pdf.addImage(imgData, 'JPEG', (pageW - drawW) / 2, (pageH - drawH) / 2, drawW, drawH)
       pdf.save('release-takvimi.pdf')
+      toast.success(t('releases.export_success'))
     } catch (e) {
-      console.error(e)
+      console.error('PDF export error:', e)
+      toast.error(t('releases.export_error'))
     } finally {
       setExporting(null)
     }
