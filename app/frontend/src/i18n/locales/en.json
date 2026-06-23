@@ -329,6 +329,8 @@
     "module_jira_config": "Jira Configuration",
     "module_ssl_management": "SSL Management",
     "module_inventory": "Inventory",
+    "module_releases": "Release Calendar",
+    "module_responsibility": "Responsibility",
     "module_branding": "Branding",
     "action_view": "View",
     "action_create": "Create",

@@ -20,6 +20,8 @@ export default function PermissionMatrixModal({ user, onClose }: Props) {
     { key: 'worklog', label: t('permissions.module_worklog') },
     { key: 'kanban', label: t('permissions.module_kanban') },
     { key: 'inventory', label: t('permissions.module_inventory') },
+    { key: 'releases', label: t('permissions.module_releases') },
+    { key: 'responsibility', label: t('permissions.module_responsibility') },
     { key: 'user_management', label: t('permissions.module_user_management') },
     { key: 'email_workflows', label: t('permissions.module_email_workflows') },
     { key: 'jira_config', label: t('permissions.module_jira_config') },

@@ -19,6 +19,8 @@ ROLE_DEFAULTS: dict[str, dict[str, set[str]]] = {
         "ssl_management": {"create", "edit", "delete", "view"},
         "branding": {"create", "edit", "delete", "view"},
         "inventory": {"create", "edit", "delete", "view"},
+        "releases": {"create", "edit", "delete", "view"},
+        "responsibility": {"create", "edit", "delete", "view"},
     },
     "team_manager": {
         "worklog": {"create", "edit", "delete", "view"},
@@ -29,6 +31,8 @@ ROLE_DEFAULTS: dict[str, dict[str, set[str]]] = {
         "ssl_management": set(),
         "branding": set(),
         "inventory": {"create", "edit", "delete", "view"},
+        "releases": {"view"},
+        "responsibility": {"view"},
     },
     "user": {
         "worklog": {"create", "view"},
@@ -39,6 +43,8 @@ ROLE_DEFAULTS: dict[str, dict[str, set[str]]] = {
         "ssl_management": set(),
         "branding": set(),
         "inventory": {"view"},
+        "releases": {"view"},
+        "responsibility": {"view"},
     },
 }
 

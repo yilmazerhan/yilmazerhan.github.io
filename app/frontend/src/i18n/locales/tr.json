@@ -329,6 +329,8 @@
     "module_jira_config": "Jira Yapılandırması",
     "module_ssl_management": "SSL Yönetimi",
     "module_inventory": "Envanter",
+    "module_releases": "Release Takvimi",
+    "module_responsibility": "Sorumluluk Matrisi",
     "module_branding": "Marka Ayarları",
     "action_view": "Görüntüle",
     "action_create": "Oluştur",

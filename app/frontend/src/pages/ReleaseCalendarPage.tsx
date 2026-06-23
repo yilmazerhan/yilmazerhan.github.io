@@ -453,7 +453,7 @@ type ModalState =
 export default function ReleaseCalendarPage() {
   const { t, i18n } = useTranslation()
   const user = useAuthStore((s) => s.user)
-  const canEdit = user?.role === 'superadmin' || user?.role === 'team_manager'
+  const canEdit = user?.role === 'superadmin'
   const locale = i18n.language.startsWith('tr') ? tr : enUS
 
   const [view, setView] = useState<'roadmap' | 'list'>('roadmap')

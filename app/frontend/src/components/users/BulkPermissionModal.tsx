@@ -8,8 +8,8 @@ interface Props {
 }
 
 const MODULES = [
-  'worklog', 'kanban', 'inventory', 'user_management',
-  'email_workflows', 'jira_config', 'ssl_management', 'branding',
+  'worklog', 'kanban', 'inventory', 'releases', 'responsibility',
+  'user_management', 'email_workflows', 'jira_config', 'ssl_management', 'branding',
 ]
 const ACTIONS = ['view', 'create', 'edit', 'delete']
 
