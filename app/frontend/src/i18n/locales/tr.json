@@ -65,7 +65,8 @@
     "inventory": "Envanter",
     "patches": "Müşteri Yamaları",
     "announcements": "Duyurular",
-    "team_tasks": "Takım Görevleri"
+    "team_tasks": "Takım Görevleri",
+    "responsibility": "Sorumluluk"
   },
   "dashboard": {
     "total_tasks": "Toplam Görev",
@@ -1156,5 +1157,37 @@
     "column_empty": "Bu sütunda görev yok",
     "view_table": "Tablo görünümü",
     "view_kanban": "Kanban görünümü"
+  },
+  "responsibility": {
+    "title": "Sorumluluk Menüsü",
+    "subtitle": "Gruplar ve üyelerin sorumlu oldukları modüller",
+    "add_group": "Grup Ekle",
+    "edit_group": "Grubu Düzenle",
+    "delete_group": "Grubu Sil",
+    "delete_group_confirm": "Bu grubu silmek istediğinizden emin misiniz? İçindeki tüm üyeler de silinecektir.",
+    "add_member": "Üye Ekle",
+    "edit_member": "Üyeyi Düzenle",
+    "remove_member": "Üyeyi Kaldır",
+    "remove_member_confirm": "Bu üyeyi gruptan kaldırmak istediğinizden emin misiniz?",
+    "search_user": "Kullanıcı ara...",
+    "search_module": "Modül ara...",
+    "no_groups": "Henüz grup oluşturulmamış.",
+    "no_groups_hint": "İlk grubu oluşturmak için yukarıdaki butonu kullanın.",
+    "no_members": "Bu grupta henüz üye yok.",
+    "no_modules": "Modül atanmamış",
+    "no_results": "Arama kriterlerine uygun sonuç bulunamadı.",
+    "member_singular": "üye",
+    "member_plural": "üye",
+    "group_name": "Grup Adı",
+    "group_description": "Açıklama",
+    "group_color": "Renk",
+    "group_order": "Sıra",
+    "user": "Kullanıcı",
+    "select_user": "Kullanıcı seçin...",
+    "modules": "Modüller",
+    "module_placeholder": "Modül adı yazın ve Enter'a basın...",
+    "module_hint": "Enter veya virgül ile ekleyin, Backspace ile silin",
+    "save": "Kaydet",
+    "cancel": "İptal"
   }
 }

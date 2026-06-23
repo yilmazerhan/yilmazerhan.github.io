@@ -23,3 +23,4 @@ from app.models.leave_request import LeaveRequest  # noqa: F401
 from app.models.backup_record import BackupRecord  # noqa: F401
 from app.models.inventory import InventoryItem, InventoryEmailSchedule  # noqa: F401
 from app.models.patch import CustomerPatch  # noqa: F401
+from app.models.responsibility import ResponsibilityGroup, ResponsibilityMember  # noqa: F401

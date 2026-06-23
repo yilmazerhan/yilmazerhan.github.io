@@ -65,7 +65,8 @@
     "inventory": "Inventory",
     "patches": "Customer Patches",
     "announcements": "Announcements",
-    "team_tasks": "Team Tasks"
+    "team_tasks": "Team Tasks",
+    "responsibility": "Responsibility"
   },
   "dashboard": {
     "total_tasks": "Total Tasks",
@@ -1156,5 +1157,37 @@
     "column_empty": "No tasks in this column",
     "view_table": "Table view",
     "view_kanban": "Kanban view"
+  },
+  "responsibility": {
+    "title": "Responsibility Menu",
+    "subtitle": "Groups and the modules their members are responsible for",
+    "add_group": "Add Group",
+    "edit_group": "Edit Group",
+    "delete_group": "Delete Group",
+    "delete_group_confirm": "Are you sure you want to delete this group? All members will also be removed.",
+    "add_member": "Add Member",
+    "edit_member": "Edit Member",
+    "remove_member": "Remove Member",
+    "remove_member_confirm": "Are you sure you want to remove this member from the group?",
+    "search_user": "Search by user...",
+    "search_module": "Search by module...",
+    "no_groups": "No groups have been created yet.",
+    "no_groups_hint": "Use the button above to create the first group.",
+    "no_members": "No members in this group yet.",
+    "no_modules": "No modules assigned",
+    "no_results": "No results match the search criteria.",
+    "member_singular": "member",
+    "member_plural": "members",
+    "group_name": "Group Name",
+    "group_description": "Description",
+    "group_color": "Color",
+    "group_order": "Order",
+    "user": "User",
+    "select_user": "Select a user...",
+    "modules": "Modules",
+    "module_placeholder": "Type a module name and press Enter...",
+    "module_hint": "Add with Enter or comma, remove with Backspace",
+    "save": "Save",
+    "cancel": "Cancel"
   }
 }
