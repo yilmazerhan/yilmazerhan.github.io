@@ -668,7 +668,7 @@ export default function ReleaseCalendarPage() {
         </div>
       ) : view === 'roadmap' ? (
         hasDates ? (
-          <div className="bg-white rounded-2xl border border-gray-200 dark:border-gray-800 overflow-x-auto shadow-sm">
+          <div className="bg-white rounded-2xl border border-gray-200 dark:border-gray-800 shadow-sm">
             <ReleaseGanttChart releases={sorted} t={t} locale={locale} svgRef={svgRef} />
           </div>
         ) : (
