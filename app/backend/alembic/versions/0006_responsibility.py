@@ -21,7 +21,7 @@ def upgrade() -> None:
                   server_default=sa.text('gen_random_uuid()')),
         sa.Column('name', sa.String(255), nullable=False),
         sa.Column('description', sa.Text, nullable=True),
-        sa.Column('color', sa.String(20), nullable=False, server_default='#6366f1'),
+        sa.Column('color', sa.String(20), nullable=False, server_default=sa.text("'#6366f1'")),
         sa.Column('display_order', sa.Integer, nullable=False, server_default='0'),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
         sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()')),
