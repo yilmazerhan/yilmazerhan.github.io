@@ -2,8 +2,11 @@ import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Plus, Pencil, Trash2, Loader2, Search, X, Users, Package,
-  ChevronDown, ChevronUp, UserPlus,
+  ChevronDown, ChevronUp, UserPlus, FileImage, FileText,
 } from 'lucide-react'
+import { jsPDF } from 'jspdf'
+import html2canvas from 'html2canvas'
+import { toast } from '@/store/toastStore'
 import { useAuthStore } from '@/store/authStore'
 import { useUsers } from '@/api/users'
 import {
@@ -622,6 +625,8 @@ export default function ResponsibilityPage() {
 
   const [userFilter, setUserFilter] = useState('')
   const [moduleFilter, setModuleFilter] = useState('')
+  const [exporting, setExporting] = useState<'png' | 'pdf' | null>(null)
+  const exportRef = useRef<HTMLDivElement>(null)
 
   const [groupModalOpen, setGroupModalOpen] = useState(false)
   const [editingGroup, setEditingGroup] = useState<ResponsibilityGroup | null>(null)
@@ -712,6 +717,78 @@ export default function ResponsibilityPage() {
   const currentGroup = memberGroupId ? groups.find((g) => g.id === memberGroupId) : null
   const existingUserIds = currentGroup?.members.map((m) => m.user.id) ?? []
 
+  async function renderCanvas(): Promise<HTMLCanvasElement> {
+    const el = exportRef.current
+    if (!el) throw new Error('Export element not found')
+    return html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false })
+  }
+
+  function triggerDownload(url: string, filename: string) {
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  }
+
+  async function exportPng() {
+    setExporting('png')
+    try {
+      const canvas = await renderCanvas()
+      await new Promise<void>((res, rej) => {
+        canvas.toBlob((b) => {
+          if (!b) { rej(new Error('Canvas toBlob failed')); return }
+          triggerDownload(URL.createObjectURL(b), 'sorumluluk-matrisi.png')
+          res()
+        }, 'image/png')
+      })
+      toast.success(t('releases.export_success'))
+    } catch (e) {
+      console.error('PNG export error:', e)
+      toast.error(t('releases.export_error'))
+    } finally {
+      setExporting(null)
+    }
+  }
+
+  async function exportPdf() {
+    setExporting('pdf')
+    try {
+      const canvas = await renderCanvas()
+      const imgData = canvas.toDataURL('image/jpeg', 0.92)
+      const wPx = canvas.width
+      const hPx = canvas.height
+      const orientation = wPx >= hPx ? 'landscape' : 'portrait'
+      const pdf = new jsPDF({ orientation, unit: 'pt', format: 'a4' })
+      const pageW = pdf.internal.pageSize.getWidth()
+      const pageH = pdf.internal.pageSize.getHeight()
+      const margin = 24
+      const ratio = (pageW - margin * 2) / wPx
+      const drawW = wPx * ratio
+      const drawH = hPx * ratio
+      const usableH = pageH - margin * 2
+      if (drawH <= usableH) {
+        pdf.addImage(imgData, 'JPEG', margin, margin, drawW, drawH)
+      } else {
+        let yOffset = 0
+        while (yOffset < drawH) {
+          if (yOffset > 0) pdf.addPage()
+          pdf.addImage(imgData, 'JPEG', margin, margin - yOffset, drawW, drawH)
+          yOffset += usableH
+        }
+      }
+      pdf.save('sorumluluk-matrisi.pdf')
+      toast.success(t('releases.export_success'))
+    } catch (e) {
+      console.error('PDF export error:', e)
+      toast.error(t('releases.export_error'))
+    } finally {
+      setExporting(null)
+    }
+  }
+
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
       {/* Page header */}
@@ -729,15 +806,33 @@ export default function ResponsibilityPage() {
             </p>
           </div>
         </div>
-        {isSuperadmin && (
+        <div className="flex items-center gap-2 flex-shrink-0">
           <button
-            onClick={openAddGroup}
-            className="flex items-center gap-2 px-4 py-2.5 bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium rounded-xl transition-colors shadow-sm shadow-primary-500/30 flex-shrink-0"
+            onClick={exportPng}
+            disabled={!!exporting || isLoading}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
           >
-            <Plus className="h-4 w-4" />
-            {t('responsibility.add_group')}
+            {exporting === 'png' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileImage className="h-4 w-4" />}
+            PNG
           </button>
-        )}
+          <button
+            onClick={exportPdf}
+            disabled={!!exporting || isLoading}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+          >
+            {exporting === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+            PDF
+          </button>
+          {isSuperadmin && (
+            <button
+              onClick={openAddGroup}
+              className="flex items-center gap-2 px-4 py-2.5 bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium rounded-xl transition-colors shadow-sm shadow-primary-500/30"
+            >
+              <Plus className="h-4 w-4" />
+              {t('responsibility.add_group')}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Search filters */}
@@ -781,55 +876,57 @@ export default function ResponsibilityPage() {
       </div>
 
       {/* Groups */}
-      {isLoading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
-        </div>
-      ) : visibleGroups.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-            <Users className="h-8 w-8 text-gray-400" />
+      <div ref={exportRef}>
+        {isLoading ? (
+          <div className="flex justify-center py-16">
+            <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
           </div>
-          <div>
-            <p className="text-base font-medium text-gray-700 dark:text-gray-300">
-              {userFilter || moduleFilter
-                ? t('responsibility.no_results')
-                : t('responsibility.no_groups')}
-            </p>
-            {isSuperadmin && !userFilter && !moduleFilter && (
-              <p className="text-sm text-gray-400 mt-1">
-                {t('responsibility.no_groups_hint')}
+        ) : visibleGroups.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+              <Users className="h-8 w-8 text-gray-400" />
+            </div>
+            <div>
+              <p className="text-base font-medium text-gray-700 dark:text-gray-300">
+                {userFilter || moduleFilter
+                  ? t('responsibility.no_results')
+                  : t('responsibility.no_groups')}
               </p>
+              {isSuperadmin && !userFilter && !moduleFilter && (
+                <p className="text-sm text-gray-400 mt-1">
+                  {t('responsibility.no_groups_hint')}
+                </p>
+              )}
+            </div>
+            {isSuperadmin && !userFilter && !moduleFilter && (
+              <button
+                onClick={openAddGroup}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary-500 text-white rounded-xl hover:bg-primary-600 transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                {t('responsibility.add_group')}
+              </button>
             )}
           </div>
-          {isSuperadmin && !userFilter && !moduleFilter && (
-            <button
-              onClick={openAddGroup}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-medium bg-primary-500 text-white rounded-xl hover:bg-primary-600 transition-colors"
-            >
-              <Plus className="h-4 w-4" />
-              {t('responsibility.add_group')}
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {visibleGroups.map((group) => (
-            <GroupCard
-              key={group.id}
-              group={group}
-              isSuperadmin={isSuperadmin}
-              userFilter={userFilter}
-              moduleFilter={moduleFilter}
-              onEditGroup={() => openEditGroup(group)}
-              onDeleteGroup={() => handleDeleteGroup(group.id)}
-              onAddMember={() => openAddMember(group.id)}
-              onEditMember={(member) => openEditMember(member, group.id)}
-              onRemoveMember={(memberId) => handleRemoveMember(group.id, memberId)}
-            />
-          ))}
-        </div>
-      )}
+        ) : (
+          <div className="space-y-4">
+            {visibleGroups.map((group) => (
+              <GroupCard
+                key={group.id}
+                group={group}
+                isSuperadmin={isSuperadmin}
+                userFilter={userFilter}
+                moduleFilter={moduleFilter}
+                onEditGroup={() => openEditGroup(group)}
+                onDeleteGroup={() => handleDeleteGroup(group.id)}
+                onAddMember={() => openAddMember(group.id)}
+                onEditMember={(member) => openEditMember(member, group.id)}
+                onRemoveMember={(memberId) => handleRemoveMember(group.id, memberId)}
+              />
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Group modal */}
       <GroupModal
