@@ -897,10 +897,10 @@ export default function ResponsibilityPage() {
           res()
         }, 'image/png')
       })
-      toast.success(t('releases.export_success'))
+      toast.success(t('responsibility.export_success'))
     } catch (e) {
       console.error('PNG export error:', e)
-      toast.error(t('releases.export_error'))
+      toast.error(t('responsibility.export_error'))
     } finally {
       setExporting(null)
     }
@@ -933,10 +933,10 @@ export default function ResponsibilityPage() {
         }
       }
       pdf.save('sorumluluk-matrisi.pdf')
-      toast.success(t('releases.export_success'))
+      toast.success(t('responsibility.export_success'))
     } catch (e) {
       console.error('PDF export error:', e)
-      toast.error(t('releases.export_error'))
+      toast.error(t('responsibility.export_error'))
     } finally {
       setExporting(null)
     }

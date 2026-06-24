@@ -66,7 +66,7 @@
     "patches": "Customer Patches",
     "announcements": "Announcements",
     "team_tasks": "Team Tasks",
-    "responsibility": "Responsibility",
+    "responsibility": "Responsibility Matrix",
     "releases": "Release Calendar"
   },
   "dashboard": {
@@ -330,7 +330,7 @@
     "module_ssl_management": "SSL Management",
     "module_inventory": "Inventory",
     "module_releases": "Release Calendar",
-    "module_responsibility": "Responsibility",
+    "module_responsibility": "Responsibility Matrix",
     "module_branding": "Branding",
     "action_view": "View",
     "action_create": "Create",
@@ -1162,7 +1162,7 @@
     "view_kanban": "Kanban view"
   },
   "responsibility": {
-    "title": "Responsibility Menu",
+    "title": "Responsibility Matrix",
     "subtitle": "Groups and the modules their members are responsible for",
     "add_group": "Add Group",
     "edit_group": "Edit Group",
@@ -1190,6 +1190,8 @@
     "modules": "Modules",
     "module_placeholder": "Type a module name and press Enter...",
     "module_hint": "Add with Enter or comma, remove with Backspace",
+    "export_success": "Export completed. Check your downloads.",
+    "export_error": "Export failed. Please try again.",
     "save": "Save",
     "cancel": "Cancel"
   },
