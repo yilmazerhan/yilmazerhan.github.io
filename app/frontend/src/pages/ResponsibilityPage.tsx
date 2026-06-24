@@ -5,7 +5,6 @@ import {
   ChevronDown, ChevronUp, UserPlus, FileImage, FileText,
 } from 'lucide-react'
 import { jsPDF } from 'jspdf'
-import html2canvas from 'html2canvas'
 import { toast } from '@/store/toastStore'
 import { useAuthStore } from '@/store/authStore'
 import { useUsers } from '@/api/users'
@@ -626,7 +625,6 @@ export default function ResponsibilityPage() {
   const [userFilter, setUserFilter] = useState('')
   const [moduleFilter, setModuleFilter] = useState('')
   const [exporting, setExporting] = useState<'png' | 'pdf' | null>(null)
-  const exportRef = useRef<HTMLDivElement>(null)
 
   const [groupModalOpen, setGroupModalOpen] = useState(false)
   const [editingGroup, setEditingGroup] = useState<ResponsibilityGroup | null>(null)
@@ -717,10 +715,165 @@ export default function ResponsibilityPage() {
   const currentGroup = memberGroupId ? groups.find((g) => g.id === memberGroupId) : null
   const existingUserIds = currentGroup?.members.map((m) => m.user.id) ?? []
 
+  function buildSvg(): string {
+    const W = 900
+    const PX = 20
+    const CARD_W = W - PX * 2
+    const HEADER_H = 58
+    const MIN_ROW_H = 50
+    const TAG_H = 20
+    const TAG_GAP = 6
+    const TAG_ROW_H = 28
+    const GROUP_GAP = 14
+    const FONT = "system-ui,-apple-system,'Segoe UI',Arial,sans-serif"
+    const BORDER_W = 4
+    const AV_R = 17
+    const AV_CX_OFF = BORDER_W + 16 + AV_R
+    const NAME_X_OFF = AV_CX_OFF + AV_R + 12
+    const NAME_COL_W = 195
+    const MOD_X_OFF = NAME_X_OFF + NAME_COL_W + 8
+    const MOD_MAX_W = CARD_W - MOD_X_OFF - 8
+
+    const x = (s: string) =>
+      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+    const tagW = (text: string) => Math.ceil(text.length * 6.5 + 20)
+
+    function layoutTags(modules: string[]) {
+      const out: { text: string; tx: number; tw: number; row: number }[] = []
+      let cx = 0, row = 0
+      for (const mod of modules) {
+        const tw = tagW(mod)
+        if (cx + tw > MOD_MAX_W && cx > 0) { row++; cx = 0 }
+        out.push({ text: mod, tx: cx, tw, row })
+        cx += tw + TAG_GAP
+      }
+      return out
+    }
+
+    function rowH(member: ResponsibilityMember) {
+      if (member.modules.length === 0) return MIN_ROW_H
+      const tags = layoutTags(member.modules)
+      const maxRow = tags.reduce((m, t) => Math.max(m, t.row), 0)
+      return Math.max(MIN_ROW_H, (maxRow + 1) * TAG_ROW_H + 16)
+    }
+
+    const cards = visibleGroups.map(g => {
+      const mh = g.members.map(rowH)
+      return { g, mh, cardH: HEADER_H + 1 + mh.reduce((s, h) => s + h, 0) }
+    })
+
+    const totalH = cards.reduce((s, c) => s + c.cardH + GROUP_GAP, 0) - GROUP_GAP + PX * 2
+    const els: string[] = [`<rect width="${W}" height="${totalH}" fill="#f9fafb"/>`]
+
+    let gradIdx = 0
+    let gy = PX
+
+    for (const { g, mh, cardH } of cards) {
+      const c = g.color
+      const cx = PX
+      const gid = `g${gradIdx++}`
+
+      // Card shadow
+      els.push(`<rect x="${cx + 2}" y="${gy + 2}" width="${CARD_W}" height="${cardH}" rx="12" fill="#00000012"/>`)
+      // Card background
+      els.push(`<rect x="${cx}" y="${gy}" width="${CARD_W}" height="${cardH}" rx="12" fill="white" stroke="#e5e7eb" stroke-width="1"/>`)
+      // Left color border
+      els.push(`<rect x="${cx}" y="${gy + 1}" width="${BORDER_W}" height="${cardH - 2}" rx="2" fill="${c}"/>`)
+      // Header gradient
+      els.push(`<defs><linearGradient id="${gid}"><stop offset="0%" stop-color="${c}" stop-opacity="0.12"/><stop offset="100%" stop-color="${c}" stop-opacity="0.04"/></linearGradient></defs>`)
+      els.push(`<rect x="${cx + BORDER_W}" y="${gy}" width="${CARD_W - BORDER_W}" height="${HEADER_H}" fill="url(#${gid})"/>`)
+      // Header top-right corner cover (white pill to fix rect/circle corners)
+
+      // Icon circle
+      const avCx = cx + AV_CX_OFF
+      const avCy = gy + HEADER_H / 2
+      els.push(`<circle cx="${avCx}" cy="${avCy}" r="${AV_R}" fill="${c}"/>`)
+      // Person icon (simplified)
+      els.push(`<circle cx="${avCx}" cy="${avCy - 5}" r="5" fill="white"/>`)
+      els.push(`<path d="M${avCx - 8},${avCy + 14} Q${avCx},${avCy + 3} ${avCx + 8},${avCy + 14}" fill="white"/>`)
+
+      // Group name
+      const nX = cx + NAME_X_OFF
+      const hasDesc = g.description && g.description.length > 0
+      els.push(`<text x="${nX}" y="${gy + (hasDesc ? HEADER_H / 2 - 3 : HEADER_H / 2 + 5)}" font-family="${FONT}" font-size="15" font-weight="700" fill="#111827">${x(g.name)}</text>`)
+      if (hasDesc) {
+        const desc = g.description!.length > 90 ? g.description!.slice(0, 90) + '…' : g.description!
+        els.push(`<text x="${nX}" y="${gy + HEADER_H / 2 + 14}" font-family="${FONT}" font-size="11" fill="#9ca3af">${x(desc)}</text>`)
+      }
+
+      // Member count badge
+      const badge = `${g.members.length} üye`
+      const bW = badge.length * 7.2 + 14
+      const bX = cx + CARD_W - bW - 12
+      els.push(`<rect x="${bX}" y="${avCy - 11}" width="${bW}" height="22" rx="11" fill="${c}"/>`)
+      els.push(`<text x="${bX + bW / 2}" y="${avCy + 5}" text-anchor="middle" font-family="${FONT}" font-size="12" font-weight="600" fill="white">${x(badge)}</text>`)
+
+      let ry = gy + HEADER_H
+      // Header divider
+      els.push(`<line x1="${cx + BORDER_W}" y1="${ry}" x2="${cx + CARD_W}" y2="${ry}" stroke="#e5e7eb" stroke-width="1"/>`)
+      ry++
+
+      // Members
+      for (let i = 0; i < g.members.length; i++) {
+        const m = g.members[i]
+        const rH = mh[i]
+        if (i > 0) els.push(`<line x1="${cx + BORDER_W + 12}" y1="${ry}" x2="${cx + CARD_W - 12}" y2="${ry}" stroke="#f3f4f6" stroke-width="1"/>`)
+
+        const mAvCy = ry + MIN_ROW_H / 2
+        const mAvCx = cx + AV_CX_OFF
+        els.push(`<circle cx="${mAvCx}" cy="${mAvCy}" r="${AV_R}" fill="${c}"/>`)
+        const ini = m.user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+        els.push(`<text x="${mAvCx}" y="${mAvCy + 5}" text-anchor="middle" fill="white" font-size="12" font-weight="700" font-family="${FONT}">${x(ini)}</text>`)
+
+        els.push(`<text x="${cx + NAME_X_OFF}" y="${ry + 20}" font-family="${FONT}" font-size="13" font-weight="600" fill="#111827">${x(m.user.full_name)}</text>`)
+        const emailTrunc = m.user.email.length > 30 ? m.user.email.slice(0, 29) + '…' : m.user.email
+        els.push(`<text x="${cx + NAME_X_OFF}" y="${ry + 34}" font-family="${FONT}" font-size="11" fill="#9ca3af">${x(emailTrunc)}</text>`)
+
+        const mBase = cx + MOD_X_OFF
+        if (m.modules.length === 0) {
+          els.push(`<text x="${mBase}" y="${ry + 28}" font-family="${FONT}" font-size="11" fill="#d1d5db" font-style="italic">${x(t('responsibility.no_modules'))}</text>`)
+        } else {
+          const tags = layoutTags(m.modules)
+          for (const tag of tags) {
+            const tx = mBase + tag.tx
+            const ty = ry + 8 + tag.row * TAG_ROW_H
+            els.push(`<rect x="${tx}" y="${ty}" width="${tag.tw}" height="${TAG_H}" rx="10" fill="${c}" fill-opacity="0.10" stroke="${c}" stroke-opacity="0.40" stroke-width="1"/>`)
+            els.push(`<text x="${tx + tag.tw / 2}" y="${ty + 14}" text-anchor="middle" font-family="${FONT}" font-size="10.5" font-weight="500" fill="${c}">${x(tag.text)}</text>`)
+          }
+        }
+        ry += rH
+      }
+      gy += cardH + GROUP_GAP
+    }
+
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${totalH}" viewBox="0 0 ${W} ${totalH}">${els.join('')}</svg>`
+  }
+
   async function renderCanvas(): Promise<HTMLCanvasElement> {
-    const el = exportRef.current
-    if (!el) throw new Error('Export element not found')
-    return html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false })
+    const svgStr = buildSvg()
+    const dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr)
+    const tmpSvg = document.createElement('div')
+    tmpSvg.innerHTML = svgStr
+    const svgEl = tmpSvg.querySelector('svg')!
+    const w = Number(svgEl.getAttribute('width')) || 900
+    const h = Number(svgEl.getAttribute('height')) || 400
+    const img = new Image()
+    await new Promise<void>((res, rej) => {
+      img.onload = () => res()
+      img.onerror = () => rej(new Error('SVG render failed'))
+      img.src = dataUrl
+    })
+    const scale = 2
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.round(w * scale)
+    canvas.height = Math.round(h * scale)
+    const ctx = canvas.getContext('2d')!
+    ctx.fillStyle = '#f9fafb'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    ctx.scale(scale, scale)
+    ctx.drawImage(img, 0, 0, w, h)
+    return canvas
   }
 
   function triggerDownload(url: string, filename: string) {
@@ -876,7 +1029,7 @@ export default function ResponsibilityPage() {
       </div>
 
       {/* Groups */}
-      <div ref={exportRef}>
+      <div>
         {isLoading ? (
           <div className="flex justify-center py-16">
             <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
