@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Clock, Play, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Clock, Play, ChevronDown, ChevronUp, X } from 'lucide-react'
 import {
   useEmailWorkflows,
   useEmailTemplates,
@@ -15,6 +15,7 @@ import {
   type EmailWorkflow,
   type EmailLog,
 } from '@/api/email'
+import { useUsers } from '@/api/users'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -149,17 +150,19 @@ export default function EmailWorkflowsPage() {
   ]
 
   const RECIPIENT_TYPES = [
-    { value: 'assignee', label: t('email.recipient_assignee') },
-    { value: 'team_manager', label: t('email.recipient_team_manager') },
-    { value: 'all_managers', label: t('email.recipient_all_managers') },
-    { value: 'all_users', label: t('email.recipient_all_users') },
-    { value: 'creator', label: t('email.recipient_creator') },
-    { value: 'specific_emails', label: t('email.recipient_specific_emails') },
+    { value: 'assignee', label: t('email.recipient_assignee'), timedOnly: false },
+    { value: 'team_manager', label: t('email.recipient_team_manager'), timedOnly: false },
+    { value: 'all_managers', label: t('email.recipient_all_managers'), timedOnly: false },
+    { value: 'all_users', label: t('email.recipient_all_users'), timedOnly: false },
+    { value: 'creator', label: t('email.recipient_creator'), timedOnly: false },
+    { value: 'specific_emails', label: t('email.recipient_specific_emails'), timedOnly: false },
+    { value: 'specific_users', label: t('email.recipient_specific_users'), timedOnly: true },
   ]
 
   const { data: workflows = [], isLoading } = useEmailWorkflows()
   const { data: templates = [] } = useEmailTemplates()
   const { data: teamsWebhooks = [] } = useTeamsWebhooks()
+  const { data: allUsersData } = useUsers({ is_active: true, limit: 500 })
   const { data: heartbeatData } = useEmailCeleryHeartbeat()
   const createWorkflow = useCreateEmailWorkflow()
   const updateWorkflow = useUpdateEmailWorkflow()
@@ -179,6 +182,7 @@ export default function EmailWorkflowsPage() {
   const [teamsWebhookId, setTeamsWebhookId] = useState('')
   const [daysBefore, setDaysBefore] = useState(3)
   const [recipientEmailsInput, setRecipientEmailsInput] = useState('')
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([])
   const [sendHour, setSendHour] = useState(8)
   const [timezone, setTimezone] = useState(detectBrowserTimezone())
   const [frequency, setFrequency] = useState('daily')
@@ -195,6 +199,7 @@ export default function EmailWorkflowsPage() {
     setTeamsWebhookId('')
     setDaysBefore(3)
     setRecipientEmailsInput('')
+    setSelectedUserIds([])
     setSendHour(8)
     setTimezone(detectBrowserTimezone())
     setFrequency('daily')
@@ -226,8 +231,13 @@ export default function EmailWorkflowsPage() {
     setSendDays(Array.isArray(cfg.send_days) ? (cfg.send_days as number[]) : [0, 1, 2, 3, 4, 5, 6])
     if (wf.recipient_type === 'specific_emails' && Array.isArray(wf.recipient_users)) {
       setRecipientEmailsInput((wf.recipient_users as string[]).join(', '))
+      setSelectedUserIds([])
+    } else if (wf.recipient_type === 'specific_users' && Array.isArray(wf.recipient_users)) {
+      setSelectedUserIds(wf.recipient_users as string[])
+      setRecipientEmailsInput('')
     } else {
       setRecipientEmailsInput('')
+      setSelectedUserIds([])
     }
     setError('')
     setShowForm(true)
@@ -258,6 +268,8 @@ export default function EmailWorkflowsPage() {
     let recipientUsers: string[] | undefined
     if (recipientType === 'specific_emails') {
       recipientUsers = recipientEmailsInput.split(',').map((e) => e.trim()).filter((e) => e.includes('@'))
+    } else if (recipientType === 'specific_users') {
+      recipientUsers = selectedUserIds
     }
 
     const data: Record<string, unknown> = {
@@ -587,7 +599,9 @@ export default function EmailWorkflowsPage() {
               <div>
                 <label className={labelCls}>{t('email.recipient_type_label')} *</label>
                 <select value={recipientType} onChange={(e) => setRecipientType(e.target.value)} className={inputCls}>
-                  {RECIPIENT_TYPES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+                  {RECIPIENT_TYPES.filter((r) => !r.timedOnly || isTimedTrigger).map((r) => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
+                  ))}
                 </select>
               </div>
 
@@ -601,6 +615,43 @@ export default function EmailWorkflowsPage() {
                     placeholder="email1@domain.com, email2@domain.com"
                     className={inputCls}
                   />
+                </div>
+              )}
+
+              {recipientType === 'specific_users' && (
+                <div>
+                  <label className={labelCls}>{t('email.recipient_specific_users')}</label>
+                  {selectedUserIds.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {selectedUserIds.map((uid) => {
+                        const u = (allUsersData?.items ?? []).find((x) => x.id === uid)
+                        return u ? (
+                          <span key={uid} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800 dark:bg-primary-900/40 dark:text-primary-300">
+                            {u.full_name}
+                            <button type="button" onClick={() => setSelectedUserIds(selectedUserIds.filter((id) => id !== uid))} className="hover:text-primary-600">
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        ) : null
+                      })}
+                    </div>
+                  )}
+                  <select
+                    className={inputCls}
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value && !selectedUserIds.includes(e.target.value)) {
+                        setSelectedUserIds([...selectedUserIds, e.target.value])
+                      }
+                    }}
+                  >
+                    <option value="">{t('email.recipient_user_select_placeholder')}</option>
+                    {(allUsersData?.items ?? [])
+                      .filter((u) => !selectedUserIds.includes(u.id))
+                      .map((u) => (
+                        <option key={u.id} value={u.id}>{u.full_name} — {u.email}</option>
+                      ))}
+                  </select>
                 </div>
               )}
 

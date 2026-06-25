@@ -646,12 +646,17 @@ async def _handle_worklog_reminder(db, workflow, today: date):
     from app.models.user import User
     from app.models.worklog import WorkLog
     from app.services.email_service import EmailService
+    import uuid as _uuid
 
     svc = EmailService(db)
     active_users = await db.execute(
         select(User).where(User.is_active == True, User.is_deleted == False)
     )
     users = active_users.scalars().all()
+
+    if workflow.recipient_type == "specific_users" and workflow.recipient_users:
+        allowed = {_uuid.UUID(str(uid)) for uid in workflow.recipient_users}
+        users = [u for u in users if u.id in allowed]
 
     logged_today = await db.execute(
         select(WorkLog.user_id).where(WorkLog.log_date == today).distinct()
@@ -701,9 +706,17 @@ async def _handle_dashboard_report(db, workflow, today: date):
     svc = EmailService(db)
 
     # Build recipient email list based on recipient_type
+    import uuid as _uuid
     recipient_emails = []
     if workflow.recipient_type == "specific_emails" and workflow.recipient_users:
         recipient_emails = [e for e in workflow.recipient_users if isinstance(e, str) and "@" in e]
+    elif workflow.recipient_type == "specific_users" and workflow.recipient_users:
+        allowed = {_uuid.UUID(str(uid)) for uid in workflow.recipient_users}
+        from app.models.user import User as _User
+        all_result = await db.execute(
+            select(_User).where(_User.is_active == True, _User.is_deleted == False)
+        )
+        recipient_emails = [u.email for u in all_result.scalars().all() if u.id in allowed]
     elif workflow.recipient_type == "all_users":
         from app.models.user import User as _User
         all_result = await db.execute(
@@ -840,6 +853,19 @@ async def _send_worklog_reminders_async():
             smtp_cfg = await svc.get_smtp_config()
             if not smtp_cfg:
                 logger.warning("send_worklog_reminders: SMTP not configured — skipping")
+                return
+
+            # If an active workflow-driven reminder exists, _evaluate_workflows_async()
+            # handles it (with recipient_type support). Skip here to avoid duplicate sends.
+            from app.models.email_workflow import EmailWorkflow as _EWF
+            wf_result = await db.execute(
+                select(_EWF).where(
+                    _EWF.is_active == True,
+                    _EWF.trigger_type == "worklog_reminder",
+                )
+            )
+            if wf_result.scalars().first() is not None:
+                logger.info("send_worklog_reminders: active workflow found — deferring to workflow eval")
                 return
 
             template = await svc.get_template_by_slug("worklog_reminder")
