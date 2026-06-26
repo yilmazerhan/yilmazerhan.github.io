@@ -69,6 +69,7 @@ export default function KanbanColumnComp({ column, tasks, onAddTask, onTaskClick
                 key={task.id}
                 task={task}
                 onClick={onTaskClick}
+                isTerminal={column.is_terminal}
                 selectionMode={selectionMode}
                 isSelected={selectedTaskIds?.has(task.id)}
                 onToggleSelect={onToggleSelect}

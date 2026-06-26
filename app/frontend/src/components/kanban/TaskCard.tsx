@@ -26,12 +26,13 @@ interface Props {
   task: Task
   onClick: (task: Task) => void
   isDragOverlay?: boolean
+  isTerminal?: boolean
   selectionMode?: boolean
   isSelected?: boolean
   onToggleSelect?: (id: string) => void
 }
 
-export default function TaskCard({ task, onClick, isDragOverlay = false, selectionMode, isSelected, onToggleSelect }: Props) {
+export default function TaskCard({ task, onClick, isDragOverlay = false, isTerminal = false, selectionMode, isSelected, onToggleSelect }: Props) {
   const { t, i18n } = useTranslation()
   const locale = i18n.language === 'tr' ? tr : enUS
 
@@ -54,7 +55,7 @@ export default function TaskCard({ task, onClick, isDragOverlay = false, selecti
   const stripeColor = PRIORITY_STRIPE[task.priority] ?? PRIORITY_STRIPE.low
 
   let dueDateStatus: 'overdue' | 'today' | 'soon' | 'upcoming' | null = null
-  if (task.due_date) {
+  if (task.due_date && !isTerminal) {
     const d = parseISO(task.due_date)
     if (isPast(d) && !isToday(d)) dueDateStatus = 'overdue'
     else if (isToday(d)) dueDateStatus = 'today'
