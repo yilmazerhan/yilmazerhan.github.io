@@ -128,10 +128,11 @@ function TaskDetailTooltip({ task, pos }: { task: TeamTask; pos: { top: number; 
   const { t, i18n } = useTranslation()
   const dateLocale = i18n.language === 'tr' ? tr : enUS
 
-  const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200
   const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800
-  const tooltipWidth = 300
-  const left = pos.left + tooltipWidth > viewportWidth - 8 ? pos.left - tooltipWidth - 16 : pos.left
+  const tooltipWidth = 288 // w-72 = 18rem = 288px
+  // Prefer left side; fall back to right if not enough space
+  const leftIdeal = pos.left - tooltipWidth - 16
+  const left = leftIdeal >= 8 ? leftIdeal : pos.left + 16
   const top = Math.min(pos.top, viewportHeight - 420)
 
   return (
@@ -240,7 +241,7 @@ function KanbanCard({
       onMouseEnter={(e) => {
         if (!isDraggingGlobal) {
           const rect = e.currentTarget.getBoundingClientRect()
-          onHoverTask(task, { top: rect.top, left: rect.right + 12 })
+          onHoverTask(task, { top: rect.top, left: rect.left })
         }
       }}
       onMouseLeave={onHoverEnd}
@@ -853,7 +854,7 @@ export default function TeamTasksPage() {
                       className="hover:bg-gray-50 dark:hover:bg-gray-800/50"
                       onMouseEnter={(e) => {
                         const rect = e.currentTarget.getBoundingClientRect()
-                        handleHoverTask(task, { top: rect.top, left: rect.right + 12 })
+                        handleHoverTask(task, { top: rect.top, left: rect.left })
                       }}
                       onMouseLeave={handleHoverEnd}
                     >
