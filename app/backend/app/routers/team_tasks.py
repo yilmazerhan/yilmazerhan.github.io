@@ -55,8 +55,21 @@ async def update_team_task(
     svc = TeamTaskService(db)
     old_task = await svc.get_task(task_id)
 
-    if current_user.role != 'superadmin' and old_task.created_by != current_user.id:
-        raise HTTPException(status_code=403, detail="Bu görevi düzenlemek için yetkiniz yok.")
+    if current_user.role == 'team_manager' and old_task.created_by != current_user.id:
+        # Check if the task is visible to this manager (assigned to one of their team members)
+        from sqlalchemy import select
+        from app.models.user_team import user_teams
+        from app.models.team_task import TeamTaskAssignee
+        my_team_ids = select(user_teams.c.team_id).where(user_teams.c.user_id == current_user.id)
+        team_member_ids = select(user_teams.c.user_id).where(user_teams.c.team_id.in_(my_team_ids))
+        result = await db.execute(
+            select(TeamTaskAssignee).where(
+                TeamTaskAssignee.team_task_id == task_id,
+                TeamTaskAssignee.user_id.in_(team_member_ids),
+            )
+        )
+        if not result.scalars().first():
+            raise HTTPException(status_code=403, detail="Bu görevi düzenlemek için yetkiniz yok.")
 
     old_assignee_ids = {a.user_id for a in old_task.assignees}
 
