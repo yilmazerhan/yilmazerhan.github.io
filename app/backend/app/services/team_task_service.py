@@ -76,6 +76,10 @@ class TeamTaskService:
 
         if assignee_ids is not None:
             await self._set_assignees(task.id, assignee_ids)
+            # _set_assignees mutates the association table directly, so the
+            # already-loaded task.assignees collection is stale. Expire it so
+            # the reload below returns the fresh set.
+            self.db.expire(task, ["assignees"])
 
         await self.db.flush()
         return await self.get_task(task_id)
@@ -101,9 +105,25 @@ class TeamTaskService:
         return await self.get_task(task_id)
 
     async def _set_assignees(self, task_id: uuid.UUID, assignee_ids: List[uuid.UUID]) -> None:
-        await self.db.execute(
-            delete(TeamTaskAssignee).where(TeamTaskAssignee.team_task_id == task_id)
+        # Diff against existing rows so we preserve completed_at for assignees
+        # that stay on the task. A full delete+recreate would wipe completions.
+        result = await self.db.execute(
+            select(TeamTaskAssignee.user_id).where(TeamTaskAssignee.team_task_id == task_id)
         )
-        for user_id in assignee_ids:
+        existing = set(result.scalars().all())
+        target = set(assignee_ids)
+
+        to_remove = existing - target
+        to_add = target - existing
+
+        if to_remove:
+            await self.db.execute(
+                delete(TeamTaskAssignee).where(
+                    TeamTaskAssignee.team_task_id == task_id,
+                    TeamTaskAssignee.user_id.in_(to_remove),
+                )
+            )
+        for user_id in to_add:
             self.db.add(TeamTaskAssignee(team_task_id=task_id, user_id=user_id))
+
         await self.db.flush()
