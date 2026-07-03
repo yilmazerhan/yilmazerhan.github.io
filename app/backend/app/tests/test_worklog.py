@@ -196,3 +196,57 @@ class TestWorkLogStats:
         assert "total_hours" in data
         assert "by_type" in data
         assert data["total_hours"] >= 4.0
+
+
+class TestWorkLogListPagination:
+    """Regression: the dashboard's 7-day trend widget requests logs without
+    an explicit `limit`, relying on the client-side default. If a team logs
+    more than the API's default page size within the window, list_logs
+    (sorted log_date DESC) silently drops the OLDEST days — the dashboard
+    chart then renders those days as zero hours even though data exists."""
+
+    async def test_default_limit_does_not_silently_drop_oldest_days(
+        self, client: AsyncClient, superadmin_user: User, db: AsyncSession
+    ):
+        wt = await create_work_type(db, "Bulk Test")
+        users = []
+        for i in range(20):
+            u = User(
+                email=f"bulk{i}@test.com",
+                username=f"bulk{i}",
+                hashed_password=hash_password("Passw0rd!"),
+                full_name=f"Bulk User {i}",
+                role="user",
+                is_active=True,
+            )
+            db.add(u)
+            users.append(u)
+        await db.flush()
+
+        # 20 users x 7 days = 140 logs, well past the API's default limit of 100
+        for days_ago in range(7):
+            for u in users:
+                await create_log(db, u.id, wt.id, days_ago=days_ago)
+
+        headers = await get_auth_headers(client, superadmin_user.email, "Admin123!")
+        date_from = (date.today() - timedelta(days=6)).isoformat()
+        date_to = date.today().isoformat()
+
+        # Explicit high limit (what the dashboard now sends) must return every log
+        resp = await client.get(
+            "/api/v1/worklogs",
+            headers=headers,
+            params={"date_from": date_from, "date_to": date_to, "limit": 5000},
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 140
+        assert len(data["items"]) == 140
+
+        hours_by_day: dict[str, float] = {}
+        for item in data["items"]:
+            hours_by_day[item["log_date"]] = hours_by_day.get(item["log_date"], 0) + item["duration_hours"]
+
+        for days_ago in range(7):
+            d = (date.today() - timedelta(days=days_ago)).isoformat()
+            assert hours_by_day.get(d) == 40.0, f"day {d} should have 40h (20 users x 2h), got {hours_by_day.get(d)}"

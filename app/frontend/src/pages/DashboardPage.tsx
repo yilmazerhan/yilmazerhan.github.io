@@ -278,7 +278,7 @@ export default function DashboardPage() {
   const canSeeTeamData = user?.role === 'superadmin' || user?.role === 'team_manager'
 
   const { data: tasksData }     = useTasks({ limit: 500 })
-  const { data: logsData }      = useWorkLogs({ date_from: weekAgo, date_to: today })
+  const { data: logsData }      = useWorkLogs({ date_from: weekAgo, date_to: today, limit: 5000 })
   const { data: dailyLogsData } = useWorkLogs({ date_from: selectedDate, date_to: selectedDate, limit: 500 })
   const { data: allUsersData }  = useUsers({ is_active: true, limit: 200 }, canSeeTeamData)
   const { data: dbStats }       = useDashboardStats({ enabled: isSuperAdmin })
