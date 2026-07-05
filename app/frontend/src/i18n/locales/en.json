@@ -866,7 +866,7 @@
     "reason": "Reason",
     "reason_placeholder": "Vacation, personal, medical...",
     "submit": "Submit Request",
-    "kolayik_notice": "Leave requests entered here have no official validity and are for informational purposes only. You must officially submit your leave through the KolayİK system.",
+    "kolayik_notice": "Leave requests entered here have no official validity and are for informational purposes only. You must officially submit your leave through the KolayIK system.",
     "date_required": "Start and end date are required.",
     "date_range_invalid": "End date must be after start date.",
     "days": "days",
