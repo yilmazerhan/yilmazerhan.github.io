@@ -47,6 +47,11 @@
     "idle_timeout_message": "You were signed out after 12 hours of inactivity. Please sign in again."
   },
   "nav": {
+    "group_main": "Main",
+    "group_planning": "Planning",
+    "group_resources": "Resources",
+    "group_management": "Management",
+    "group_system": "System",
     "dashboard": "Dashboard",
     "worklog": "Work Log",
     "kanban": "Task Board",

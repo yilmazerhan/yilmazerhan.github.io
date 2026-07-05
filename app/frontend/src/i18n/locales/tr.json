@@ -47,6 +47,11 @@
     "idle_timeout_message": "12 saat boyunca işlem yapılmadığı için güvenliğiniz için oturumunuz sonlandırıldı. Lütfen tekrar giriş yapın."
   },
   "nav": {
+    "group_main": "Ana",
+    "group_planning": "Planlama",
+    "group_resources": "Kaynaklar",
+    "group_management": "Yönetim",
+    "group_system": "Sistem",
     "dashboard": "Gösterge Paneli",
     "worklog": "İş Günlüğü",
     "kanban": "Görev Panosu",
