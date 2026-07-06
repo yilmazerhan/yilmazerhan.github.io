@@ -162,7 +162,7 @@ export default function EmailWorkflowsPage() {
   const { data: workflows = [], isLoading } = useEmailWorkflows()
   const { data: templates = [] } = useEmailTemplates()
   const { data: teamsWebhooks = [] } = useTeamsWebhooks()
-  const { data: allUsersData } = useUsers({ is_active: true, limit: 500 })
+  const { data: allUsersData } = useUsers({ is_active: true, limit: 200 })
   const { data: heartbeatData } = useEmailCeleryHeartbeat()
   const createWorkflow = useCreateEmailWorkflow()
   const updateWorkflow = useUpdateEmailWorkflow()
