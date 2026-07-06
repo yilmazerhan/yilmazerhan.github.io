@@ -12,4 +12,13 @@ i18n
     interpolation: { escapeValue: false },
   })
 
+// Keep <html lang> in sync with the active language. Without this it stays
+// hard-coded as "tr", so browsers apply Turkish case-folding rules to any
+// CSS `uppercase` text even when displaying English — turning "i" into the
+// Turkish dotted "İ" instead of a plain Latin "I" (e.g. "PLANNING" → "PLANNİNG").
+document.documentElement.lang = i18n.language
+i18n.on('languageChanged', (lng) => {
+  document.documentElement.lang = lng
+})
+
 export default i18n
