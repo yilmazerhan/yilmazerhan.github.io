@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { format, startOfMonth, startOfWeek, addWeeks, addDays } from 'date-fns'
 import { tr as trLocale, enUS } from 'date-fns/locale'
-import { Clock, Users, FileText, TrendingUp, CalendarClock, Plus, Trash2, Play, Pencil, Trophy, Activity, CalendarCheck, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Clock, Users, FileText, TrendingUp, CalendarClock, Plus, Trash2, Play, Pencil, Trophy, Activity, CalendarCheck, ChevronLeft, ChevronRight, LineChart } from 'lucide-react'
 import { useWorkLogs, type WorkLog } from '@/api/worklog'
 import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
@@ -130,6 +130,72 @@ function MiniSparkline({ dailyData }: { dailyData: Array<[string, number]> }) {
         className="stroke-indigo-400 dark:stroke-indigo-500"
       />
     </svg>
+  )
+}
+
+// ── Employee performance trend (bar chart, responsive width) ──────────────────
+
+function useElementWidth<T extends HTMLElement>(): [React.RefObject<T>, number] {
+  const ref = useRef<T>(null)
+  const [width, setWidth] = useState(0)
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const update = () => setWidth(el.clientWidth)
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  return [ref, width]
+}
+
+function BarTrendChart({ data, hourAbbr }: { data: Array<{ label: string; hours: number }>; hourAbbr: string }) {
+  const [ref, W] = useElementWidth<HTMLDivElement>()
+  const H = 140
+  const padX = 6, padTop = 10, padBottom = 20
+  const chartW = Math.max(W - padX * 2, 1)
+  const chartH = H - padTop - padBottom
+  const maxH = Math.max(...data.map(d => d.hours), 1)
+  const axisMax = Math.max(Math.ceil(maxH), 1)
+  const barSlot = data.length ? chartW / data.length : 0
+  const toY = (h: number) => padTop + chartH - (h / axisMax) * chartH
+  const labelEvery = data.length > 12 ? Math.ceil(data.length / 8) : 1
+
+  if (data.length === 0) return null
+
+  return (
+    <div ref={ref} className="w-full">
+      {W > 0 && (
+        <svg width={W} height={H} className="block">
+          <line x1={padX} x2={padX + chartW} y1={toY(0)} y2={toY(0)} className="stroke-gray-200 dark:stroke-gray-700" strokeWidth="1" />
+          {data.map((d, i) => {
+            const barH = (d.hours / axisMax) * chartH
+            const x = padX + i * barSlot
+            const barW = Math.max(barSlot * 0.6, 2)
+            return (
+              <g key={i}>
+                <rect
+                  x={x + (barSlot - barW) / 2}
+                  y={toY(d.hours)}
+                  width={barW}
+                  height={Math.max(barH, 0)}
+                  rx="2"
+                  className={d.hours > 0 ? 'fill-primary-500' : 'fill-gray-100 dark:fill-gray-800'}
+                >
+                  <title>{d.label}: {d.hours.toFixed(1)}{hourAbbr}</title>
+                </rect>
+                {i % labelEvery === 0 && (
+                  <text x={x + barSlot / 2} y={H - 6} textAnchor="middle" fontSize="9" className="fill-gray-400 dark:fill-gray-500">
+                    {d.label}
+                  </text>
+                )}
+              </g>
+            )
+          })}
+        </svg>
+      )}
+    </div>
   )
 }
 
@@ -677,6 +743,12 @@ export default function ReportsPage() {
     user_id: selectedUserId || undefined,
     limit: 5000,
   })
+  // Team-wide logs for the same date range, ignoring the person filter — the
+  // work-type distribution chart must always reflect the whole team, not just
+  // whichever employee is selected for the performance trend. When no person
+  // filter is active this resolves to the same query as `data` above (React
+  // Query dedupes identical keys), so no extra request is made in that case.
+  const { data: teamRangeData } = useWorkLogs({ date_from: dateFrom, date_to: dateTo, limit: 5000 })
 
   const logs = data?.items ?? []
   const hourAbbr = t('worklog.hours_abbr')
@@ -753,6 +825,64 @@ export default function ReportsPage() {
   const multipleUsers = (pivot?.sortedUsers.length ?? 0) > 1
   const maxTotal = pivot?.sortedUsers[0]?.[1].total ?? 0
   const minTotal = pivot?.sortedUsers[pivot.sortedUsers.length - 1]?.[1].total ?? 0
+
+  // Team-wide work-type distribution for the selected date range (month/custom
+  // range) — built from teamRangeData so the person filter never narrows it.
+  const teamPivot = useMemo(() => buildPivot(teamRangeData?.items ?? []), [teamRangeData])
+  const rangeDonutData = useMemo(() => {
+    if (!teamPivot) return []
+    return teamPivot.typeList
+      .map(([typeId, type]) => ({
+        name: resolveName(t, type.name, type.name_key),
+        color: type.color,
+        hours: teamPivot.typeTotals[typeId] ?? 0,
+      }))
+      .sort((a, b) => b.hours - a.hours)
+  }, [teamPivot, t])
+
+  // Employee performance trend: a manager/superadmin picks a person via the
+  // user filter above; a regular user always sees their own trend (the
+  // backend already scopes `logs` to just their own entries).
+  const targetUserName = canFilterByUser
+    ? usersData?.items.find((u) => u.id === selectedUserId)?.full_name
+    : user?.full_name
+  const showEmployeePerf = canFilterByUser ? !!selectedUserId : !!user
+
+  // Daily trend: every day in the selected range, 0 hours where there's no log
+  const dailyTrendData = useMemo(() => {
+    if (!showEmployeePerf) return []
+    const byDate: Record<string, number> = {}
+    for (const log of logs) byDate[log.log_date] = (byDate[log.log_date] ?? 0) + log.duration_hours
+    const days: Array<{ label: string; hours: number }> = []
+    let d = new Date(dateFrom + 'T12:00:00')
+    const end = new Date(dateTo + 'T12:00:00')
+    while (d <= end) {
+      const key = format(d, 'yyyy-MM-dd')
+      days.push({ label: format(d, 'd MMM', { locale }), hours: byDate[key] ?? 0 })
+      d = addDays(d, 1)
+    }
+    return days
+  }, [logs, dateFrom, dateTo, locale, showEmployeePerf])
+
+  // Weekly trend: the same range grouped into Mon–Sun weeks
+  const weeklyTrendData = useMemo(() => {
+    if (!showEmployeePerf) return []
+    const byDate: Record<string, number> = {}
+    for (const log of logs) byDate[log.log_date] = (byDate[log.log_date] ?? 0) + log.duration_hours
+    const weeks: Array<{ label: string; hours: number }> = []
+    let weekStart = startOfWeek(new Date(dateFrom + 'T12:00:00'), { weekStartsOn: 1 })
+    const rangeEnd = new Date(dateTo + 'T12:00:00')
+    while (weekStart <= rangeEnd) {
+      let total = 0
+      for (let i = 0; i < 7; i++) {
+        const key = format(addDays(weekStart, i), 'yyyy-MM-dd')
+        total += byDate[key] ?? 0
+      }
+      weeks.push({ label: format(weekStart, 'd MMM', { locale }), hours: total })
+      weekStart = addWeeks(weekStart, 1)
+    }
+    return weeks
+  }, [logs, dateFrom, dateTo, locale, showEmployeePerf])
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -947,12 +1077,50 @@ export default function ReportsPage() {
         )}
       </div>
 
+      {/* Employee Performance Trend — daily + weekly hours for one person over the selected date range */}
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6 space-y-5">
+        <div className="flex items-center gap-2">
+          <LineChart className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+          <div>
+            <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200">
+              {t('reports.employee_perf_title')}{targetUserName ? ` · ${targetUserName}` : ''}
+            </h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{t('reports.employee_perf_subtitle')}</p>
+          </div>
+        </div>
+
+        {!showEmployeePerf ? (
+          <p className="text-center py-8 text-gray-400 text-sm">{t('reports.employee_perf_hint')}</p>
+        ) : dailyTrendData.every((d) => d.hours === 0) ? (
+          <div className="text-center py-8 text-gray-400 text-sm">{t('reports.no_data')}</div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+              <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3">{t('reports.daily_trend')}</h3>
+              <BarTrendChart data={dailyTrendData} hourAbbr={hourAbbr} />
+            </div>
+            <div>
+              <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-3">{t('reports.weekly_trend')}</h3>
+              <BarTrendChart data={weeklyTrendData} hourAbbr={hourAbbr} />
+            </div>
+          </div>
+        )}
+      </div>
+
       {isLoading ? (
         <div className="text-center py-12 text-gray-400">{t('common.loading')}</div>
       ) : !pivot ? (
         <div className="text-center py-12 text-gray-400">{t('reports.no_data')}</div>
       ) : (
         <>
+          {/* Team-wide work-type distribution for the selected date range */}
+          <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6">
+            <h2 className="text-base font-semibold text-gray-800 dark:text-gray-200 mb-4">{t('reports.by_work_type_range')}</h2>
+            <div className="flex justify-center">
+              <DonutChart data={rangeDonutData} hourAbbr={hourAbbr} />
+            </div>
+          </div>
+
           {/* Pivot table */}
           <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-800">
