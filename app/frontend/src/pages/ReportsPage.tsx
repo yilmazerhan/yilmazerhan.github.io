@@ -8,6 +8,7 @@ import { useWorkLogs, type WorkLog } from '@/api/worklog'
 import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
 import ExportButton from '@/components/ui/ExportButton'
+import DatePicker from '@/components/ui/DatePicker'
 import { exportWorklogs } from '@/api/export'
 import {
   useReportSchedules, useCreateReportSchedule, useUpdateReportSchedule,
@@ -738,8 +739,8 @@ export default function ReportsPage() {
     : { is_active: true, limit: 200 }
   const { data: usersData } = useUsers(canFilterByUser ? usersParams : undefined)
   const { data, isLoading } = useWorkLogs({
-    date_from: dateFrom,
-    date_to: dateTo,
+    date_from: dateFrom || undefined,
+    date_to: dateTo || undefined,
     user_id: selectedUserId || undefined,
     limit: 5000,
   })
@@ -748,7 +749,7 @@ export default function ReportsPage() {
   // whichever employee is selected for the performance trend. When no person
   // filter is active this resolves to the same query as `data` above (React
   // Query dedupes identical keys), so no extra request is made in that case.
-  const { data: teamRangeData } = useWorkLogs({ date_from: dateFrom, date_to: dateTo, limit: 5000 })
+  const { data: teamRangeData } = useWorkLogs({ date_from: dateFrom || undefined, date_to: dateTo || undefined, limit: 5000 })
 
   const logs = data?.items ?? []
   const hourAbbr = t('worklog.hours_abbr')
@@ -890,8 +891,8 @@ export default function ReportsPage() {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t('reports.title')}</h1>
         <ExportButton
           onExport={(fmt) => exportWorklogs({
-            date_from: dateFrom,
-            date_to: dateTo,
+            date_from: dateFrom || undefined,
+            date_to: dateTo || undefined,
             user_id: selectedUserId || undefined,
             format: fmt,
           })}
@@ -902,20 +903,18 @@ export default function ReportsPage() {
       <div className="flex gap-3 flex-wrap items-end">
         <div>
           <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('reports.date_from')}</label>
-          <input
-            type="date"
+          <DatePicker
             value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
+            onChange={setDateFrom}
             className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
         <div>
           <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('reports.date_to')}</label>
-          <input
-            type="date"
+          <DatePicker
             value={dateTo}
             max={today}
-            onChange={(e) => setDateTo(e.target.value)}
+            onChange={setDateTo}
             className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>

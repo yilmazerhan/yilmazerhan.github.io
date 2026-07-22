@@ -7,6 +7,7 @@ import { useAuthStore } from '@/store/authStore'
 import PatchModal from '@/components/patches/PatchModal'
 import { JiraTicketLink } from '@/components/JiraTicketLink'
 import { Pagination } from '@/components/ui/Pagination'
+import DatePicker from '@/components/ui/DatePicker'
 
 const LIMIT = 50
 
@@ -121,19 +122,17 @@ export default function PatchesPage() {
         </div>
         <div>
           <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('patches.date_from')}</label>
-          <input
-            type="date"
+          <DatePicker
             value={dateFrom}
-            onChange={(e) => { setDateFrom(e.target.value); resetPage() }}
+            onChange={(v) => { setDateFrom(v); resetPage() }}
             className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
         <div>
           <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('patches.date_to')}</label>
-          <input
-            type="date"
+          <DatePicker
             value={dateTo}
-            onChange={(e) => { setDateTo(e.target.value); resetPage() }}
+            onChange={(v) => { setDateTo(v); resetPage() }}
             className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>

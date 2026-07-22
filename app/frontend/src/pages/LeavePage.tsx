@@ -5,6 +5,7 @@ import { CalendarDays, Plus, X, Trash2, Check, Info } from 'lucide-react'
 import { useLeaves, useCreateLeave, useUpdateLeave, useDeleteLeave, type LeaveRequest } from '@/api/leaves'
 import { useAuthStore } from '@/store/authStore'
 import { useUsers } from '@/api/users'
+import DatePicker from '@/components/ui/DatePicker'
 
 const STATUS_COLORS: Record<string, string> = {
   pending:   'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
@@ -179,21 +180,19 @@ export default function LeavePage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('leave.start_date')} *</label>
-                <input
-                  type="date"
+                <DatePicker
                   value={form.start_date}
-                  onChange={(e) => setForm(f => ({ ...f, start_date: e.target.value }))}
+                  onChange={(v) => setForm(f => ({ ...f, start_date: v }))}
                   required
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('leave.end_date')} *</label>
-                <input
-                  type="date"
+                <DatePicker
                   value={form.end_date}
                   min={form.start_date || undefined}
-                  onChange={(e) => setForm(f => ({ ...f, end_date: e.target.value }))}
+                  onChange={(v) => setForm(f => ({ ...f, end_date: v }))}
                   required
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />

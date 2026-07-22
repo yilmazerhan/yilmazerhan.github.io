@@ -6,6 +6,7 @@ import {
   useCreatePatch, useUpdatePatch, useCustomers, useCreateCustomer,
   type CustomerPatch, type PatchFile, type PatchCreate, type PatchUpdate,
 } from '@/api/patches'
+import DatePicker from '@/components/ui/DatePicker'
 
 interface Props {
   patch?: CustomerPatch
@@ -360,10 +361,9 @@ export default function PatchModal({ patch, onClose }: Props) {
               <label className={labelCls}>
                 {t('patches.apply_date')} <span className="text-red-500">*</span>
               </label>
-              <input
-                type="date"
+              <DatePicker
                 value={applyDate}
-                onChange={(e) => setApplyDate(e.target.value)}
+                onChange={setApplyDate}
                 required
                 className={inputCls}
               />

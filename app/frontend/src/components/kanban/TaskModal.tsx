@@ -16,6 +16,7 @@ import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
 import { resolveName } from '@/utils/i18nName'
 import LabelChip from './LabelChip'
+import DatePicker from '@/components/ui/DatePicker'
 
 interface Props {
   task?: Task | null
@@ -420,10 +421,9 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     {t('kanban.due_date')}
                   </label>
-                  <input
-                    type="date"
+                  <DatePicker
                     value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
+                    onChange={setDueDate}
                     disabled={!canEdit}
                     className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-60"
                   />
@@ -434,10 +434,9 @@ export default function TaskModal({ task, defaultColumnId, columns, onClose, onT
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   {t('kanban.start_date')}
                 </label>
-                <input
-                  type="date"
+                <DatePicker
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  onChange={setStartDate}
                   disabled={!canEdit}
                   className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-60"
                 />

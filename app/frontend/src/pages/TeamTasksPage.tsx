@@ -25,6 +25,7 @@ import {
   type TeamTaskUser,
 } from '@/api/teamTasks'
 import { useUsers } from '@/api/users'
+import DatePicker from '@/components/ui/DatePicker'
 
 const STATUS_COLORS = {
   pending: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300',
@@ -527,6 +528,7 @@ function TaskModal({ task, onClose }: TaskModalProps) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    if (!deadline) { setError(t('common.required_fields')); return }
     try {
       if (task) {
         await updateTask.mutateAsync({ id: task.id, title, description: description || undefined, deadline, reminder_days_before: reminderDays, status: status as TeamTask['status'], assignee_ids: assigneeIds })
@@ -577,10 +579,9 @@ function TaskModal({ task, onClose }: TaskModalProps) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('team_tasks.deadline')} *</label>
-              <input
-                type="date"
+              <DatePicker
                 value={deadline}
-                onChange={(e) => setDeadline(e.target.value)}
+                onChange={setDeadline}
                 required
                 className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
@@ -754,18 +755,16 @@ export default function TeamTasksPage() {
           />
         </div>
         <div className="flex items-center gap-2">
-          <input
-            type="date"
+          <DatePicker
             value={filterFrom}
-            onChange={(e) => setFilterFrom(e.target.value)}
+            onChange={setFilterFrom}
             title={t('team_tasks.filter_from')}
             className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
           <span className="text-gray-400 text-sm">–</span>
-          <input
-            type="date"
+          <DatePicker
             value={filterTo}
-            onChange={(e) => setFilterTo(e.target.value)}
+            onChange={setFilterTo}
             title={t('team_tasks.filter_to')}
             className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
           />

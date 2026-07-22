@@ -21,6 +21,7 @@ import {
   type Release, type ReleasePhase, type ReleaseMilestone,
   type PhaseStatus, type MilestoneType,
 } from '@/api/releases'
+import DatePicker from '@/components/ui/DatePicker'
 
 // ─── Modal shell ────────────────────────────────────────────────────────────────
 
@@ -195,13 +196,13 @@ function PhaseModal({
             <label className={labelCls}>
               {t('releases.start_date')} <span className="text-red-500">*</span>
             </label>
-            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required className={inputCls} />
+            <DatePicker value={startDate} onChange={setStartDate} required className={inputCls} />
           </div>
           <div>
             <label className={labelCls}>
               {t('releases.end_date')} <span className="text-red-500">*</span>
             </label>
-            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} required className={inputCls} />
+            <DatePicker value={endDate} onChange={setEndDate} required className={inputCls} />
           </div>
         </div>
         {dateError && <p className="text-xs text-red-500 -mt-2">{t('releases.date_error')}</p>}
@@ -270,7 +271,7 @@ function MilestoneModal({
           <label className={labelCls}>
             {t('releases.milestone_date')} <span className="text-red-500">*</span>
           </label>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required className={inputCls} />
+          <DatePicker value={date} onChange={setDate} required className={inputCls} />
         </div>
         <div>
           <label className={labelCls}>{t('releases.milestone_label')}</label>

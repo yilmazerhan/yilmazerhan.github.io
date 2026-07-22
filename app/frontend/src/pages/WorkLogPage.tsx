@@ -11,6 +11,7 @@ import { resolveName } from '@/utils/i18nName'
 import ExportButton from '@/components/ui/ExportButton'
 import { exportWorklogs } from '@/api/export'
 import { Pagination } from '@/components/ui/Pagination'
+import DatePicker from '@/components/ui/DatePicker'
 
 const LIMIT = 50
 
@@ -170,7 +171,7 @@ export default function WorkLogPage() {
   const canFilterByUser = user?.role === 'superadmin' || user?.role === 'team_manager'
   const { data: usersData } = useUsers(canFilterByUser ? { limit: 200 } : undefined)
 
-  const baseParams = { date_from: dateFrom, date_to: dateTo, user_id: selectedUserId || undefined }
+  const baseParams = { date_from: dateFrom || undefined, date_to: dateTo || undefined, user_id: selectedUserId || undefined }
   const queryParams = viewMode === 'calendar'
     ? { ...baseParams, limit: 500 }
     : { ...baseParams, skip: page * LIMIT, limit: LIMIT }
@@ -215,8 +216,8 @@ export default function WorkLogPage() {
           </div>
           <ExportButton
             onExport={(fmt) => exportWorklogs({
-              date_from: dateFrom,
-              date_to: dateTo,
+              date_from: dateFrom || undefined,
+              date_to: dateTo || undefined,
               user_id: selectedUserId || undefined,
               format: fmt,
             })}
@@ -234,19 +235,17 @@ export default function WorkLogPage() {
       <div className="flex gap-3 flex-wrap">
         <div className="flex-1 min-w-[140px]">
           <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('worklog.date_from')}</label>
-          <input
-            type="date"
+          <DatePicker
             value={dateFrom}
-            onChange={(e) => handleDateFrom(e.target.value)}
+            onChange={handleDateFrom}
             className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>
         <div className="flex-1 min-w-[140px]">
           <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('worklog.date_to')}</label>
-          <input
-            type="date"
+          <DatePicker
             value={dateTo}
-            onChange={(e) => handleDateTo(e.target.value)}
+            onChange={handleDateTo}
             className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
           />
         </div>

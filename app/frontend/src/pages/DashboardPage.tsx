@@ -14,6 +14,7 @@ import { useUsers } from '@/api/users'
 import { useAuthStore } from '@/store/authStore'
 import { useDashboardStats, useSystemHealth } from '@/api/admin'
 import { resolveName } from '@/utils/i18nName'
+import DatePicker from '@/components/ui/DatePicker'
 
 const WIDGET_KEYS = [
   'db_stats', 'charts', 'daily_worklog', 'overdue', 'recent_logs', 'health_check',
@@ -279,7 +280,7 @@ export default function DashboardPage() {
 
   const { data: tasksData }     = useTasks({ limit: 500 })
   const { data: logsData }      = useWorkLogs({ date_from: weekAgo, date_to: today, limit: 5000 })
-  const { data: dailyLogsData } = useWorkLogs({ date_from: selectedDate, date_to: selectedDate, limit: 500 })
+  const { data: dailyLogsData } = useWorkLogs({ date_from: selectedDate || undefined, date_to: selectedDate || undefined, limit: 500 })
   const { data: allUsersData }  = useUsers({ is_active: true, limit: 200 }, canSeeTeamData)
   const { data: dbStats }       = useDashboardStats({ enabled: isSuperAdmin })
 
@@ -794,10 +795,9 @@ export default function DashboardPage() {
               <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300">{t('dashboard.daily_worklog_title')}</h2>
             </div>
             <div className="flex items-center gap-2">
-              <input
-                type="date"
+              <DatePicker
                 value={selectedDate}
-                onChange={e => setSelectedDate(e.target.value)}
+                onChange={setSelectedDate}
                 max={today}
                 className="text-sm border border-gray-300 dark:border-gray-700 rounded-lg px-2 py-1 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-primary-500"
               />

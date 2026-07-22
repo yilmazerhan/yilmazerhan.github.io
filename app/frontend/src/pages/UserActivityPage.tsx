@@ -7,6 +7,7 @@ import { ArrowLeft, Clock, CheckSquare, AlertTriangle, Archive } from 'lucide-re
 import apiClient from '@/api/client'
 import { resolveName } from '@/utils/i18nName'
 import ExportButton from '@/components/ui/ExportButton'
+import DatePicker from '@/components/ui/DatePicker'
 import { exportUserActivity } from '@/api/export'
 
 interface ActivityReport {
@@ -41,7 +42,7 @@ export default function UserActivityPage() {
     queryFn: () =>
       apiClient
         .get<ActivityReport>(`/admin/reports/user/${userId}`, {
-          params: { date_from: dateFrom, date_to: dateTo },
+          params: { date_from: dateFrom || undefined, date_to: dateTo || undefined },
         })
         .then((r) => r.data),
     enabled: !!userId,
@@ -73,19 +74,19 @@ export default function UserActivityPage() {
       <div className="flex gap-3 flex-wrap items-end">
         <div>
           <label className="block text-xs text-gray-500 mb-1">{t('reports.date_from')}</label>
-          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+          <DatePicker value={dateFrom} onChange={setDateFrom}
             className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
         </div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">{t('reports.date_to')}</label>
-          <input type="date" value={dateTo} max={today} onChange={(e) => setDateTo(e.target.value)}
+          <DatePicker value={dateTo} max={today} onChange={setDateTo}
             className="px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500" />
         </div>
         <ExportButton
           onExport={(fmt) => exportUserActivity({
             user_id: userId,
-            date_from: dateFrom,
-            date_to: dateTo,
+            date_from: dateFrom || undefined,
+            date_to: dateTo || undefined,
             format: fmt,
           })}
         />

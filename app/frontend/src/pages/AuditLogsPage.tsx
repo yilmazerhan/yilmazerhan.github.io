@@ -4,6 +4,7 @@ import { format, parseISO } from 'date-fns'
 import { tr, enUS } from 'date-fns/locale'
 import { Shield, ChevronLeft, ChevronRight, Plus, Pencil, Trash2, LogIn, LogOut, ChevronDown, ChevronUp, Copy } from 'lucide-react'
 import { useAuditLogs, type AuditLog } from '@/api/admin'
+import DatePicker from '@/components/ui/DatePicker'
 
 const ACTION_COLORS: Record<string, string> = {
   create: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
@@ -259,19 +260,17 @@ export default function AuditLogsPage() {
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{t('worklog.date_from')}</label>
-            <input
-              type="date"
+            <DatePicker
               value={dateFrom}
-              onChange={(e) => { setDateFrom(e.target.value); handleFilterChange() }}
+              onChange={(v) => { setDateFrom(v); handleFilterChange() }}
               className="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{t('worklog.date_to')}</label>
-            <input
-              type="date"
+            <DatePicker
               value={dateTo}
-              onChange={(e) => { setDateTo(e.target.value); handleFilterChange() }}
+              onChange={(v) => { setDateTo(v); handleFilterChange() }}
               className="w-full px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
