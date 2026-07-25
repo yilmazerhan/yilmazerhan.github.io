@@ -39,7 +39,7 @@ nginx (443/80) ──► frontend (React, port 80 inside)
 ```
 app/
 ├── docker-compose.yml
-├── docker-compose.override.yml   (dev mounts + hot reload)
+├── docker-compose.dev.yml        (dev mounts + hot reload, opt-in)
 ├── .env.example
 ├── nginx/
 │   └── nginx.conf

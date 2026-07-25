@@ -770,7 +770,11 @@ export default function ResponsibilityPage() {
     let gy = PX
 
     for (const { g, mh, cardH } of cards) {
-      const c = g.color
+      // Sanitised at the source: `c` is interpolated raw into SVG attributes in the
+      // string that is later assigned to innerHTML, so a non-colour value could
+      // break out of the attribute. The backend constrains this to #RRGGBB, but the
+      // DB column is String(20) and this code must not depend on a remote regex.
+      const c = /^#[0-9a-fA-F]{6}$/.test(g.color) ? g.color : '#6366f1'
       const cx = PX
       const gid = `g${gradIdx++}`
 

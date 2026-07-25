@@ -3,11 +3,9 @@ from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
 from app.database import get_db
 from app.models.user import User
-from app.models.user_team import user_teams
 from app.schemas.team import (
     TeamCreate, TeamUpdate, TeamResponse, TeamDetailResponse,
     TeamListResponse, AddMemberRequest
@@ -102,19 +100,15 @@ async def delete_team(
 async def add_member(
     team_id: uuid.UUID,
     body: AddMemberRequest,
-    current_user: Annotated[User, Depends(require_manager_or_above)],
+    _: Annotated[User, Depends(require_superadmin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    # Managers can only add to teams they belong to (via junction table)
-    if current_user.role == "team_manager":
-        in_team = (await db.execute(
-            select(user_teams.c.team_id).where(
-                user_teams.c.user_id == current_user.id,
-                user_teams.c.team_id == team_id,
-            )
-        )).scalar_one_or_none()
-        if not in_team:
-            raise ForbiddenError("Yalnızca kendi takımınıza üye ekleyebilirsiniz.")
+    # Superadmin-only: the user_teams junction table is the authoritative ACL for
+    # nearly every tenant boundary in the app (worklogs, leaves, kanban boards,
+    # user edits, password resets, reports, exports). Letting a team_manager
+    # insert arbitrary users into their own team would let them expand their own
+    # authorization scope at will. Team create/update/delete are already
+    # superadmin-only, and the Teams UI is a superadmin-only route.
     svc = TeamService(db)
     return await svc.add_member(team_id, body.user_id)
 
@@ -123,19 +117,10 @@ async def add_member(
 async def remove_member(
     team_id: uuid.UUID,
     user_id: uuid.UUID,
-    current_user: Annotated[User, Depends(require_manager_or_above)],
+    current_user: Annotated[User, Depends(require_superadmin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    # Managers can only remove from teams they belong to (via junction table)
-    if current_user.role == "team_manager":
-        in_team = (await db.execute(
-            select(user_teams.c.team_id).where(
-                user_teams.c.user_id == current_user.id,
-                user_teams.c.team_id == team_id,
-            )
-        )).scalar_one_or_none()
-        if not in_team:
-            raise ForbiddenError("Yalnızca kendi takımınızdan üye çıkarabilirsiniz.")
+    # Superadmin-only for the same reason as add_member above.
     svc = TeamService(db)
     await svc.remove_member(team_id, user_id, current_user)
     return {"message": "Üye takımdan çıkarıldı."}

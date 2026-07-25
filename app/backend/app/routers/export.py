@@ -5,7 +5,7 @@ import uuid
 from datetime import date
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,13 +15,19 @@ from app.database import get_db
 from app.models.user import User
 from app.models.user_team import user_teams
 from app.models.worklog import WorkLog
-from app.models.kanban import Task, KanbanColumn
 from app.models.task_label import task_label_assignments, TaskLabel
 from app.core.dependencies import get_current_user
+from app.core.rate_limit import limiter
+from app.services.kanban_service import KanbanService
 
 router = APIRouter(prefix="/export", tags=["export"])
 
 _FORMULA_CHARS = ('=', '+', '-', '@', '\t', '\r')
+
+# Exports materialise the whole result set in memory (list of rows, plus an
+# openpyxl workbook for Excel), so they need a ceiling. Every other list
+# endpoint in the app is capped; these were the outlier.
+_EXPORT_ROW_CAP = 50_000
 
 
 def _csv_safe(value: str) -> str:
@@ -48,7 +54,9 @@ def _csv_response(filename: str, rows: list[list], headers: list[str]) -> Stream
 # ─── Work Log Export ─────────────────────────────────────────────────────────
 
 @router.get("/worklogs")
+@limiter.limit("5/minute")
 async def export_worklogs(
+    request: Request,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     date_from: Optional[date] = Query(None),
@@ -87,7 +95,7 @@ async def export_worklogs(
     if date_to:
         q = q.where(WorkLog.log_date <= date_to)
 
-    q = q.order_by(WorkLog.log_date.desc(), WorkLog.created_at.desc())
+    q = q.order_by(WorkLog.log_date.desc(), WorkLog.created_at.desc()).limit(_EXPORT_ROW_CAP)
     result = await db.execute(q)
     logs = list(result.scalars().all())
 
@@ -112,7 +120,9 @@ async def export_worklogs(
 # ─── Task Export ──────────────────────────────────────────────────────────────
 
 @router.get("/tasks")
+@limiter.limit("5/minute")
 async def export_tasks(
+    request: Request,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     board_id: Optional[uuid.UUID] = Query(None),
@@ -123,48 +133,21 @@ async def export_tasks(
     format: str = Query("csv", pattern="^(csv|excel)$"),
 ):
     """Export tasks with optional filters."""
-    q = (
-        select(Task)
-        .options(
-            selectinload(Task.assignee),
-            selectinload(Task.creator),
-            selectinload(Task.column),
-            selectinload(Task.labels),
-        )
+    # Delegate scoping to KanbanService.list_tasks — it is the authoritative
+    # implementation (board-visibility for personal boards + user_teams junction
+    # table). The previous inline copy used the stale users.team_id FK, ignored
+    # KanbanBoard.is_personal, and OR'd in `assignee_id IS NULL`, which exposed
+    # every unassigned task on every personal board to any authenticated user.
+    svc = KanbanService(db)
+    tasks, _total = await svc.list_tasks(
+        requester=current_user,
+        assignee_id=assignee_id,
+        column_id=column_id,
+        board_id=board_id,
+        priority=priority,
+        include_archived=include_archived,
+        limit=_EXPORT_ROW_CAP,
     )
-
-    if not include_archived:
-        q = q.where(Task.is_archived == False)
-
-    # Role-based scoping
-    if current_user.role == "superadmin":
-        pass
-    elif current_user.team_id is not None:
-        from sqlalchemy import or_
-        Assignee = User.__table__.alias("assignee_user")
-        q = q.outerjoin(Assignee, Task.assignee_id == Assignee.c.id).where(
-            or_(
-                Assignee.c.team_id == current_user.team_id,
-                Task.assignee_id.is_(None),
-            )
-        )
-    else:
-        q = q.where(Task.assignee_id == current_user.id)
-
-    if board_id:
-        q = q.join(KanbanColumn, Task.column_id == KanbanColumn.id).where(
-            KanbanColumn.board_id == board_id
-        )
-    if column_id:
-        q = q.where(Task.column_id == column_id)
-    if assignee_id:
-        q = q.where(Task.assignee_id == assignee_id)
-    if priority:
-        q = q.where(Task.priority == priority)
-
-    q = q.order_by(Task.created_at.desc())
-    result = await db.execute(q)
-    tasks = list(result.scalars().all())
 
     headers = ["Title", "Column", "Assignee", "Priority", "Due Date", "Status", "Labels", "Jira Ticket", "Created At"]
     rows = [
@@ -191,7 +174,9 @@ async def export_tasks(
 # ─── User Activity Export ─────────────────────────────────────────────────────
 
 @router.get("/user-activity")
+@limiter.limit("5/minute")
 async def export_user_activity(
+    request: Request,
     current_user: Annotated[User, Depends(get_current_user)],
     db: Annotated[AsyncSession, Depends(get_db)],
     user_id: Optional[uuid.UUID] = Query(None),
@@ -217,11 +202,14 @@ async def export_user_activity(
     )
 
     if current_user.role == "team_manager":
-        # Always scope a manager to their own team, then optionally narrow to a user.
-        from app.models.user import User as UserModel
-        q = q.join(UserModel, WorkLog.user_id == UserModel.id).where(
-            UserModel.team_id == current_user.team_id
-        )
+        # Scope a manager to their teams via the user_teams junction table — the
+        # authoritative ACL. The stale users.team_id FK diverges from real
+        # membership (it is only a "primary team" pointer, see migration
+        # 0023_repair_user_teams), and `== NULL` would have matched every
+        # team-less user. Mirrors export_worklogs above.
+        my_team_ids = select(user_teams.c.team_id).where(user_teams.c.user_id == current_user.id)
+        team_member_ids = select(user_teams.c.user_id).where(user_teams.c.team_id.in_(my_team_ids))
+        q = q.where(WorkLog.user_id.in_(team_member_ids))
         if target_user_id:
             q = q.where(WorkLog.user_id == target_user_id)
     elif target_user_id:
@@ -232,7 +220,7 @@ async def export_user_activity(
     if date_to:
         q = q.where(WorkLog.log_date <= date_to)
 
-    q = q.order_by(WorkLog.log_date, WorkLog.user_id)
+    q = q.order_by(WorkLog.log_date, WorkLog.user_id).limit(_EXPORT_ROW_CAP)
     result = await db.execute(q)
     logs = list(result.scalars().all())
 
@@ -240,11 +228,15 @@ async def export_user_activity(
     rows = [
         [
             log.log_date.isoformat() if log.log_date else "",
-            log.user.full_name if log.user else "",
-            log.user.email if log.user else "",
-            log.work_type.name if log.work_type else "",
+            # _csv_safe on every user-controlled field: full_name is self-settable
+            # via PATCH /users/me/profile, so an unescaped "=HYPERLINK(...)" would
+            # execute in the exporting admin's spreadsheet. The sibling exports
+            # above already escape; this one was missed.
+            _csv_safe(log.user.full_name if log.user else ""),
+            _csv_safe(log.user.email if log.user else ""),
+            _csv_safe(log.work_type.name if log.work_type else ""),
             str(log.duration_hours),
-            log.description or "",
+            _csv_safe(log.description or ""),
         ]
         for log in logs
     ]

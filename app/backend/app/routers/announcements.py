@@ -7,6 +7,7 @@ from sqlalchemy import select
 
 from app.database import get_db
 from app.models.user import User
+from app.models.user_team import user_teams
 from app.models.announcement import Announcement
 from app.schemas.announcement import AnnouncementCreate, AnnouncementUpdate, AnnouncementResponse
 from app.core.dependencies import get_current_user, require_superadmin
@@ -30,6 +31,13 @@ async def get_active_announcements(
     )
     all_active = result.scalars().all()
 
+    # All teams the viewer actually belongs to (junction table is authoritative).
+    my_team_ids = {
+        str(t) for t in (await db.execute(
+            select(user_teams.c.team_id).where(user_teams.c.user_id == current_user.id)
+        )).scalars().all()
+    }
+
     visible = []
     for ann in all_active:
         # Check expiry
@@ -43,7 +51,11 @@ async def get_active_announcements(
             if str(current_user.id) in ids:
                 visible.append(ann)
         elif ann.target_type == "specific_teams":
-            if current_user.team_id and str(current_user.team_id) in [str(i) for i in (ann.target_ids or [])]:
+            # Resolve ALL of the viewer's teams from the junction table. Using the
+            # single stale users.team_id pointer showed team-A announcements to
+            # users who had moved to team B, hid team-B ones from them, and only
+            # ever matched one team for multi-team users.
+            if my_team_ids & {str(i) for i in (ann.target_ids or [])}:
                 visible.append(ann)
 
     return visible

@@ -130,8 +130,23 @@ class AuthService:
         # the response time does not reveal whether the username exists.
         password_ok = verify_password(password, user.hashed_password if user else DUMMY_PASSWORD_HASH)
         if not user or not password_ok:
+            # Failed attempts were previously invisible: /auth/login is in the audit
+            # middleware's EXCLUDED_PREFIXES and the middleware only records 2xx, so
+            # credential stuffing and password spraying left no trace anywhere. Log
+            # the username and source IP (never the submitted password) so the
+            # attempts are at least detectable and alertable.
+            import logging
+            logging.getLogger(__name__).warning(
+                "Failed login attempt for username=%r from ip=%s user_agent=%r",
+                username, ip or "unknown", (user_agent or "")[:200],
+            )
             raise AuthenticationError("Kullanıcı adı veya şifre hatalı.")
         if not user.is_active:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Login attempt on inactive account username=%r from ip=%s",
+                username, ip or "unknown",
+            )
             raise ForbiddenError("Hesabınız aktif değil. Lütfen yöneticinizle iletişime geçin.")
 
         # Rehash if algorithm params changed

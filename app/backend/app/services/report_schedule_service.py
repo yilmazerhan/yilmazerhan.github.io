@@ -63,7 +63,6 @@ def compute_next_run(
 async def generate_and_send_report(db: AsyncSession, schedule) -> int:
     """Generate work log CSV report and send to recipients. Returns count of emails attempted."""
     from app.models.worklog import WorkLog
-    from app.models.user import User
     import csv
     import io
 
@@ -87,9 +86,13 @@ async def generate_and_send_report(db: AsyncSession, schedule) -> int:
     if schedule.user_id:
         q = q.where(WorkLog.user_id == schedule.user_id)
     elif schedule.team_id:
-        # Filter by team members
+        # Filter by team members via the user_teams junction table (authoritative).
+        # users.team_id is only a "primary team" pointer and diverges from real
+        # membership, so a multi-team user's worklogs were mailed to one team's
+        # recipient list and silently omitted from the other's.
+        from app.models.user_team import user_teams
         team_members = await db.execute(
-            select(User.id).where(User.team_id == schedule.team_id)
+            select(user_teams.c.user_id).where(user_teams.c.team_id == schedule.team_id)
         )
         member_ids = [r[0] for r in team_members.all()]
         if member_ids:

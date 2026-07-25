@@ -24,7 +24,11 @@ export function JiraTicketLink({ ticket }: JiraTicketLinkProps) {
 
   if (!ticket) return <span className="text-gray-300 dark:text-gray-700">—</span>
 
-  const base = baseUrl.endsWith('/') ? baseUrl : baseUrl ? baseUrl + '/' : ''
+  // Defence in depth: only ever build an href from an http(s) base. The value comes
+  // from the unauthenticated /public/branding endpoint, and React renders a
+  // "javascript:" href with only a console warning. The backend validates this too.
+  const safeBaseUrl = /^https?:\/\//i.test(baseUrl) ? baseUrl : ''
+  const base = safeBaseUrl.endsWith('/') ? safeBaseUrl : safeBaseUrl ? safeBaseUrl + '/' : ''
 
   const parts = ticket
     .split(/[\s,]+/)

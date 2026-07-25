@@ -157,7 +157,11 @@ async def reveal_field(
     request: Request,
     item_id: uuid.UUID,
     body: InventoryRevealRequest,
-    _: Annotated[User, Depends(require_permission("inventory", "view"))],
+    # Requires "edit", not "view": this endpoint DECRYPTS stored secrets (root/SSH
+    # keys, DB and cloud credentials). Every other read path masks them to
+    # has_password/has_ssh_key/has_access_key booleans, so "view" was never meant
+    # to grant decryption — and the default `user` role holds inventory:view.
+    _: Annotated[User, Depends(require_permission("inventory", "edit"))],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = InventoryService(db)

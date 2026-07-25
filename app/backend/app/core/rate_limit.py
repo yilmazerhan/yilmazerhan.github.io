@@ -43,7 +43,39 @@ def _get_real_ip(request: Request) -> str:
     return "127.0.0.1"
 
 
-limiter = Limiter(key_func=_get_real_ip)
+def _limiter_storage_uri() -> str | None:
+    """Share rate-limit counters across worker processes via Redis.
+
+    The default in-memory backend is per-process, and production runs uvicorn
+    with --workers 2, so every configured limit was silently doubled and reset
+    on any worker restart — e.g. login "5/minute" was really 10/minute.
+
+    Returns None (in-memory) when Redis is unreachable, so a missing Redis
+    degrades rate limiting instead of breaking every limited endpoint —
+    including login — with a connection error.
+    """
+    import logging
+
+    from app.config import settings
+
+    uri = settings.REDIS_URL
+    if not uri:
+        return None
+    try:
+        from limits.storage import storage_from_string
+
+        if storage_from_string(uri).check():
+            return uri
+        raise RuntimeError("storage check failed")
+    except Exception as exc:
+        logging.getLogger(__name__).warning(
+            "Rate limiter falling back to per-process in-memory storage "
+            "(Redis unavailable: %s). Limits will be enforced per worker.", exc
+        )
+        return None
+
+
+limiter = Limiter(key_func=_get_real_ip, storage_uri=_limiter_storage_uri())
 
 
 def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:

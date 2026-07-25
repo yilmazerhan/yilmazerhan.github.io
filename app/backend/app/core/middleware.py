@@ -50,7 +50,13 @@ AUDIT_TABLE_MAP = {
 }
 
 # Never store secret values in audit data.
-_SENSITIVE_KEY_RE = re.compile(r"password|token|secret|api_key|webhook_url|_pem|^value$", re.I)
+# `_encrypted` catches ssh_key_encrypted / access_key_id_encrypted (and any future
+# *_encrypted column) — otherwise their Fernet ciphertext is copied verbatim into
+# audit_logs, which is never pruned and is not covered by key rotation, so retired
+# keys stay useful to anyone holding an old pg_dump.
+_SENSITIVE_KEY_RE = re.compile(
+    r"password|token|secret|api_key|webhook_url|_pem|_encrypted|^value$", re.I
+)
 
 # Don't try to parse/store unreasonably large payloads.
 _MAX_AUDIT_BODY = 100_000
@@ -127,7 +133,12 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
 
     async def dispatch(self, request: Request, call_next):
-        path = request.url.path
+        # Use the raw ASGI path — the same value routing itself dispatches on.
+        # request.url is rebuilt from the client-supplied Host header, so it can
+        # be made to disagree with the routed path (CVE-2026-48710); a request
+        # whose reconstructed path started with an EXCLUDED_PREFIX would execute
+        # its mutation with no audit row and no before-snapshot.
+        path = request.scope.get("path") or request.url.path
         audited = request.method in AUDITED_METHODS and not any(
             path.startswith(p) for p in EXCLUDED_PREFIXES
         )

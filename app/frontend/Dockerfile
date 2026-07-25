@@ -13,11 +13,15 @@ CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 FROM node:22-alpine AS build
 
 WORKDIR /app
-COPY package.json ./
+# Build with pnpm + the committed lockfile. `npm install` ignored pnpm-lock.yaml
+# (non-deterministic versions on every build) and silently discarded the
+# `pnpm.overrides` block in package.json — so the deliberate `dompurify >=3.4.0`
+# transitive pin never applied to the image that actually shipped.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-RUN npm install
+RUN corepack enable && pnpm install --frozen-lockfile
 COPY . .
-RUN npm run build
+RUN pnpm run build
 
 # ─── Production stage ────────────────────────────────────────────────────────
 FROM nginxinc/nginx-unprivileged:1.25-alpine AS production

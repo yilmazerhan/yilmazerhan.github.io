@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 from app.models.team_task import TeamTask, TeamTaskAssignee
 from app.models.user import User
 from app.models.user_team import user_teams
-from app.core.exceptions import NotFoundError, ValidationError
+from app.core.exceptions import NotFoundError, ValidationError, ForbiddenError
 
 _VALID_STATUSES = ("pending", "in_progress", "done")
 
@@ -55,6 +55,26 @@ class TeamTaskService:
         if not task:
             raise NotFoundError("Takım görevi")
         return task
+
+    async def validate_assignee_scope(self, assignee_ids, requester: User) -> None:
+        """Reject assignees outside the requester's teams.
+
+        A team_manager could otherwise assign a task to any user in the system,
+        injecting work items, in-app notifications and recurring reminder emails
+        across tenant boundaries — and because update_task's ACL only requires
+        ONE assignee to be in the manager's teams, adding a single own-team
+        member to someone else's task granted persistent edit rights over it.
+        """
+        if requester.role == "superadmin" or not assignee_ids:
+            return
+        my_team_ids = select(user_teams.c.team_id).where(user_teams.c.user_id == requester.id)
+        allowed = set((await self.db.execute(
+            select(user_teams.c.user_id).where(user_teams.c.team_id.in_(my_team_ids))
+        )).scalars().all())
+        allowed.add(requester.id)
+        outside = [a for a in assignee_ids if a not in allowed]
+        if outside:
+            raise ForbiddenError("Yalnızca kendi takımınızdaki kullanıcılara görev atayabilirsiniz.")
 
     async def create_task(self, data: dict, created_by: uuid.UUID) -> TeamTask:
         assignee_ids = data.pop("assignee_ids", [])

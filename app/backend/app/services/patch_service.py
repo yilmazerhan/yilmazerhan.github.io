@@ -7,6 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from app.models.patch import CustomerPatch, Customer
 from app.models.user import User
+from app.models.user_team import user_teams
 from app.schemas.patch import PatchCreate, PatchUpdate, CustomerCreate
 from app.core.exceptions import NotFoundError, ForbiddenError, ConflictError
 
@@ -105,18 +106,37 @@ class PatchService:
             raise NotFoundError("Müşteri yaması")
         return patch
 
-    def _check_permission(self, patch: CustomerPatch, requester: User) -> None:
-        if requester.role in ("superadmin", "team_manager"):
+    async def _check_permission(self, patch: CustomerPatch, requester: User) -> None:
+        if requester.role == "superadmin":
             return
         if patch.created_by == requester.id:
             return
+        if requester.role == "team_manager":
+            # A manager may only modify patches created by someone in one of their
+            # teams. Previously ANY team_manager could edit or delete ANY patch —
+            # including another team's record of which binary/md5 was shipped to
+            # which customer, which is the module's audit trail.
+            if patch.created_by is None:
+                raise ForbiddenError()
+            shared = await self.db.execute(
+                select(user_teams.c.team_id).where(
+                    user_teams.c.user_id == requester.id,
+                    user_teams.c.team_id.in_(
+                        select(user_teams.c.team_id).where(
+                            user_teams.c.user_id == patch.created_by
+                        )
+                    ),
+                ).limit(1)
+            )
+            if shared.scalar_one_or_none():
+                return
         raise ForbiddenError()
 
     async def update_patch(
         self, patch_id: uuid.UUID, data: PatchUpdate, requester: User
     ) -> CustomerPatch:
         patch = await self.get_patch(patch_id)
-        self._check_permission(patch, requester)
+        await self._check_permission(patch, requester)
 
         update_data = data.model_dump(exclude_unset=True)
         for field, value in update_data.items():
@@ -127,6 +147,6 @@ class PatchService:
 
     async def delete_patch(self, patch_id: uuid.UUID, requester: User) -> None:
         patch = await self.get_patch(patch_id)
-        self._check_permission(patch, requester)
+        await self._check_permission(patch, requester)
         await self.db.delete(patch)
         await self.db.flush()

@@ -52,9 +52,15 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
-      // Only persist the user profile (no role-sensitive data) — NOT the access token.
-      // The access token stays in memory only; the httpOnly refresh cookie is used
-      // to obtain a new one on page load without exposing the JWT to JavaScript.
+      // Persist the user profile — NOT the access token. The access token stays in
+      // memory only; the httpOnly refresh cookie is used to obtain a new one on page
+      // load without exposing the JWT to JavaScript.
+      //
+      // NOTE: the persisted profile DOES include `role`, and it is editable in
+      // localStorage. Treat it purely as a display/navigation cache — a tampered
+      // role only reveals admin UI shells, because every privileged operation is
+      // authorised server-side from the JWT (require_superadmin / role checks).
+      // Never persist anything here that is trusted for an authorisation decision.
       partialize: (state) => ({ user: state.user, lastActivityAt: state.lastActivityAt }),
     }
   )

@@ -11,6 +11,14 @@ KEY=/ssl/current.key
 
 # Allow the (non-root) backend container to replace the cert files on activation.
 # The ssl_certs volume is internal and only mounted into nginx + backend.
+#
+# NOTE: 0777 is wider than necessary — unlink/rename permission comes from the
+# DIRECTORY mode, so any uid in either container can replace current.key/.crt even
+# though the key file itself is 0600. nginx now mounts this volume :ro (see
+# docker-compose.yml), which removes the request-parsing process as a write vector.
+# Properly narrowing this needs the backend's uid pinned in backend/Dockerfile and
+# `chown`ing here, which would change ownership of existing named volumes on
+# upgrade — deliberately left for a coordinated change rather than done silently.
 mkdir -p /ssl
 chmod 0777 /ssl
 

@@ -41,12 +41,26 @@ python -c "import secrets; print(secrets.token_hex(32))"
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-## Development Mode (docker-compose.override.yml)
+## Development Mode (docker-compose.dev.yml)
 
-`docker-compose.override.yml` is automatically applied in development. It:
+Development overrides live in `docker-compose.dev.yml` and must be requested
+explicitly — they are **not** applied automatically:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+
+It:
 - Mounts source directories into containers for hot reload
 - Exposes PostgreSQL on `localhost:5432` and Redis on `localhost:6379`
 - Runs backend with `--reload` and frontend with Vite HMR
+
+> The file is deliberately **not** named `docker-compose.override.yml`. Compose
+> auto-loads that name on every `docker compose up`, which would silently put a
+> production host into development mode: SQL echo (logging password hashes),
+> Fernet keys re-derived from `SECRET_KEY` (existing ciphertext becomes
+> unreadable), rate limiting collapsing to a single shared counter, public
+> `/api/docs`, and port 8000 published past nginx's TLS and security headers.
 
 ## Running Tests
 

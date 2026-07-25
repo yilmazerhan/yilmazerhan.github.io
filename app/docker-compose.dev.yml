@@ -1,12 +1,17 @@
 # ⚠️  SADECE YEREL GELİŞTİRME İÇİN / FOR LOCAL DEVELOPMENT ONLY
 #
-# Bu dosya Docker Compose tarafından otomatik yüklenir ve docker-compose.yml
-# üzerine yazar. Üretim ortamında (production) KULLANILMAZ — install.sh ve
-# systemd servisi açıkça "-f docker-compose.yml" ile çalışır.
+# Bu dosya BİLEREK "docker-compose.override.yml" DEĞİL: o isim Docker Compose
+# tarafından her "docker compose up" komutunda otomatik yüklenir ve üretim
+# ortamını sessizce geliştirme moduna düşürürdü. Bunun sonuçları:
+#   - SQL echo açılır → tüm sorgular ve parametreler (hashed_password dahil) log'a
+#   - 4 Fernet anahtarı SECRET_KEY'den yeniden türetilir → mevcut şifreli veri okunamaz
+#   - X-Real-IP güvenilmez olur → rate limit tüm kullanıcılar için tek sayaca düşer
+#   - /api/docs herkese açılır, dev CORS origin'leri geri gelir, refresh cookie
+#     "secure" bayrağını kaybeder, port 8000 nginx'i (TLS + güvenlik başlıkları) baypas eder
 #
-# Geliştirici kullanımı:
-#   docker compose up            → hem yml hem bu override devreye girer (HMR, --reload)
-#   docker compose -f docker-compose.yml up  → sadece production stage
+# Geliştirici kullanımı (açıkça belirtilmeli):
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#   docker compose up   → yalnızca production stage (güvenli varsayılan)
 
 services:
   backend:

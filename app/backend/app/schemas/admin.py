@@ -34,6 +34,17 @@ class BrandingUpdate(BaseModel):
             raise ValueError("Renk geçerli bir HEX değeri olmalıdır (örn: #3b82f6).")
         return v
 
+    @field_validator("jira_base_url")
+    @classmethod
+    def validate_jira_base_url(cls, v: Optional[str]) -> Optional[str]:
+        # This value is served by the UNAUTHENTICATED /public/branding endpoint and
+        # interpolated straight into an <a href> for every Jira ticket link, so a
+        # "javascript:" URL would execute in every user's authenticated session
+        # (React only warns, it still renders the href).
+        if v is not None and v.strip() and not v.strip().lower().startswith(("http://", "https://")):
+            raise ValueError("Jira adresi http:// veya https:// ile başlamalıdır.")
+        return v
+
 
 class AuditLogResponse(BaseModel):
     id: uuid.UUID

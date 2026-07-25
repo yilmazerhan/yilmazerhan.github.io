@@ -249,6 +249,12 @@ class UserService:
             )
             if not shared_q.scalar_one_or_none():
                 raise ForbiddenError("Yalnızca kendi takımınızdaki kullanıcıları düzenleyebilirsiniz.")
+            # Guard on the TARGET's current role, not just the submitted one. Without
+            # this, a manager could demote a superadmin to "user" and then reach
+            # admin_set_password (whose guard reads the now-downgraded role) to take
+            # over the account — or simply deactivate every superadmin via is_active.
+            if user.role in ("superadmin", "team_manager"):
+                raise ForbiddenError("Bu kullanıcıyı düzenleme yetkiniz yok.")
             if role and role in ("superadmin", "team_manager"):
                 raise ForbiddenError("Takım yöneticisi kullanıcı rolünü yükseltemez.")
             if email is not None:

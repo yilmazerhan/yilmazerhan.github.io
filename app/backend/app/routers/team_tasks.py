@@ -31,6 +31,7 @@ async def create_team_task(
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = TeamTaskService(db)
+    await svc.validate_assignee_scope(body.assignee_ids, current_user)
     task = await svc.create_task(body.model_dump(), created_by=current_user.id)
     notif_svc = NotificationService(db)
     for assignee in task.assignees:
@@ -74,6 +75,8 @@ async def update_team_task(
     old_assignee_ids = {a.user_id for a in old_task.assignees}
 
     body_dict = body.model_dump(exclude_none=True)
+    if body_dict.get("assignee_ids") is not None:
+        await svc.validate_assignee_scope(body_dict["assignee_ids"], current_user)
     task = await svc.update_task(task_id, body_dict)
 
     new_assignee_ids_raw = body_dict.get("assignee_ids")

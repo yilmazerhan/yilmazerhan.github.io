@@ -67,6 +67,7 @@ class Settings(BaseSettings):
         if self.ENVIRONMENT in ("development", "testing"):
             import base64
             import hashlib
+            derived = []
             for label, attr in [
                 ("jira", "JIRA_ENCRYPTION_KEY"),
                 ("smtp", "SMTP_ENCRYPTION_KEY"),
@@ -78,6 +79,21 @@ class Settings(BaseSettings):
                         hashlib.sha256(f"{label}:{self.SECRET_KEY}".encode()).digest()
                     ).decode()
                     object.__setattr__(self, attr, key)
+                    derived.append(attr)
+            if derived and self.SECRET_KEY == _DEFAULT_SECRET:
+                # These keys are then a pure function of a constant committed to
+                # this repository, so anyone can decrypt inventory credentials,
+                # SMTP/Jira secrets and SSL private keys from a DB dump. Tolerable
+                # for a throwaway dev DB; catastrophic if a real deployment ever
+                # boots without ENVIRONMENT=production. Fail loudly rather than
+                # silently, and do not put real secrets in such an instance.
+                import logging
+                logging.getLogger(__name__).error(
+                    "INSECURE: %s derived from the default SECRET_KEY — these "
+                    "encryption keys are PUBLICLY PREDICTABLE. Set SECRET_KEY and "
+                    "ENVIRONMENT=production before storing any real secret.",
+                    ", ".join(derived),
+                )
         return self
 
     @model_validator(mode="after")
