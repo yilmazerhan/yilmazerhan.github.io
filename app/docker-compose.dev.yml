@@ -1,0 +1,56 @@
+# ⚠️  SADECE YEREL GELİŞTİRME İÇİN / FOR LOCAL DEVELOPMENT ONLY
+#
+# Bu dosya BİLEREK "docker-compose.override.yml" DEĞİL: o isim Docker Compose
+# tarafından her "docker compose up" komutunda otomatik yüklenir ve üretim
+# ortamını sessizce geliştirme moduna düşürürdü. Bunun sonuçları:
+#   - SQL echo açılır → tüm sorgular ve parametreler (hashed_password dahil) log'a
+#   - 4 Fernet anahtarı SECRET_KEY'den yeniden türetilir → mevcut şifreli veri okunamaz
+#   - X-Real-IP güvenilmez olur → rate limit tüm kullanıcılar için tek sayaca düşer
+#   - /api/docs herkese açılır, dev CORS origin'leri geri gelir, refresh cookie
+#     "secure" bayrağını kaybeder, port 8000 nginx'i (TLS + güvenlik başlıkları) baypas eder
+#
+# Geliştirici kullanımı (açıkça belirtilmeli):
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+#   docker compose up   → yalnızca production stage (güvenli varsayılan)
+
+services:
+  backend:
+    build:
+      context: ./backend
+      target: development
+    entrypoint: []
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/workspace
+    ports:
+      - "8000:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      ENVIRONMENT: development
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@host.docker.internal:${POSTGRES_PORT:-5432}/${POSTGRES_DB}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  celery_worker:
+    build:
+      context: ./backend
+      target: development
+    volumes:
+      - ./backend:/workspace
+    command: celery -A app.tasks.celery_app worker --loglevel=debug --concurrency=2
+
+  frontend:
+    build:
+      context: ./frontend
+      target: development
+    command: npm run dev -- --host 0.0.0.0 --port 80
+    volumes:
+      - ./frontend:/workspace
+      - /workspace/node_modules
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000

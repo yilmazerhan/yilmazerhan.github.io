@@ -1,0 +1,75 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "teamapp-backend"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+    # Web framework
+    "fastapi>=0.115.5",
+    "starlette>=0.49.1",
+    "uvicorn[standard]==0.32.1",
+
+    # Database
+    "sqlalchemy[asyncio]==2.0.36",
+    "asyncpg==0.30.0",
+    "alembic==1.14.0",
+
+    # Auth & Security
+    "argon2-cffi==23.1.0",
+    "PyJWT>=2.13.0",
+    "itsdangerous==2.2.0",
+    "cryptography>=46.0.6",
+
+    # HTTP & Validation
+    "pydantic==2.10.3",
+    "pydantic-settings==2.7.0",
+    "python-multipart>=0.0.27",
+    "httpx==0.28.1",
+
+    # Email
+    "fastapi-mail==1.4.1",
+    "jinja2==3.1.6",
+
+    # Background tasks
+    "celery[redis]==5.4.0",
+    "redis==5.2.1",
+    "apscheduler==3.11.2",
+
+    # Rate limiting
+    "slowapi==0.1.9",
+
+    # Utilities
+    "python-dateutil==2.9.0",
+    "pytz==2024.2",
+
+    # Export
+    "openpyxl==3.1.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-asyncio>=0.25.0",
+    "pytest-cov==6.0.0",
+    "httpx==0.28.1",
+    "factory-boy==3.3.1",
+    "freezegun==1.5.1",
+    "respx==0.21.1",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["app/tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+env = [
+    "ENVIRONMENT=testing",
+    "DATABASE_URL=postgresql+asyncpg://teamapp:teamapp@localhost:5432/teamapp_test",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

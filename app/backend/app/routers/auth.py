@@ -1,0 +1,183 @@
+from typing import Annotated, Optional
+
+from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response, Cookie
+from fastapi.responses import JSONResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.database import get_db
+from app.schemas.auth import (
+    RegisterRequest, LoginRequest, ForgotPasswordRequest,
+    ResetPasswordRequest, TokenResponse, UserPublic, MessageResponse
+)
+from app.services.auth_service import AuthService
+from app.core.dependencies import get_current_user
+from app.core.rate_limit import limiter
+from app.config import settings
+from app.models.user import User
+from app.tasks.email_tasks import send_auth_email_direct
+
+router = APIRouter(prefix="/auth", tags=["auth"])
+
+REFRESH_COOKIE = "refresh_token"
+COOKIE_MAX_AGE = settings.SESSION_MAX_DURATION_HOURS * 3600  # matches actual session lifetime
+
+
+def _set_refresh_cookie(response: Response, token: str) -> None:
+    # `secure=True` requires HTTPS — only enforce in production.
+    # In development the cookie must still be stored over HTTP so the
+    # ProtectedRoute silent-refresh flow works correctly.
+    is_prod = settings.ENVIRONMENT == "production"
+    response.set_cookie(
+        key=REFRESH_COOKIE,
+        value=token,
+        httponly=True,
+        secure=is_prod,
+        samesite="strict",
+        max_age=COOKIE_MAX_AGE,
+        path="/api/v1/auth",
+    )
+
+
+def _clear_refresh_cookie(response: Response) -> None:
+    is_prod = settings.ENVIRONMENT == "production"
+    response.delete_cookie(
+        key=REFRESH_COOKIE,
+        path="/api/v1/auth",
+        httponly=True,
+        secure=is_prod,
+        samesite="strict",
+    )
+
+
+@router.post("/register", response_model=MessageResponse, status_code=201)
+@limiter.limit("5/hour")
+async def register(
+    request: Request,
+    body: RegisterRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    background_tasks: BackgroundTasks,
+):
+    svc = AuthService(db)
+    user, activation_token = await svc.register(body.email, body.password, body.full_name, body.preferred_language)
+    background_tasks.add_task(
+        send_auth_email_direct,
+        template_slug="account_activation",
+        to_email=user.email,
+        variables={
+            "full_name": user.full_name,
+            "activation_url": f"{settings.FRONTEND_URL.rstrip('/')}/activate/{activation_token}",
+            "expires_in": getattr(settings, "ACCOUNT_ACTIVATION_TOKEN_EXPIRE_HOURS", 48),
+        },
+    )
+    return {"message": "Kayıt başarılı. Email adresinize aktivasyon bağlantısı gönderildi."}
+
+
+@router.post("/activate/{token}", response_model=MessageResponse)
+@limiter.limit("10/hour")
+async def activate_account(request: Request, token: str, db: Annotated[AsyncSession, Depends(get_db)]):
+    svc = AuthService(db)
+    await svc.activate_account(token)
+    return {"message": "Hesabınız başarıyla aktive edildi. Giriş yapabilirsiniz."}
+
+
+@router.post("/login", response_model=TokenResponse)
+@limiter.limit(settings.AUTH_LOGIN_RATE_LIMIT)
+async def login(
+    request: Request,
+    body: LoginRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = AuthService(db)
+    ip = request.client.host if request.client else None
+    ua = request.headers.get("user-agent")
+    user, access_token, raw_refresh = await svc.login(
+        body.username, body.password, ip=ip, user_agent=ua
+    )
+
+    response = JSONResponse(content={
+        "access_token": access_token,
+        "token_type": "bearer",
+        "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    })
+    _set_refresh_cookie(response, raw_refresh)
+    return response
+
+
+@router.post("/refresh", response_model=TokenResponse)
+@limiter.limit(settings.AUTH_REFRESH_RATE_LIMIT)
+async def refresh(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    refresh_token: Annotated[Optional[str], Cookie(alias=REFRESH_COOKIE)] = None,
+):
+    from app.core.exceptions import AuthenticationError
+    if not refresh_token:
+        raise AuthenticationError("Refresh token bulunamadı.")
+
+    svc = AuthService(db)
+    new_access, new_refresh = await svc.refresh_access_token(refresh_token)
+
+    response = JSONResponse(content={
+        "access_token": new_access,
+        "token_type": "bearer",
+        "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    })
+    _set_refresh_cookie(response, new_refresh)
+    return response
+
+
+@router.post("/logout", response_model=MessageResponse)
+async def logout(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    refresh_token: Annotated[Optional[str], Cookie(alias=REFRESH_COOKIE)] = None,
+):
+    if refresh_token:
+        svc = AuthService(db)
+        ip = request.client.host if request.client else None
+        ua = request.headers.get("user-agent")
+        await svc.logout(refresh_token, ip=ip, user_agent=ua)
+
+    response = JSONResponse(content={"message": "Başarıyla çıkış yapıldı."})
+    _clear_refresh_cookie(response)
+    return response
+
+
+@router.post("/forgot-password", response_model=MessageResponse)
+@limiter.limit(settings.AUTH_FORGOT_PASSWORD_RATE_LIMIT)
+async def forgot_password(
+    request: Request,
+    body: ForgotPasswordRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    background_tasks: BackgroundTasks,
+):
+    svc = AuthService(db)
+    result = await svc.forgot_password(body.email)
+    if result:
+        user, raw_token = result
+        background_tasks.add_task(
+            send_auth_email_direct,
+            template_slug="password_reset",
+            to_email=user.email,
+            variables={
+                "full_name": user.full_name,
+                "reset_url": f"{settings.FRONTEND_URL.rstrip('/')}/reset-password?token={raw_token}",
+                "expires_in": getattr(settings, "PASSWORD_RESET_TOKEN_EXPIRE_HOURS", 1),
+            },
+        )
+
+    # Always return success message to prevent user enumeration
+    return {"message": "Şifre sıfırlama bağlantısı email adresinize gönderildi (eğer kayıtlıysa)."}
+
+
+@router.post("/reset-password", response_model=MessageResponse)
+@limiter.limit("10/hour")
+async def reset_password(request: Request, body: ResetPasswordRequest, db: Annotated[AsyncSession, Depends(get_db)]):
+    svc = AuthService(db)
+    await svc.reset_password(body.token, body.new_password)
+    return {"message": "Şifreniz başarıyla sıfırlandı. Yeni şifrenizle giriş yapabilirsiniz."}
+
+
+@router.get("/me", response_model=UserPublic)
+async def get_me(current_user: Annotated[User, Depends(get_current_user)]):
+    return current_user

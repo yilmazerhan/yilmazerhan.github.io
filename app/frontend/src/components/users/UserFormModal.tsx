@@ -1,0 +1,216 @@
+import { useState } from 'react'
+import { X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { useCreateUser, useUpdateUser, type User } from '@/api/users'
+import { useAuthStore } from '@/store/authStore'
+
+interface Props {
+  user?: User
+  onClose: () => void
+}
+
+/** Normalize a string to a username-safe base using dot separators. */
+function toUsernameBase(raw: string): string {
+  let s = raw.toLowerCase()
+  const trMap: [string, string][] = [
+    ['ı','i'],['i̇','i'],['ğ','g'],['ü','u'],['ş','s'],['ö','o'],['ç','c'],
+  ]
+  for (const [src, dst] of trMap) s = s.split(src).join(dst)
+  s = s.replace(/[\s\-_]+/g, '.').replace(/[^a-z0-9.]/g, '').replace(/\.{2,}/g, '.').replace(/^\.+|\.+$/g, '')
+  return s.slice(0, 30) || 'user'
+}
+
+/** Generate firstname.lastname from "First Last" full name string. */
+function fullNameToUsername(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return ''
+  if (parts.length === 1) return toUsernameBase(parts[0])
+  // first word + last word → firstname.lastname
+  return toUsernameBase(parts[0]) + '.' + toUsernameBase(parts[parts.length - 1])
+}
+
+export default function UserFormModal({ user, onClose }: Props) {
+  const { t } = useTranslation()
+  const isEdit = !!user
+  const currentUser = useAuthStore((s) => s.user)
+  const isSuperAdmin = currentUser?.role === 'superadmin'
+
+  const [email, setEmail] = useState(user?.email || '')
+  const [username, setUsername] = useState(user?.username || '')
+  const [usernameManual, setUsernameManual] = useState(false)
+  const [fullName, setFullName] = useState(user?.full_name || '')
+  const [role, setRole] = useState(user?.role || 'user')
+  const [isActive, setIsActive] = useState(user?.is_active ?? true)
+  const [error, setError] = useState('')
+
+  const createUser = useCreateUser()
+  const updateUser = useUpdateUser(user?.id || '')
+
+  function handleEmailChange(val: string) {
+    setEmail(val)
+    if (!isEdit && !usernameManual) {
+      // Prefer full name for username; fall back to email local part
+      const base = fullName.trim()
+        ? fullNameToUsername(fullName)
+        : toUsernameBase(val.split('@')[0])
+      setUsername(base)
+    }
+  }
+
+  function handleFullNameChange(val: string) {
+    setFullName(val)
+    if (!usernameManual) {
+      const generated = fullNameToUsername(val)
+      if (generated) setUsername(generated)
+    }
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    try {
+      if (isEdit) {
+        const payload: Parameters<typeof updateUser.mutateAsync>[0] = {
+          full_name: fullName,
+          role,
+          is_active: isActive,
+        }
+        // Only superadmin can change email; only send if changed
+        if (isSuperAdmin && email.trim() && email.trim() !== user?.email) {
+          payload.email = email.trim()
+        }
+        await updateUser.mutateAsync(payload)
+      } else {
+        await createUser.mutateAsync({ email, username: username || undefined, full_name: fullName, role })
+      }
+      onClose()
+    } catch (err: any) {
+      setError(err.response?.data?.detail || t('common.error'))
+    }
+  }
+
+  const loading = createUser.isPending || updateUser.isPending
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl w-full max-w-md shadow-xl">
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-800">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {isEdit ? t('users.edit_user') : t('users.invite_user')}
+          </h2>
+          <button onClick={onClose} className="p-1 rounded text-gray-400 hover:text-gray-600">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {error && (
+            <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">
+              {error}
+            </p>
+          )}
+
+          {/* New user: email + username fields */}
+          {!isEdit && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('auth.email')}</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => handleEmailChange(e.target.value)}
+                  required
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('auth.username')}</label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => { setUsername(e.target.value); setUsernameManual(true) }}
+                  required
+                  placeholder={t('auth.username_placeholder')}
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+            </>
+          )}
+
+          {/* Edit mode: email change (superadmin only) */}
+          {isEdit && isSuperAdmin && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                {t('auth.email')}
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => handleEmailChange(e.target.value)}
+                required
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {t('users.email_change_note')}
+              </p>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('auth.full_name')}</label>
+            <input
+              type="text"
+              value={fullName}
+              onChange={(e) => handleFullNameChange(e.target.value)}
+              required
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('users.role')}</label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value as 'superadmin' | 'team_manager' | 'user')}
+              className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="user">{t('users.role_user')}</option>
+              <option value="team_manager">{t('users.role_team_manager')}</option>
+              <option value="superadmin">{t('users.role_superadmin')}</option>
+            </select>
+          </div>
+
+          {isEdit && (
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="is_active"
+                checked={isActive}
+                onChange={(e) => setIsActive(e.target.checked)}
+                className="rounded"
+              />
+              <label htmlFor="is_active" className="text-sm text-gray-700 dark:text-gray-300">{t('common.active')}</label>
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2 px-4 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800"
+            >
+              {t('common.cancel')}
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 py-2 px-4 rounded-lg bg-primary-500 hover:bg-primary-600 text-white text-sm font-medium disabled:opacity-50"
+            >
+              {loading ? t('common.saving') : t('common.save')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
