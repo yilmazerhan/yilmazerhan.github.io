@@ -529,16 +529,28 @@
 
   <section id="renewal">
     <h2><span class="section-num">06</span> Renewal engine</h2>
-    <p class="lede">One scheduled job, run daily, drives both automatic and manual renewals through the same code path — a manual "renew now" click in the UI just runs the same job early, for one certificate.</p>
+    <p class="lede">A scan of the certificate table runs on a schedule — not a one-off job — driving both automatic and manual renewals through the same code path. A manual "renew now" click in the UI runs that same code early, for one certificate, without disturbing the schedule.</p>
 
     <ol class="plain">
-      <li>Scan <code>certificate</code> for rows where <code>auto_renew = true</code> and days-to-expiry ≤ <code>renew_before_days</code> (default 30).</li>
+      <li>On each scheduled run, scan <code>certificate</code> for rows where <code>auto_renew = true</code> and days-to-expiry ≤ <code>renew_before_days</code> (default 30).</li>
       <li>Generate a new key pair (or reuse the existing one, per policy) and a CSR for the certificate's domain set.</li>
       <li>Submit to the recorded <code>ca_provider</code> through the CertificateAuthority interface; complete the domain validation challenge.</li>
       <li>On success, write a new <code>certificate_version</code> row, update <code>certificate.not_after</code>, and push the new material to any downstream target (load balancer, CDN, secret store consumers).</li>
       <li>On failure, retry with exponential backoff (up to 3 attempts across 24 hours); if still failing, escalate to a critical alert rather than retrying silently forever.</li>
       <li>Record the outcome to <code>audit_log</code> either way.</li>
     </ol>
+
+    <h3>Scan schedule</h3>
+    <p>The scan interval is an admin setting, not a hardcoded cron expression — an operator can tighten it during a CA incident or loosen it once expiries are calm, without a redeploy.</p>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>Setting</th><th class="wrap">Default</th><th class="wrap">Bounds</th><th class="wrap">Where it's changed</th></tr></thead>
+        <tbody>
+          <tr><td><code>renewal_scan_interval</code></td><td class="wrap">Every 6 hours</td><td class="wrap">15 minutes – 24 hours</td><td class="wrap">Admin → Settings → Renewal, or the API</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Shortening the interval reschedules the next run relative to the moment the setting is saved, not the previous schedule — so lowering it from 6h to 30m during an incident takes effect on the next tick, not up to 6 hours later. The scan itself stays idempotent: running it early via "renew now", or twice in the same window because the interval just changed, never double-issues for a certificate that's already mid-renewal.</p>
 
     <h3>Failure modes worth designing for up front</h3>
     <div class="table-wrap">
@@ -635,7 +647,7 @@
       <div class="card"><h4>Frontend</h4><p>React + TypeScript, a component library over hand-rolled CSS for the inventory table and forms.</p></div>
       <div class="card"><h4>Database</h4><p>PostgreSQL for metadata, roles, and the audit log.</p></div>
       <div class="card"><h4>Secrets</h4><p>HashiCorp Vault (or cloud KMS/Secrets Manager) for private keys and CA credentials.</p></div>
-      <div class="card"><h4>Scheduling</h4><p>A Kubernetes CronJob or a workflow engine (Temporal) for the renewal scan and retry logic.</p></div>
+      <div class="card"><h4>Scheduling</h4><p>An in-process ticker reading an admin-configurable interval (see <a href="#renewal">§06</a>), not a fixed Kubernetes CronJob — the schedule changes without a redeploy.</p></div>
       <div class="card"><h4>Observability</h4><p>Structured logs, metrics on renewal success rate, and the audit log itself as a compliance artifact.</p></div>
     </div>
   </section>
