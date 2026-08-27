@@ -411,12 +411,19 @@
         <tbody>
           <tr><td>certificate_id</td><td class="wrap">Foreign key to certificate</td></tr>
           <tr><td>serial_number / fingerprint_sha256</td><td class="wrap">From the issued cert, for lookup and CT log cross-check</td></tr>
+          <tr><td>signature_algorithm</td><td class="wrap">Parsed from the cert, e.g. <code>SHA256-RSA</code>, <code>ECDSA-SHA384</code></td></tr>
+          <tr><td>key_usage / extended_key_usage</td><td class="wrap">Parsed flags, e.g. Digital Signature, Server Auth, Client Auth — flags a cert issued for the wrong purpose</td></tr>
+          <tr><td>sct_count</td><td class="wrap">Embedded Signed Certificate Timestamps; 0 flags a Certificate Transparency gap browsers may reject</td></tr>
+          <tr><td>tls_versions_observed</td><td class="wrap">Protocol versions (e.g. TLS 1.2, TLS 1.3) seen on the most recent live handshake probe against the primary domain</td></tr>
+          <tr><td>cipher_suite_observed / ocsp_stapled</td><td class="wrap">From the same probe — flags a weak negotiated cipher or a missing OCSP staple</td></tr>
+          <tr><td>live_probe_at</td><td class="wrap">Timestamp of that probe; null if the domain isn't publicly reachable (internal-only certs skip it)</td></tr>
           <tr><td>pem_cert / pem_chain</td><td class="wrap">Stored encrypted at rest</td></tr>
           <tr><td>private_key_ref</td><td class="wrap">Pointer into Vault — the key itself never lives in Postgres</td></tr>
           <tr><td>issued_at</td><td class="wrap">Timestamp from the CA response</td></tr>
         </tbody>
       </table>
     </div>
+    <p>The signature/key/usage/SCT fields are parsed straight out of the X.509 cert at issuance — no extra network call. The TLS version, cipher, and OCSP-stapling fields are different: they come from an optional lightweight handshake the app makes against the certificate's own primary domain right after issuance and on each renewal-engine tick (<a href="#renewal">§06</a>), so drift between "what was issued" and "what's actually being served" shows up in the inventory without a separate network-discovery subsystem.</p>
 
     <div class="table-wrap">
       <table class="data">
@@ -529,16 +536,28 @@
 
   <section id="renewal">
     <h2><span class="section-num">06</span> Renewal engine</h2>
-    <p class="lede">One scheduled job, run daily, drives both automatic and manual renewals through the same code path — a manual "renew now" click in the UI just runs the same job early, for one certificate.</p>
+    <p class="lede">A scan of the certificate table runs on a schedule — not a one-off job — driving both automatic and manual renewals through the same code path. A manual "renew now" click in the UI runs that same code early, for one certificate, without disturbing the schedule.</p>
 
     <ol class="plain">
-      <li>Scan <code>certificate</code> for rows where <code>auto_renew = true</code> and days-to-expiry ≤ <code>renew_before_days</code> (default 30).</li>
+      <li>On each scheduled run, scan <code>certificate</code> for rows where <code>auto_renew = true</code> and days-to-expiry ≤ <code>renew_before_days</code> (default 30).</li>
       <li>Generate a new key pair (or reuse the existing one, per policy) and a CSR for the certificate's domain set.</li>
       <li>Submit to the recorded <code>ca_provider</code> through the CertificateAuthority interface; complete the domain validation challenge.</li>
       <li>On success, write a new <code>certificate_version</code> row, update <code>certificate.not_after</code>, and push the new material to any downstream target (load balancer, CDN, secret store consumers).</li>
       <li>On failure, retry with exponential backoff (up to 3 attempts across 24 hours); if still failing, escalate to a critical alert rather than retrying silently forever.</li>
       <li>Record the outcome to <code>audit_log</code> either way.</li>
     </ol>
+
+    <h3>Scan schedule</h3>
+    <p>The scan interval is an admin setting, not a hardcoded cron expression — an operator can tighten it during a CA incident or loosen it once expiries are calm, without a redeploy.</p>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>Setting</th><th class="wrap">Default</th><th class="wrap">Bounds</th><th class="wrap">Where it's changed</th></tr></thead>
+        <tbody>
+          <tr><td><code>renewal_scan_interval</code></td><td class="wrap">Every 6 hours</td><td class="wrap">15 minutes – 24 hours</td><td class="wrap">Admin → Settings → Renewal, or the API</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Shortening the interval reschedules the next run relative to the moment the setting is saved, not the previous schedule — so lowering it from 6h to 30m during an incident takes effect on the next tick, not up to 6 hours later. The scan itself stays idempotent: running it early via "renew now", or twice in the same window because the interval just changed, never double-issues for a certificate that's already mid-renewal.</p>
 
     <h3>Failure modes worth designing for up front</h3>
     <div class="table-wrap">
@@ -581,9 +600,27 @@
     <h2><span class="section-num">08</span> Web UI &amp; access control</h2>
     <div class="card-grid">
       <div class="card"><h4>Dashboard</h4><p>Certificates expiring in 30/14/7 days front and center, plus counts by issuer and status.</p></div>
-      <div class="card"><h4>Inventory table</h4><p>Sortable, filterable by domain, issuer, environment, owning team, and expiry window.</p></div>
-      <div class="card"><h4>Certificate detail</h4><p>Chain, SANs, renewal history, and scoped download buttons — key export requires re-authentication.</p></div>
+      <div class="card"><h4>Inventory table</h4><p>Sortable, filterable by domain, issuer, environment, owning team, expiry window, key algorithm, and minimum TLS version observed — so a weak-crypto sweep is a filter, not a spreadsheet export.</p></div>
+      <div class="card"><h4>Certificate detail</h4><p>Chain, SANs, renewal history, scoped download buttons, and a crypto &amp; protocol posture panel (below) — key export requires re-authentication.</p></div>
       <div class="card"><h4>New certificate wizard</h4><p>The full from-scratch flow — domains, CA, validation, live challenge status, and the issued cert — detailed in <a href="#creation-flow">§05</a>.</p></div>
+    </div>
+
+    <h3>Crypto &amp; protocol posture</h3>
+    <p>Every certificate detail page carries a posture panel — the fields land on <code>certificate_version</code> (<a href="#data-model">§03</a>) and most are just parsed from the cert itself, not gathered live.</p>
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>Field</th><th class="wrap">Shown as</th><th class="wrap">Why it's worth surfacing</th></tr></thead>
+        <tbody>
+          <tr><td>Key algorithm &amp; size</td><td class="wrap">e.g. <code>ECDSA P-256</code>, <code>RSA-2048</code></td><td class="wrap">RSA below 2048 bits or any DSA key is flagged <span class="pill critical">weak</span> — a one-glance deprecation sweep</td></tr>
+          <tr><td>Signature algorithm</td><td class="wrap">e.g. <code>SHA256-RSA</code></td><td class="wrap">Any SHA-1 signature is flagged <span class="pill critical">weak</span> — most CAs won't issue it anymore, but old certs may still carry it</td></tr>
+          <tr><td>TLS versions observed</td><td class="wrap"><span class="pill ok">TLS 1.3</span> <span class="pill ok">TLS 1.2</span> <span class="pill critical">TLS 1.0</span></td><td class="wrap">From the live handshake probe (§03) — a server still answering on TLS 1.0/1.1 is a finding independent of the certificate itself</td></tr>
+          <tr><td>Cipher suite observed</td><td class="wrap">e.g. <code>TLS_AES_256_GCM_SHA384</code></td><td class="wrap">Flags a non-AEAD or export-grade cipher still being negotiated</td></tr>
+          <tr><td>OCSP stapling</td><td class="wrap"><span class="pill ok">stapled</span> / <span class="pill warn">not stapled</span></td><td class="wrap">Stapling avoids a client-side revocation-check round trip; its absence isn't fatal but is worth knowing</td></tr>
+          <tr><td>Key usage / extended key usage</td><td class="wrap">e.g. Server Auth, Client Auth</td><td class="wrap">Catches a cert issued for the wrong purpose before it's deployed somewhere that needs it</td></tr>
+          <tr><td>SANs &amp; SCT count</td><td class="wrap">Domain list; embedded SCT count</td><td class="wrap">Zero SCTs flags a Certificate Transparency gap some browsers will reject outright</td></tr>
+          <tr><td>Fingerprint (SHA-256) &amp; serial</td><td class="wrap">Full value, copyable</td><td class="wrap">What you hand a CT-log or CA support ticket when chasing a specific cert</td></tr>
+        </tbody>
+      </table>
     </div>
 
     <h3>Roles</h3>
@@ -635,7 +672,7 @@
       <div class="card"><h4>Frontend</h4><p>React + TypeScript, a component library over hand-rolled CSS for the inventory table and forms.</p></div>
       <div class="card"><h4>Database</h4><p>PostgreSQL for metadata, roles, and the audit log.</p></div>
       <div class="card"><h4>Secrets</h4><p>HashiCorp Vault (or cloud KMS/Secrets Manager) for private keys and CA credentials.</p></div>
-      <div class="card"><h4>Scheduling</h4><p>A Kubernetes CronJob or a workflow engine (Temporal) for the renewal scan and retry logic.</p></div>
+      <div class="card"><h4>Scheduling</h4><p>An in-process ticker reading an admin-configurable interval (see <a href="#renewal">§06</a>), not a fixed Kubernetes CronJob — the schedule changes without a redeploy.</p></div>
       <div class="card"><h4>Observability</h4><p>Structured logs, metrics on renewal success rate, and the audit log itself as a compliance artifact.</p></div>
     </div>
   </section>
