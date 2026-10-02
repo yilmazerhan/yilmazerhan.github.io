@@ -1,0 +1,764 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kişilik Renk Testi</title>
+<meta name="description" content="20 soruluk Kişilik Renk Testi: Kırmızı, Sarı, Mavi ve Yeşil dağılımını öğren, renk çarkında kendi konumunu ve kişilik profilini gör.">
+<meta name="theme-color" content="#0b1020">
+<style>
+:root{
+  --bg:#0b1020;
+  --ink:#f4f6ff;
+  --ink2:#c0c7e2;
+  --muted:#8790b3;
+  --card:rgba(255,255,255,.055);
+  --card-strong:rgba(255,255,255,.09);
+  --line:rgba(255,255,255,.13);
+  --red:#ef4458;
+  --yellow:#fbbf24;
+  --blue:#4c8dff;
+  --green:#2fd27a;
+  --accent:#8b9cff;
+  --radius:22px;
+  --font:"Segoe UI Variable Display","Segoe UI","Inter",system-ui,-apple-system,"Helvetica Neue",Roboto,Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  min-height:100vh;background:var(--bg);color:var(--ink);font-family:var(--font);
+  line-height:1.55;overflow-x:hidden;-webkit-font-smoothing:antialiased;
+}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+:focus-visible{outline:3px solid var(--accent);outline-offset:3px;border-radius:12px}
+
+/* ---------- Arka plan ---------- */
+.bg{position:fixed;inset:0;z-index:-1;overflow:hidden;
+  background:
+    radial-gradient(1100px 650px at 12% -8%,#1b2556 0%,transparent 62%),
+    radial-gradient(900px 600px at 100% 100%,#2c1648 0%,transparent 58%),
+    var(--bg);}
+.blob{position:absolute;border-radius:50%;filter:blur(95px);opacity:.27;animation:drift 24s ease-in-out infinite alternate;will-change:transform}
+.blob.r{width:430px;height:430px;background:var(--red);top:-90px;right:-70px}
+.blob.y{width:360px;height:360px;background:var(--yellow);bottom:-110px;right:20%;animation-delay:-7s}
+.blob.b{width:470px;height:470px;background:var(--blue);top:32%;left:-150px;animation-delay:-13s}
+.blob.g{width:340px;height:340px;background:var(--green);bottom:-90px;left:26%;animation-delay:-3s}
+@keyframes drift{to{transform:translate(70px,-50px) scale(1.18)}}
+
+/* ---------- Ortak ---------- */
+.wrap{width:100%;max-width:1040px;margin:0 auto}
+.screen{display:none;min-height:100vh;padding:28px 20px 70px}
+.screen.active{display:block;animation:fadeIn .5s ease both}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.glass{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);box-shadow:0 20px 50px -25px rgba(0,0,0,.6)}
+.btn{display:inline-flex;align-items:center;gap:10px;padding:15px 30px;border-radius:999px;font-weight:700;font-size:1.05rem;
+  color:#0b1020;background:linear-gradient(110deg,var(--yellow),#ffd86b 40%,var(--green));background-size:200% 100%;
+  box-shadow:0 14px 34px -12px rgba(251,191,36,.7);transition:transform .2s,box-shadow .2s,background-position .6s}
+.btn:hover{transform:translateY(-2px) scale(1.02);background-position:100% 0;box-shadow:0 18px 40px -12px rgba(47,210,122,.65)}
+.btn:active{transform:scale(.98)}
+.btn.ghost{color:var(--ink);background:var(--card-strong);border:1px solid var(--line);box-shadow:none;font-weight:600;padding:12px 22px;font-size:.97rem}
+.btn.ghost:hover{background:rgba(255,255,255,.15);box-shadow:none}
+.dot{display:inline-block;width:.8em;height:.8em;border-radius:50%;vertical-align:-.05em}
+
+/* ---------- Karşılama ---------- */
+#intro .wrap{min-height:calc(100vh - 100px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:6px}
+.orbs{display:flex;gap:16px;margin-bottom:26px}
+.orb{width:58px;height:58px;border-radius:50%;animation:bob 3.4s ease-in-out infinite}
+.orb:nth-child(1){background:radial-gradient(circle at 32% 28%,#ff9aa6,var(--red) 55%,#a3162b);box-shadow:0 14px 34px -8px var(--red)}
+.orb:nth-child(2){background:radial-gradient(circle at 32% 28%,#fff0a8,var(--yellow) 55%,#b97d03);box-shadow:0 14px 34px -8px var(--yellow);animation-delay:-.85s}
+.orb:nth-child(3){background:radial-gradient(circle at 32% 28%,#a9ccff,var(--blue) 55%,#1c4cb8);box-shadow:0 14px 34px -8px var(--blue);animation-delay:-1.7s}
+.orb:nth-child(4){background:radial-gradient(circle at 32% 28%,#a5f5c9,var(--green) 55%,#0f8a4a);box-shadow:0 14px 34px -8px var(--green);animation-delay:-2.55s}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-16px)}}
+.pill{display:inline-block;padding:7px 16px;border-radius:999px;background:var(--card-strong);border:1px solid var(--line);color:var(--ink2);font-size:.88rem;letter-spacing:.02em}
+h1.title{font-size:clamp(2.6rem,8vw,5.2rem);font-weight:850;line-height:1.02;letter-spacing:-.035em;margin:18px 0 12px}
+.rainbow{background:linear-gradient(90deg,var(--red),var(--yellow),var(--green),var(--blue),var(--red));background-size:250% 100%;
+  -webkit-background-clip:text;background-clip:text;color:transparent;animation:flow 7s linear infinite}
+@keyframes flow{to{background-position:250% 0}}
+.lead{max-width:560px;color:var(--ink2);font-size:1.12rem;margin-bottom:30px}
+.fine{color:var(--muted);font-size:.86rem;margin-top:22px;max-width:480px}
+
+/* ---------- Soru ekranı ---------- */
+#quiz .wrap{max-width:780px}
+.qtop{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:6px 0 14px}
+.qcount{font-weight:700;letter-spacing:.02em}
+.qcount span{color:var(--muted);font-weight:500}
+.back{padding:8px 16px;border-radius:999px;color:var(--ink2);background:var(--card);border:1px solid var(--line);font-size:.92rem;transition:.2s}
+.back:hover:not(:disabled){background:var(--card-strong);color:var(--ink)}
+.back:disabled{opacity:.35;cursor:default}
+.bar{height:8px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden;margin-bottom:34px}
+.bar i{display:block;height:100%;width:0;border-radius:99px;
+  background:linear-gradient(90deg,var(--red),var(--yellow),var(--green),var(--blue));background-size:100vw 100%;
+  transition:width .55s cubic-bezier(.2,.8,.2,1)}
+.qcard{padding:34px clamp(20px,4vw,40px) 30px}
+.qnum{color:var(--accent);font-weight:700;font-size:.88rem;letter-spacing:.14em;text-transform:uppercase;margin-bottom:10px}
+.qtext{font-size:clamp(1.5rem,4.2vw,2.15rem);font-weight:760;line-height:1.2;letter-spacing:-.02em;margin-bottom:26px}
+.opts{display:grid;gap:12px}
+.opt{display:flex;align-items:center;gap:16px;width:100%;text-align:left;padding:15px 18px;border-radius:16px;
+  background:rgba(255,255,255,.045);border:1.5px solid var(--line);font-size:1.07rem;transition:transform .18s,background .18s,border-color .18s,box-shadow .18s}
+.opt .badge{flex:none;display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:rgba(255,255,255,.09);
+  font-weight:800;color:var(--ink2);transition:.18s}
+.opt:hover{transform:translateX(6px);background:rgba(255,255,255,.09);border-color:rgba(139,156,255,.65)}
+.opt:hover .badge{background:var(--accent);color:#0b1020}
+.opt.sel{background:rgba(139,156,255,.2);border-color:var(--accent);box-shadow:0 0 0 4px rgba(139,156,255,.18);transform:translateX(6px)}
+.opt.sel .badge{background:var(--accent);color:#0b1020}
+.hint{margin-top:18px;text-align:center;color:var(--muted);font-size:.84rem}
+.hint kbd{font-family:inherit;border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:1px 7px;background:var(--card);color:var(--ink2)}
+.in-fwd{animation:inFwd .38s cubic-bezier(.2,.8,.2,1) both}
+.in-back{animation:inBack .38s cubic-bezier(.2,.8,.2,1) both}
+.out-fwd{animation:outFwd .2s ease-in both}
+.out-back{animation:outBack .2s ease-in both}
+@keyframes inFwd{from{opacity:0;transform:translateX(46px)}to{opacity:1;transform:none}}
+@keyframes inBack{from{opacity:0;transform:translateX(-46px)}to{opacity:1;transform:none}}
+@keyframes outFwd{to{opacity:0;transform:translateX(-40px)}}
+@keyframes outBack{to{opacity:0;transform:translateX(40px)}}
+
+/* ---------- Sonuç ---------- */
+.reveal{opacity:0;transform:translateY(26px);transition:opacity .8s ease,transform .8s cubic-bezier(.2,.8,.2,1)}
+.reveal.in{opacity:1;transform:none}
+.hero{text-align:center;padding:18px 0 8px}
+.kicker{display:inline-block;color:var(--ink2);font-size:.9rem;letter-spacing:.18em;text-transform:uppercase;margin-bottom:6px}
+.hero h1{font-size:clamp(3rem,10vw,6.4rem);font-weight:880;letter-spacing:-.04em;line-height:1.02;margin:4px 0 6px}
+.grad{background:linear-gradient(100deg,var(--c1),var(--c2),var(--c1));background-size:220% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:flow2 5s ease-in-out infinite alternate}
+@keyframes flow2{to{background-position:100% 0}}
+.hero .type{font-size:clamp(1.15rem,3vw,1.5rem);color:var(--ink2)}
+.hero .type b{color:var(--ink)}
+.chips{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin:18px 0 6px}
+.chip{padding:7px 16px;border-radius:999px;background:var(--card-strong);border:1px solid var(--line);font-size:.95rem}
+.ribbon{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:26px auto 4px;max-width:520px}
+.ribbon i{width:22px;height:22px;border-radius:50%;transform:scale(0);animation:pop .5s cubic-bezier(.3,1.6,.5,1) forwards}
+@keyframes pop{to{transform:scale(1)}}
+.ribbon-cap{color:var(--muted);font-size:.84rem}
+.sec{margin-top:46px}
+.sec h2{font-size:clamp(1.4rem,3.2vw,1.9rem);font-weight:780;letter-spacing:-.02em;margin-bottom:6px}
+.sec .sub{color:var(--ink2);margin-bottom:20px;max-width:640px}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.tile{padding:22px 20px 20px;position:relative;overflow:hidden}
+.tile::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;background:var(--c)}
+.tile .nm{display:flex;align-items:center;gap:9px;font-weight:700;font-size:1.05rem}
+.tile .nm .dot{background:var(--c)}
+.tile .let{margin-left:auto;color:var(--muted);font-size:.8rem;font-weight:600}
+.tile .num{font-size:3.3rem;font-weight:850;letter-spacing:-.04em;line-height:1;margin:14px 0 2px;font-variant-numeric:tabular-nums}
+.tile .num small{font-size:1.05rem;font-weight:600;color:var(--muted);letter-spacing:0;margin-left:4px}
+.track{height:8px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden;margin:12px 0 10px}
+.track i{display:block;height:100%;width:0;border-radius:99px;background:var(--c);transition:width 1.4s cubic-bezier(.2,.8,.2,1)}
+.tile .pc{font-weight:700;font-variant-numeric:tabular-nums}
+.tile p{color:var(--ink2);font-size:.9rem;margin-top:4px}
+.tile.top{box-shadow:0 0 0 2px var(--c),0 24px 50px -22px var(--c)}
+.crown{margin-left:auto;font-size:.68rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:3px 9px;border-radius:99px;background:var(--c);color:#0b1020}
+
+.wheelcard{padding:clamp(14px,3vw,30px)}
+#wheel{width:100%;height:auto;display:block;max-height:76vh}
+.wlabel{fill:var(--ink2);font-size:16.5px;transition:fill .4s}
+.compact .wlabel{display:none}
+.wlabel.hot{fill:var(--ink);font-weight:800}
+.wring{font-size:12.4px;font-weight:800;letter-spacing:.14em}
+.wq,.wq-n{paint-order:stroke;stroke:rgba(11,16,32,.85);stroke-width:3px;stroke-linejoin:round}
+.wq{font-size:12px;font-weight:700;letter-spacing:.16em;fill:var(--ink2);opacity:.75;text-anchor:middle}
+.wq-n{font-size:11px;fill:var(--muted);text-anchor:middle}
+.wcap{color:var(--muted);font-size:.9rem;margin-top:10px;text-align:center}
+#wlegend{display:none;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+#wlegend div{padding:9px 12px;border-radius:12px;background:var(--card);border:1px solid var(--line);font-size:.84rem;color:var(--ink2)}
+#wlegend b{display:block;color:var(--ink);font-size:.92rem}
+#wlegend div.hot{border-color:var(--ink);background:var(--card-strong)}
+.pulse{transform-box:fill-box;transform-origin:center;animation:ping 1.8s ease-out infinite}
+@keyframes ping{0%{transform:scale(1);opacity:.7}100%{transform:scale(3.4);opacity:0}}
+
+.persona{padding:clamp(22px,4vw,40px)}
+.persona .blend{display:flex;align-items:center;gap:8px;color:var(--ink2);font-size:.95rem;margin-bottom:6px}
+.persona h2{font-size:clamp(1.9rem,5vw,3rem);margin-bottom:2px}
+.persona .tag{font-size:1.2rem;color:var(--ink2);margin-bottom:16px}
+.persona .sum{font-size:1.1rem;max-width:760px;margin-bottom:6px}
+.note{margin-top:10px;color:var(--muted);font-size:.9rem}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:22px}
+.box{padding:22px 22px 20px}
+.box h3{font-size:.8rem;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+.box ul{list-style:none;display:grid;gap:8px}
+.box li{position:relative;padding-left:22px}
+.box li::before{content:"";position:absolute;left:2px;top:.62em;width:8px;height:8px;border-radius:50%;background:var(--accent)}
+.box p{color:var(--ink)}
+.roles{display:flex;flex-wrap:wrap;gap:8px}
+.roles span{padding:6px 14px;border-radius:999px;background:var(--card-strong);border:1px solid var(--line);font-size:.92rem}
+.meaning{display:flex;flex-wrap:wrap;gap:12px;margin-top:22px}
+.meaning div{flex:1 1 260px;padding:16px 20px;border-radius:18px;background:var(--card);border:1px solid var(--line)}
+.meaning small{display:block;color:var(--muted);letter-spacing:.14em;text-transform:uppercase;font-size:.72rem;font-weight:700;margin-bottom:4px}
+.meaning b{font-size:1.1rem}
+.meaning p{color:var(--ink2);font-size:.95rem}
+.actions{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:44px}
+.disc{margin:26px auto 0;max-width:640px;text-align:center;color:var(--muted);font-size:.82rem}
+#confetti{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:60}
+.toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,30px);opacity:0;background:#fff;color:#0b1020;padding:11px 20px;border-radius:99px;
+  font-weight:600;font-size:.94rem;box-shadow:0 14px 40px -10px rgba(0,0,0,.6);transition:.35s;z-index:70;pointer-events:none}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:900px){.tiles{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:640px){
+  .screen{padding:20px 16px 60px}
+  .grid2{grid-template-columns:1fr}
+  .tiles{gap:12px}
+  .tile .num{font-size:2.6rem}
+  .orb{width:46px;height:46px}
+  .opt{padding:13px 14px;font-size:1rem}
+  #wlegend{display:grid}
+}
+@media (max-width:380px){.tiles{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  .reveal{opacity:1;transform:none}
+  .blob{display:none}
+}
+@media print{
+  :root{--bg:#fff;--ink:#111;--ink2:#333;--muted:#555;--card:#f4f5fa;--card-strong:#eceef6;--line:#cfd3e3}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .bg,#confetti,.actions,.toast{display:none!important}
+  body{background:#fff}
+  .glass{backdrop-filter:none;box-shadow:none}
+  .reveal{opacity:1;transform:none}
+  .grad,.rainbow{animation:none}
+}
+</style>
+</head>
+<body>
+<div class="bg" aria-hidden="true"><div class="blob r"></div><div class="blob y"></div><div class="blob b"></div><div class="blob g"></div></div>
+<canvas id="confetti" aria-hidden="true"></canvas>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<noscript><p style="padding:40px;text-align:center">Bu test için JavaScript gerekiyor. Lütfen tarayıcınızda etkinleştirin.</p></noscript>
+
+<!-- KARŞILAMA -->
+<section id="intro" class="screen active">
+  <div class="wrap">
+    <div class="orbs" aria-hidden="true"><div class="orb"></div><div class="orb"></div><div class="orb"></div><div class="orb"></div></div>
+    <span class="pill">20 soru · yaklaşık 3 dakika</span>
+    <h1 class="title">Senin rengin <span class="rainbow">hangisi?</span></h1>
+    <p class="lead">Kişilik Renk Testi ile Kırmızı, Sarı, Mavi ve Yeşil eğilimlerini keşfet, renk çarkında kendi yerini ve kişilik profilini gör.</p>
+    <button class="btn" id="startBtn">Teste Başla <span aria-hidden="true">→</span></button>
+    <p class="fine">Doğru ya da yanlış cevap yok. Sana en yakın olanı, uzun düşünmeden seç. Cevapların yalnızca tarayıcında değerlendirilir; hiçbir yere gönderilmez.</p>
+  </div>
+</section>
+
+<!-- SORULAR -->
+<section id="quiz" class="screen" aria-live="polite">
+  <div class="wrap">
+    <div class="qtop">
+      <div class="qcount" id="qcount"></div>
+      <button class="back" id="backBtn" type="button">← Önceki</button>
+    </div>
+    <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="20" id="bar"><i id="barFill"></i></div>
+    <div class="glass qcard" id="qcard"></div>
+    <p class="hint">Klavye ile de yanıtlayabilirsin: <kbd>A</kbd> <kbd>B</kbd> <kbd>C</kbd> <kbd>D</kbd> veya <kbd>1</kbd>–<kbd>4</kbd> · geri için <kbd>←</kbd></p>
+  </div>
+</section>
+
+<!-- SONUÇ -->
+<section id="result" class="screen">
+  <div class="wrap">
+    <header class="hero">
+      <span class="kicker">Sonucun hazır</span>
+      <h1 id="rTitle"></h1>
+      <p class="type" id="rType"></p>
+      <div class="chips" id="rChips"></div>
+      <div class="ribbon" id="ribbon" aria-hidden="true"></div>
+      <div class="ribbon-cap">20 cevabın, sırasıyla</div>
+    </header>
+
+    <section class="sec reveal">
+      <h2>Renk dağılımın</h2>
+      <p class="sub">Her şık bir renge karşılık geliyor: A şıkları Kırmızı, B şıkları Sarı, C şıkları Mavi, D şıkları Yeşil.</p>
+      <div class="tiles" id="tiles"></div>
+    </section>
+
+    <section class="sec reveal" id="wheelSec">
+      <h2>Renk çarkında konumun</h2>
+      <p class="sub">Cevaplarının dört renk arasındaki dengesi çarkta tek bir noktaya dönüşür. Merkeze yakınsan dengeli, kenara yakınsan belirgin bir profilin var demektir.</p>
+      <div class="glass wheelcard">
+        <svg id="wheel" role="img" aria-label="Renk çarkı"></svg>
+        <div id="wlegend"></div>
+        <p class="wcap">Çarkın köşegenleri test renklerine denk gelir: sağ üst Kırmızı, sağ alt Sarı, sol alt Yeşil, sol üst Mavi.</p>
+      </div>
+    </section>
+
+    <section class="sec reveal">
+      <div class="glass persona">
+        <div class="blend" id="pBlend"></div>
+        <h2 id="pName"></h2>
+        <p class="tag" id="pTag"></p>
+        <p class="sum" id="pSum"></p>
+        <p class="note" id="pNote"></p>
+        <div class="meaning" id="meaning"></div>
+        <div class="grid2">
+          <div class="glass box"><h3>Güçlü yönlerin</h3><ul id="pStr"></ul></div>
+          <div class="glass box"><h3>Gelişim alanların</h3><ul id="pGrow"></ul></div>
+          <div class="glass box"><h3>Ekipte nasılsın?</h3><p id="pTeam"></p></div>
+          <div class="glass box"><h3>İletişim ipuçları</h3><ul id="pComm"></ul></div>
+        </div>
+        <div class="glass box" style="margin-top:16px"><h3>Sana uyabilecek roller</h3><div class="roles" id="pRoles"></div></div>
+      </div>
+    </section>
+
+    <div class="actions">
+      <button class="btn" id="retryBtn">↺ Testi tekrarla</button>
+      <button class="btn ghost" id="copyBtn">Sonuç bağlantısını kopyala</button>
+      <button class="btn ghost" id="printBtn">Yazdır / PDF</button>
+    </div>
+    <p class="disc">Bu test, öz-farkındalık ve sohbet amacıyla hazırlanmış kısa bir değerlendirmedir; klinik ya da bilimsel olarak doğrulanmış bir ölçek değildir. İnsanlar tek bir renge sığmaz; sonucu bir başlangıç noktası olarak düşün.</p>
+  </div>
+</section>
+
+<script>
+/* ============================================================
+   VERİ
+   ============================================================ */
+const QUESTIONS = [{"q": "Yeni bir projeye başladığınızda...", "o": ["Hemen işe koyulurum.", "İnsanlarla konuşup fikir alırım.", "Plan yaparım.", "Herkesin fikrini dinlerim."]}, {"q": "Boş zamanlarınızı nasıl değerlendirmeyi seversiniz?", "o": ["Hedef odaklı aktiviteler.", "Arkadaşlarla eğlenmek.", "Kitap okumak veya araştırma yapmak.", "Aileyle vakit geçirmek."]}, {"q": "Bir tartışmada genellikle...", "o": ["Düşündüğümü açıkça söylerim.", "Ortamı yumuşatmaya çalışırım.", "Kanıtlarla konuşurum.", "Herkesi anlamaya çalışırım."]}, {"q": "Karar verirken...", "o": ["Hızlı davranırım.", "İçgüdülerime güvenirim.", "Verileri incelerim.", "İnsanlara etkisini düşünürüm."]}, {"q": "İnsanlar sizi en çok nasıl tanımlar?", "o": ["Kararlı.", "Neşeli.", "Düzenli.", "Sabırlı."]}, {"q": "En sevmediğiniz şey...", "o": ["Yavaşlık.", "Sıkıcılık.", "Düzensizlik.", "Kavga."]}, {"q": "Bir ekipte genellikle...", "o": ["Lider olurum.", "Moral veririm.", "Planı hazırlarım.", "Destek olurum."]}, {"q": "Başarı sizin için...", "o": ["Hedefe ulaşmaktır.", "Keyif almaktır.", "Kusursuz iş çıkarmaktır.", "Herkesin mutlu olmasıdır."]}, {"q": "Stres altında...", "o": ["Kontrolü ele alırım.", "Konuşarak rahatlarım.", "Daha fazla analiz yaparım.", "Sessizleşirim."]}, {"q": "Yeni insanlarla tanışırken...", "o": ["Kendimi tanıtırım.", "Sohbeti başlatırım.", "Önce gözlemlerim.", "Karşı tarafın yaklaşmasını beklerim."]}, {"q": "İş yaparken en önemli şey...", "o": ["Sonuç.", "Eğlence.", "Kalite.", "Uyum."]}, {"q": "Eleştiri aldığınızda...", "o": ["Hemen çözüm ararım.", "Çok önemsemem.", "Dikkatle değerlendiririm.", "Biraz üzülürüm."]}, {"q": "Sizi motive eden...", "o": ["Rekabet.", "Takdir edilmek.", "Doğru iş yapmak.", "Yardım etmek."]}, {"q": "Seyahatte...", "o": ["Macera ararım.", "Yeni insanlar tanırım.", "Program yaparım.", "Rahat bir gezi isterim."]}, {"q": "Toplantılarda...", "o": ["Konuyu yönetirim.", "Fikir üretirim.", "Not alırım.", "Herkesi dinlerim."]}, {"q": "Beklenmedik değişikliklerde...", "o": ["Hızla uyum sağlarım.", "Heyecan duyarım.", "Önce nedenini anlamak isterim.", "Biraz zamana ihtiyaç duyarım."]}, {"q": "En güçlü yönünüz...", "o": ["Cesaret.", "İletişim.", "Analiz.", "Empati."]}, {"q": "İnsanlar size neden gelir?", "o": ["Çözüm bulduğum için.", "Moral verdiğim için.", "Bilgi sahibi olduğum için.", "İyi dinlediğim için."]}, {"q": "En çok önem verdiğiniz değer...", "o": ["Başarı.", "Özgürlük.", "Doğruluk.", "Güven."]}, {"q": "Kendinizi en çok hangi kelime anlatıyor?", "o": ["Güçlü.", "Enerjik.", "Titiz.", "Sakin."]}];
+
+const KEYS = ['A','B','C','D'];
+const COLORS = {
+  A:{name:'Kırmızı', hex:'#ef4458', meaning:'Lider, kararlı, sonuç odaklı', angle:45},
+  B:{name:'Sarı',    hex:'#fbbf24', meaning:'Sosyal, yaratıcı, iyimser',    angle:135},
+  C:{name:'Mavi',    hex:'#4c8dff', meaning:'Analitik, planlı, detaycı',    angle:315},
+  D:{name:'Yeşil',   hex:'#2fd27a', meaning:'Sabırlı, uyumlu, güvenilir',   angle:225}
+};
+
+/* Çarkta saat yönünde, tepeden başlayarak 8 tip (her biri 45°) */
+const TYPES = [
+ { name:'Uygulayıcı', blend:['C','A'], lines:['Mantıksal,','Planlı, Yönetici'], ring:'#4a3fd1', txt:'#fff',
+   tagline:'Planı kuran, sonra da onu sonuca taşıyan yönetici',
+   summary:'Önce kafanda bir sistem kurarsın, sonra o sistemin gerçekten çalıştığını görmek için sahaya inersin. Ne laf kalabalığından hoşlanırsın ne de planı olmayan bir koşuşturmadan. Net hedef, açık roller ve ölçülebilir çıktılar sana iyi gelir; belirsizlik ve dağınıklık ise sabrını hızla tüketir.',
+   strengths:['Stratejiyi eyleme dökme','Süreç, zaman ve kaynak yönetimi','Baskı altında soğukkanlı karar verme','Kalite ve standart bilinci'],
+   growth:['Plan değiştiğinde esnemekte zorlanabilirsin','Sonuca odaklanırken ekibin duygusal tonunu atlayabilirsin','Her şeyi kontrol etmek yerine yetki vermeyi denemek iyi gelir'],
+   team:'Ekibin omurgasısın. Toplantıdan çıkarken “kim, neyi, ne zaman yapacak?” sorusunun cevabı çoğu zaman senin sayende netleşir.',
+   comm:['Kısa, düzenli ve veriye dayalı konuş','Önce çerçeveyi çiz, ayrıntıyı sonra ver','Sürece duyduğun güveni tabloyla değil sözle de paylaş'],
+   roles:['Proje / program yöneticisi','Operasyon yöneticisi','Ürün yöneticisi','Süreç sahibi'] },
+ { name:'Direktör', blend:['A'], lines:['Lider, Rekabetçi,','Sonuç Odaklı'], ring:'#e11d48', txt:'#fff',
+   tagline:'Hedefe kilitlenen, yönü belirleyen lider',
+   summary:'Karar almak, yön vermek ve işi bitirmek senin doğal alanın. Rekabet seni diri tutar; yavaşlık, kararsızlık ve uzayıp giden toplantılar ise sabrını zorlar. Bir engel çıktığında geri çekilmek yerine kolları sıvarsın.',
+   strengths:['Hızlı ve cesur karar alma','Sorumluluk üstlenme','Odak ve kararlılık','Kriz anında liderlik'],
+   growth:['Sabırsızlığın ekibi yorabilir','Dinleme payını bilinçli olarak artırman gerekebilir','İnsan tarafını “zaman kaybı” gibi görme eğilimine dikkat et'],
+   team:'Hedefi koyan ve tempoyu belirleyen kişi sensin. Ekip yönünü kaybettiğinde ilk seni arar; ama herkes senin hızında koşamayabilir.',
+   comm:['Doğrudan, özet ve çözüm odaklı konuş','Seçenek sun, kararı ekibe de bırak','Geri bildirimi kişiye değil sonuca bağla'],
+   roles:['Direktör / genel müdür','Satış lideri','Girişim kurucusu','Kriz ve dönüşüm yöneticisi'] },
+ { name:'Girişimci', blend:['A','B'], lines:['İkna Edici,','Özgün, Bağımsız'], ring:'#f97316', txt:'#1a0f02',
+   tagline:'Özgün fikirleri ikna gücüyle sahaya taşıyan öncü',
+   summary:'Fikir üretme cesaretini, onu başkalarına anlatma becerisiyle birleştiriyorsun. Kuralların dar geldiği, özgürce hareket edebildiğin ortamlarda parlarsın. Seni yönlendirmekten çok ilham vermek işe yarar; bağımsızlığın senin için pazarlık konusu değil.',
+   strengths:['İkna ve etkileme','Fırsatı erken görme','Risk alma cesareti','İnsanları peşinden sürükleyen enerji'],
+   growth:['Takip ve ayrıntı aşamaları seni sıkabilir','Başkalarının farklı temposunu gözden kaçırabilirsin','Bağımsızlık ihtiyacı ekip uyumunu zorlayabilir'],
+   team:'Yeni yönler öneren, durağan bir ekibi harekete geçiren kıvılcımsın. İşi bitirecek titiz birinin yanında çok daha güçlüsün.',
+   comm:['Büyük resmi ve fırsatı anlat','Özerklik tanı, mikro yönetimden uzak dur','Fikri somut bir ilk adıma bağla'],
+   roles:['İş geliştirme','Girişimci / kurucu','Satış ve iş ortaklıkları','Strateji ve yenilik'] },
+ { name:'Ateşleyici', blend:['B'], lines:['Canlı, Sosyal,','Motive Edici'], ring:'#facc15', txt:'#201700',
+   tagline:'Enerjisiyle odayı ısıtan motivasyon kaynağı',
+   summary:'İnsanlarla olmak sana enerji verir. Fikirleri paylaşmayı, birilerini heyecanlandırmayı ve işe biraz neşe katmayı kendiliğinden yaparsın. Ortam sıcak olduğunda verimin uçar; uzun süre tek başına, monoton iş yapmak ise seni çabuk söndürür.',
+   strengths:['Sıcak ve doğal iletişim','Moral ve motivasyon yaratma','Yaratıcı fikir akışı','Değişime heyecanla uyum'],
+   growth:['Yarım kalan işlere karşı dikkatli ol','Detay ve zaman planında biraz disiplin gerekebilir','Eleştiriyi kişisel algılayabilirsin'],
+   team:'Takımın pilisin. Zor bir dönemde bile ortamı canlı tutar, insanları bir araya getirirsin.',
+   comm:['Samimi ol, önce ilişkiyi kur','Fikirlerini yüksek sesle düşünmene izin ver','Önemli ayrıntıları yazıya dök'],
+   roles:['Pazarlama / topluluk yönetimi','Eğitmen, sunucu','Satış ve müşteri ilişkileri','Etkinlik ve iletişim'] },
+ { name:'Diplomat', blend:['B','D'], lines:['Yardımsever,','Sabırlı, Açık Fikirli'], ring:'#a3e635', txt:'#142003',
+   tagline:'İnsanlar arasında köprü kuran sıcak dinleyici',
+   summary:'Hem enerjin hem sabrın var; bu ikisinin birleşimi seni insanların kolayca açıldığı biri yapıyor. Farklı görüşleri aynı masada tutmayı bilirsin. Çatışmadan kaçınır, uyumu korumak istersin; bazen kendi ihtiyacını geri planda bırakabilirsin.',
+   strengths:['Empati ve iyi dinleme','Arabuluculuk','Açık fikirlilik','Sabır ve yardımseverlik'],
+   growth:['“Hayır” demekte zorlanabilirsin','Zor konuşmaları ertelemek sorunu büyütebilir','Kendi görüşünü açıkça savunmayı alıştırma yap'],
+   team:'Ekibin yapıştırıcısısın. Gerilim yükseldiğinde ortamı yumuşatan, sessiz kalanı konuşturan sensin.',
+   comm:['Önce dinle, sonra yanıtla','Beklentini nazikçe ama net söyle','Düşünmek için zamana ihtiyacın olduğunu paylaş'],
+   roles:['İnsan kaynakları / yetenek','Müşteri başarısı','Koçluk ve danışmanlık','Takım koordinatörü'] },
+ { name:'Destekleyici', blend:['D'], lines:['Güvenilir,','Uzlaşmacı, Sabit'], ring:'#22c55e', txt:'#02170a',
+   tagline:'Güven veren, istikrarlı omurga',
+   summary:'Söz verdiysen yaparsın; tutarlılığın insanlara güven verir. Gürültüden çok huzuru, ani değişimden çok istikrarı seversin. Gösteriş peşinde değilsin ama işler senin sayende yürür. Değişim konusunda biraz zamana ve açıklamaya ihtiyaç duyarsın.',
+   strengths:['Güvenilirlik ve tutarlılık','Takım ruhu ve sadakat','Sakin kalabilme','Dinleme ve destek olma'],
+   growth:['Beklenmedik değişimlerde kendine zaman tanı ama sesini de çıkar','Çatışmadan kaçınmak içinde biriktirmeye yol açabilir','Girişimi sen başlatmayı denemek gelişimini hızlandırır'],
+   team:'Ekibin güvenilir dayanağısın. Sürekliliği sağlar, ortamı dengede tutarsın.',
+   comm:['Net bir bağlam ver','Değişiklikleri önceden haber ver','Katkını açıkça takdir ettir, düşüncelerini sorulmayı beklemeden paylaş'],
+   roles:['Müşteri destek / hesap yönetimi','Operasyon ve koordinasyon','Eğitim ve topluluk hizmetleri','Ekip içi destek rolleri'] },
+ { name:'İzleyici', blend:['D','C'], lines:['Disiplinli, Tutucu,','Analiz Eden'], ring:'#14b8a6', txt:'#03201c',
+   tagline:'Sakin, disiplinli ve sistemli gözlemci',
+   summary:'Önce izler, sonra konuşursun. Yerleşik düzeni, açık kuralları ve sağlam bir mantığı olan işleri seversin. Karar verirken acele etmez, hem insanı hem veriyi tartarsın. Bu yüzden güvenilir ve istikrarlı bulunursun; yalnızca yeni fikirlere ısınman biraz zaman alabilir.',
+   strengths:['Disiplin ve süreklilik','Dikkatli gözlem ve analiz','Sakin karar verme','Sözünü tutma'],
+   growth:['Değişime direnç gösterebilirsin','Duygularını ve düşüncelerini daha açık paylaşmayı dene','Mükemmel hazırlığı beklerken fırsat kaçabilir'],
+   team:'Düzenin ve sürekliliğin bekçisisin. Acele kararların önüne “bir de şuna bakalım” diyerek geçersin.',
+   comm:['Yazılı, düzenli ve öngörülebilir ol','Değişikliği gerekçesiyle anlat','Düşünme süresi tanınmasını iste'],
+   roles:['Kalite ve uyum','Finans, muhasebe, denetim','Süreç ve operasyon uzmanı','Teknik dokümantasyon'] },
+ { name:'Analist', blend:['C'], lines:['Detaycı, Kontrollü,','Kuralcı'], ring:'#2563eb', txt:'#fff',
+   tagline:'Doğruluğu ve kaliteyi koruyan titiz zihin',
+   summary:'Detaylar senin için ayrıntı değil, işin kendisi. Kanıt, veri ve mantıklı bir gerekçe olmadan ikna olmazsın; bu da kararlarının sağlam çıkmasını sağlar. Hata yapmak istemezsin, bu yüzden hazırlıklı ve kontrollü ilerlersin. Kusursuzluk beklentisi bazen hızı yavaşlatabilir.',
+   strengths:['Derin analiz, ayrıntıya hâkimiyet','Kalite ve doğruluk','Sistematik düşünme','Kural ve standartlara bağlılık'],
+   growth:['Mükemmeliyetçilik işi geciktirebilir','“Yeterince iyi”yi kabul etmeyi öğren','Ekip dinamiğini ve duygusal tonu daha görünür kıl'],
+   team:'Ekibin kalite kontrol noktasısın. Herkesin gözünden kaçanı sen yakalarsın.',
+   comm:['Veriyle ve örnekle konuş','Karar öncesi yeterli bilgi iste','Önerilerini kısa bir özetle de sun'],
+   roles:['Veri / iş analisti','Araştırmacı','Mühendis, mimar, güvenlik uzmanı','Denetim ve risk'] }
+];
+
+const BALANCED = {
+  name:'Dengeli Profil', blend:['A','B','C','D'],
+  tagline:'Dört rengi de rahatça kullanabilen çok yönlü biri',
+  summary:'Cevapların dört renge de benzer oranda dağılmış. Bu, ortama göre davranış biçimini kolayca değiştirebildiğini gösteriyor: gerektiğinde lider, gerektiğinde dinleyici, gerektiğinde analist olabiliyorsun. Dengeli olmanın bedeli ise bazen “asıl ben neyim?” sorusuna tek cümlelik bir cevap bulamamak.',
+  strengths:['Duruma göre uyum sağlama','Farklı karakterlerle çalışabilme','Çok yönlü bakış açısı','Köprü kurma'],
+  growth:['Öncelik belirlemekte tereddüt edebilirsin','Güçlü bir imza yönün için bir rengi bilinçli geliştirebilirsin','Başkaları seni “belirsiz” okuyabilir, niyetini açık söyle'],
+  team:'Ekipte ihtiyaç neyse onu üstlenebilen joker oyuncusun. Boşluğu görür ve doldurursun.',
+  comm:['Karşındakinin rengine göre dilini ayarla','Kendi tercihini de zaman zaman açıkça söyle','Hangi şapkayı taktığını ekibe belirt'],
+  roles:['Genel yönetici adayı','Program ve ürün yönetimi','Danışmanlık','Çok disiplinli ekip koordinasyonu']
+};
+
+/* ============================================================
+   YARDIMCILAR
+   ============================================================ */
+const $ = s => document.querySelector(s);
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const state = { i:0, answers:Array(QUESTIONS.length).fill(null), busy:false };
+
+function show(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active', s.id===id));
+  window.scrollTo({top:0,behavior:'auto'});
+}
+function toast(msg){
+  const t=$('#toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('show'),2200);
+}
+const esc = s => String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ============================================================
+   SORU AKIŞI
+   ============================================================ */
+function renderQuestion(dir){
+  const q = QUESTIONS[state.i], n = QUESTIONS.length;
+  $('#qcount').innerHTML = `Soru ${state.i+1} <span>/ ${n}</span>`;
+  $('#barFill').style.width = (state.i/n*100)+'%';
+  $('#bar').setAttribute('aria-valuenow', state.i);
+  $('#backBtn').disabled = state.i===0;
+  const card = $('#qcard');
+  card.innerHTML = `
+    <div class="qnum">Soru ${state.i+1}</div>
+    <h2 class="qtext">${esc(q.q)}</h2>
+    <div class="opts" role="group" aria-label="Seçenekler">
+      ${q.o.map((t,k)=>`<button type="button" class="opt${state.answers[state.i]===KEYS[k]?' sel':''}" data-k="${KEYS[k]}"><span class="badge">${KEYS[k]}</span><span>${esc(t)}</span></button>`).join('')}
+    </div>`;
+  card.classList.remove('in-fwd','in-back','out-fwd','out-back');
+  void card.offsetWidth;
+  if(dir) card.classList.add(dir==='back'?'in-back':'in-fwd');
+}
+function go(dir){
+  const card=$('#qcard');
+  if(reduce){ renderQuestion(null); state.busy=false; return; }
+  card.classList.remove('in-fwd','in-back');
+  card.classList.add(dir==='back'?'out-back':'out-fwd');
+  setTimeout(()=>{ renderQuestion(dir); state.busy=false; }, 190);
+}
+function choose(k){
+  if(state.busy) return;
+  state.answers[state.i]=k;
+  document.querySelectorAll('.opt').forEach(b=>b.classList.toggle('sel', b.dataset.k===k));
+  state.busy=true;
+  setTimeout(()=>{
+    if(state.i < QUESTIONS.length-1){ state.i++; go('fwd'); }
+    else { $('#barFill').style.width='100%'; setTimeout(()=>{ state.busy=false; finish(); }, 350); }
+  }, 300);
+}
+function prev(){
+  if(state.busy || state.i===0) return;
+  state.busy=true; state.i--; go('back');
+}
+function startQuiz(){
+  state.i=0; state.answers.fill(null); state.busy=false;
+  show('quiz'); renderQuestion('fwd');
+}
+$('#startBtn').addEventListener('click', startQuiz);
+$('#backBtn').addEventListener('click', prev);
+$('#qcard').addEventListener('click', e=>{ const b=e.target.closest('.opt'); if(b) choose(b.dataset.k); });
+document.addEventListener('keydown', e=>{
+  if(!$('#quiz').classList.contains('active') || e.ctrlKey||e.metaKey||e.altKey) return;
+  const k=e.key.toLowerCase(); let idx=-1;
+  if('abcd'.includes(k)&&k.length===1) idx='abcd'.indexOf(k);
+  else if('1234'.includes(k)&&k.length===1) idx=+k-1;
+  if(idx>-1){ choose(KEYS[idx]); return; }
+  if(e.key==='ArrowLeft'||e.key==='Backspace') prev();
+});
+
+/* ============================================================
+   HESAPLAMA
+   ============================================================ */
+function analyze(ans){
+  const count={A:0,B:0,C:0,D:0};
+  ans.forEach(a=>count[a]++);
+  const total=ans.length;
+  let x=0,y=0;
+  KEYS.forEach(k=>{ const a=COLORS[k].angle*Math.PI/180; x+=count[k]*Math.sin(a); y+=count[k]*Math.cos(a); });
+  const mag=Math.hypot(x,y)/total;                     // 0 (tam denge) … 1
+  const theta=(Math.atan2(x,y)*180/Math.PI+360)%360;   // saat yönünde, tepeden
+  const typeIdx=Math.round(theta/45)%8;
+  const balanced=Math.hypot(x,y)<2;
+  const frac=Math.min(.82,mag*1.5);
+  const sorted=KEYS.slice().sort((a,b)=>count[b]-count[a]||a.localeCompare(b));
+  const max=count[sorted[0]];
+  const dominant=KEYS.filter(k=>count[k]===max);
+  const rest=KEYS.filter(k=>count[k]<max);
+  const second=rest.length ? rest.filter(k=>count[k]===Math.max(...rest.map(r=>count[r]))) : [];
+  return {count,total,x,y,mag,theta,typeIdx,balanced,frac,dominant,second,type:balanced?BALANCED:TYPES[typeIdx]};
+}
+
+/* ============================================================
+   SONUÇ
+   ============================================================ */
+let lastResult=null;
+function finish(){
+  const code=state.answers.join('');
+  try{ history.replaceState(null,'','#c='+code); }catch(e){}
+  showResult(code);
+}
+function showResult(code){
+  const ans=code.split('');
+  state.answers=ans.slice();
+  const r=analyze(ans); lastResult=r;
+  show('result');
+
+  const names=r.dominant.map(k=>COLORS[k].name);
+  const nd=r.dominant.length;
+  const c1=COLORS[r.dominant[0]].hex;
+  const c2=nd===2 ? COLORS[r.dominant[1]].hex : `color-mix(in srgb, ${c1} 55%, #ffffff)`;
+  const headline = nd>=3 ? (nd===4?'Dört renk':'Üç renk') : names.join(' &amp; ');
+  $('#rTitle').innerHTML = nd>=3
+    ? `<span class="rainbow">${headline}</span>`
+    : `<span class="grad" style="--c1:${c1};--c2:${c2}">${headline}</span>`;
+  $('#rType').innerHTML=`${nd>1?'Baskın renklerin':'Baskın rengin'}${nd>=3?': '+names.join(', '):''} · Kişilik tipin: <b>${r.type.name}</b>`;
+  const chipsFrom = r.balanced ? ['Uyumlu','Çok yönlü','Esnek'] : (TYPES[r.typeIdx].lines.join(' ').split(',').map(s=>s.trim()).filter(Boolean));
+  $('#rChips').innerHTML=chipsFrom.map(t=>`<span class="chip">${esc(t)}</span>`).join('');
+
+  /* cevap şeridi */
+  $('#ribbon').innerHTML=ans.map((a,i)=>`<i title="Soru ${i+1}: ${a}" style="background:${COLORS[a].hex};animation-delay:${reduce?0:300+i*55}ms"></i>`).join('');
+
+  /* renk kutuları */
+  $('#tiles').innerHTML=KEYS.map(k=>{
+    const c=COLORS[k], top=r.dominant.includes(k);
+    return `<article class="glass tile${top?' top':''}" style="--c:${c.hex}">
+      <div class="nm"><span class="dot"></span>${c.name}${top?'<span class="crown">Baskın</span>':`<span class="let">${k} şıkkı</span>`}</div>
+      <div class="num"><span data-to="${r.count[k]}">0</span><small>/ ${r.total}</small></div>
+      <div class="track"><i data-w="${r.count[k]/r.total*100}"></i></div>
+      <div class="pc">%${Math.round(r.count[k]/r.total*100)}</div>
+      <p>${c.meaning}</p></article>`;
+  }).join('');
+
+  /* kişilik */
+  const t=r.type;
+  $('#pBlend').innerHTML=t.blend.map(k=>`<span class="dot" style="background:${COLORS[k].hex}"></span>`).join('')+`<span>${t.blend.map(k=>COLORS[k].name).join(' + ')}${r.balanced?'':' enerjisi'}</span>`;
+  $('#pName').textContent=t.name;
+  $('#pTag').textContent=t.tagline;
+  $('#pSum').textContent=t.summary;
+  let note='';
+  if(r.balanced){ note = r.mag>.03 ? `Çarkta merkeze çok yakınsın; hafif eğilimin “${TYPES[r.typeIdx].name}” yönünde.` : 'Çarkta tam merkezdesin; dört renk de eşit ağırlıkta.'; }
+  else if(r.mag<.2){ note=`Merkeze yakın bir konumdasın; bu tipin özellikleri sende yumuşak, diğer renklerle harmanlanmış biçimde görünür.`; }
+  $('#pNote').textContent=note; $('#pNote').style.display=note?'block':'none';
+  const sec = r.second.map(k=>COLORS[k].name).join(' & ');
+  $('#meaning').innerHTML=`
+    <div><small>Baskın renk</small><b><span class="dot" style="background:${COLORS[r.dominant[0]].hex}"></span> ${names.join(' &amp; ')}</b><p>${r.dominant.map(k=>COLORS[k].meaning).join(' · ')}</p></div>
+    ${r.second.length?`<div><small>İkincil renk</small><b><span class="dot" style="background:${COLORS[r.second[0]].hex}"></span> ${sec}</b><p>${r.second.map(k=>COLORS[k].meaning).join(' · ')}</p></div>`:''}`;
+  $('#pStr').innerHTML=t.strengths.map(s=>`<li>${esc(s)}</li>`).join('');
+  $('#pGrow').innerHTML=t.growth.map(s=>`<li>${esc(s)}</li>`).join('');
+  $('#pTeam').textContent=t.team;
+  $('#pComm').innerHTML=t.comm.map(s=>`<li>${esc(s)}</li>`).join('');
+  $('#pRoles').innerHTML=t.roles.map(s=>`<span>${esc(s)}</span>`).join('');
+
+  buildWheel(r);
+  setupReveal();
+  if(!reduce) confetti(r);
+}
+
+/* ---------- sayaç + çubuk + kademeli görünüm ---------- */
+function countUp(el,to,dur=1100){
+  if(reduce||to===0){ el.textContent=to; return; }
+  let t0=null;
+  const f=t=>{ if(t0===null) t0=t; const p=Math.min(1,(t-t0)/dur); el.textContent=Math.round(to*(1-Math.pow(1-p,3))); if(p<1) requestAnimationFrame(f); };
+  requestAnimationFrame(f);
+}
+let io=null, wheelPlayed=false;
+function setupReveal(){
+  if(io) io.disconnect();
+  wheelPlayed=false;
+  const els=document.querySelectorAll('#result .reveal');
+  els.forEach(e=>e.classList.remove('in'));
+  document.querySelectorAll('.track i').forEach(i=>i.style.width='0');
+  document.querySelectorAll('.tile .num span').forEach(s=>s.textContent='0');
+  io=new IntersectionObserver(entries=>{
+    entries.forEach(en=>{
+      if(!en.isIntersecting) return;
+      const el=en.target; el.classList.add('in'); io.unobserve(el);
+      if(el.querySelector('#tiles')){
+        el.querySelectorAll('.tile').forEach((tile,i)=>{
+          setTimeout(()=>{
+            countUp(tile.querySelector('.num span'), +tile.querySelector('.num span').dataset.to);
+            const bar=tile.querySelector('.track i'); bar.style.width=bar.dataset.w+'%';
+          }, reduce?0:i*140);
+        });
+      }
+      if(el.id==='wheelSec' && !wheelPlayed){ wheelPlayed=true; setTimeout(playMarker, reduce?0:500); }
+    });
+  },{threshold:.2});
+  els.forEach(e=>io.observe(e));
+}
+
+/* ============================================================
+   RENK ÇARKI (SVG)
+   ============================================================ */
+const W={cx:430,cy:330,Ro:206,Ri:166,Rg:166};
+const pol=(r,deg)=>{const a=deg*Math.PI/180;return [W.cx+r*Math.sin(a), W.cy-r*Math.cos(a)];};
+const f1=n=>Math.round(n*100)/100;
+function sector(r1,r2,a1,a2){
+  const [x1,y1]=pol(r2,a1),[x2,y2]=pol(r2,a2),[x3,y3]=pol(r1,a2),[x4,y4]=pol(r1,a1);
+  return `M${f1(x1)} ${f1(y1)}A${r2} ${r2} 0 0 1 ${f1(x2)} ${f1(y2)}L${f1(x3)} ${f1(y3)}A${r1} ${r1} 0 0 0 ${f1(x4)} ${f1(y4)}Z`;
+}
+function arc(r,a1,a2,cw){
+  const [x1,y1]=pol(r,cw?a1:a2),[x2,y2]=pol(r,cw?a2:a1);
+  return `M${f1(x1)} ${f1(y1)}A${r} ${r} 0 0 ${cw?1:0} ${f1(x2)} ${f1(y2)}`;
+}
+function buildWheel(r){
+  const svg=$('#wheel');
+  const mid=(W.Ro+W.Ri)/2, fs=12.4;
+  let defs=`<defs>
+    <filter id="glow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="softglow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <clipPath id="gclip"><circle cx="${W.cx}" cy="${W.cy}" r="${W.Rg}"/></clipPath>
+    <radialGradient id="gcore" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#fff" stop-opacity=".16"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+  </defs>`;
+
+  /* iç disk + dört renk çeyreği */
+  let inner=`<circle cx="${W.cx}" cy="${W.cy}" r="${W.Rg}" fill="rgba(255,255,255,.04)"/>`;
+  const quads=[['A',0,90],['B',90,180],['D',180,270],['C',270,360]];
+  quads.forEach(([k,a1,a2])=>{
+    const [x1,y1]=pol(W.Rg,a1),[x2,y2]=pol(W.Rg,a2);
+    inner+=`<path d="M${W.cx} ${W.cy}L${f1(x1)} ${f1(y1)}A${W.Rg} ${W.Rg} 0 0 1 ${f1(x2)} ${f1(y2)}Z" fill="${COLORS[k].hex}" fill-opacity=".13"/>`;
+  });
+  inner+=`<circle cx="${W.cx}" cy="${W.cy}" r="${W.Rg}" fill="url(#gcore)"/>`;
+  [1/3,2/3,1].forEach(m=>{ inner+=`<circle cx="${W.cx}" cy="${W.cy}" r="${f1(W.Rg*m)}" fill="none" stroke="rgba(255,255,255,.2)" stroke-width="1"/>`; });
+  for(let k=0;k<8;k++){
+    const [x,y]=pol(W.Rg,k*45+22.5);
+    inner+=`<line x1="${W.cx}" y1="${W.cy}" x2="${f1(x)}" y2="${f1(y)}" stroke="rgba(255,255,255,.2)" stroke-width="1"/>`;
+  }
+  [['A',45],['B',135],['D',225],['C',315]].forEach(([k,a])=>{
+    const [x,y]=pol(W.Rg*.8,a);
+    inner+=`<text class="wq" x="${f1(x)}" y="${f1(y-2)}">${COLORS[k].name.toUpperCase()}</text><text class="wq-n" x="${f1(x)}" y="${f1(y+13)}">${r.count[k]} cevap</text>`;
+  });
+
+  /* dış halka + etiketler */
+  let ring='', labels='';
+  TYPES.forEach((t,k)=>{
+    const m=k*45, a1=m-22.5+.7, a2=m+22.5-.7;
+    const cw=!(m>90&&m<270);
+    const rr = cw ? mid-fs*.35 : mid+fs*.35;
+    ring+=`<g><path d="${sector(W.Ri,W.Ro,a1,a2)}" fill="${t.ring}"><title>${t.name}: ${t.lines.join(' ')}</title></path>
+      <path id="tp${k}" d="${arc(rr,a1+2,a2-2,cw)}" fill="none"/>
+      <text class="wring" fill="${t.txt}"><textPath href="#tp${k}" startOffset="50%" text-anchor="middle">${t.name.toUpperCase()}</textPath></text></g>`;
+    const rad=m*Math.PI/180, s=Math.sin(rad), c=Math.cos(rad);
+    const lr=W.Ro+(Math.abs(c)>.9?16:18);
+    const lx=W.cx+lr*s, ly=W.cy-lr*c;
+    const anchor = s>.3?'start':(s<-.3?'end':'middle');
+    const n=t.lines.length, lh=21;
+    let y0;
+    if(Math.abs(c)>.9) y0 = c>0 ? ly-(n-1)*lh-6 : ly+17;
+    else y0 = ly-(n-1)*lh/2+5;
+    labels+=`<text class="wlabel" id="wl${k}" text-anchor="${anchor}">${t.lines.map((ln,i)=>`<tspan x="${f1(lx)}" y="${f1(y0+i*lh)}">${ln}</tspan>`).join('')}</text>`;
+  });
+
+  /* vurgu halkası, iz, işaretçi */
+  const hl=`<path id="hl" d="" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round" opacity="0" filter="url(#softglow)" style="transition:opacity .6s"/>`;
+  const trail=`<line id="trail" x1="${W.cx}" y1="${W.cy}" x2="${W.cx}" y2="${W.cy}" stroke="#fff" stroke-opacity=".75" stroke-width="3" stroke-linecap="round" stroke-dasharray="1 7"/>`;
+  const marker=`<g id="marker" transform="translate(${W.cx} ${W.cy})" opacity="0" style="transition:opacity .4s">
+      <circle class="pulse" r="12" fill="#8b9cff"/>
+      <circle r="12" fill="#fff" stroke="#8b9cff" stroke-width="5" filter="url(#glow)"/>
+      <g transform="translate(0 -30)"><rect x="-22" y="-13" width="44" height="24" rx="12" fill="#fff"/><text x="0" y="4.5" text-anchor="middle" font-size="13" font-weight="800" letter-spacing=".08em" fill="#0b1020">SİZ</text></g>
+    </g>`;
+
+  const compact=matchMedia('(max-width:640px)').matches;
+  svg.classList.toggle('compact',compact);
+  svg.setAttribute('viewBox', compact ? '190 100 480 460' : '0 40 860 580');
+  svg.setAttribute('aria-label', r.balanced
+    ? 'Renk çarkında merkeze yakın, dengeli bir konumdasın.'
+    : `Renk çarkında ${r.type.name} bölgesindesin.`);
+  svg.innerHTML=defs+inner+ring+hl+labels+trail+marker;
+
+  /* mobil açıklama listesi */
+  $('#wlegend').innerHTML=TYPES.map((t,k)=>`<div id="wg${k}"><b>${t.name}</b>${t.lines.join(' ')}</div>`).join('');
+}
+function playMarker(){
+  const r=lastResult; if(!r) return;
+  const svg=$('#wheel'), mk=$('#marker'), tr=$('#trail'); if(!mk) return;
+  const R=r.frac*W.Rg, th=r.theta*Math.PI/180;
+  const tx=W.cx+R*Math.sin(th), ty=W.cy-R*Math.cos(th);
+  mk.setAttribute('opacity','1');
+  const done=()=>{
+    mk.setAttribute('transform',`translate(${f1(tx)} ${f1(ty)})`);
+    tr.setAttribute('x2',f1(tx)); tr.setAttribute('y2',f1(ty));
+    if(!r.balanced){
+      const m=r.typeIdx*45;
+      const hl=$('#hl'); hl.setAttribute('d',sector(W.Ri,W.Ro,m-22.5+.7,m+22.5-.7)); hl.setAttribute('opacity','1');
+      $('#wl'+r.typeIdx).classList.add('hot'); $('#wg'+r.typeIdx).classList.add('hot');
+    }
+  };
+  if(reduce){ done(); return; }
+  const D=1900, t0=performance.now();
+  const ease=p=>1-Math.pow(1-p,4);
+  (function step(t){
+    const p=Math.min(1,(t-t0)/D), e=ease(p);
+    /* hafif spiral: dönerek merkezden çıkış */
+    const wob=(1-p)*0.9*Math.sin(p*Math.PI*2);
+    const ang=th+wob, rr=R*e;
+    const x=W.cx+rr*Math.sin(ang), y=W.cy-rr*Math.cos(ang);
+    mk.setAttribute('transform',`translate(${f1(x)} ${f1(y)})`);
+    tr.setAttribute('x2',f1(x)); tr.setAttribute('y2',f1(y));
+    if(p<1) requestAnimationFrame(step); else done();
+  })(t0);
+}
+matchMedia('(max-width:640px)').addEventListener?.('change',()=>{ if(lastResult && $('#result').classList.contains('active')){ const played=wheelPlayed; buildWheel(lastResult); if(played) playMarker(); } });
+
+/* ============================================================
+   KONFETİ
+   ============================================================ */
+function confetti(r){
+  const cv=$('#confetti'), ctx=cv.getContext('2d');
+  const dpr=Math.min(2,window.devicePixelRatio||1);
+  const w=cv.width=innerWidth*dpr, h=cv.height=innerHeight*dpr;
+  const palette=[...r.dominant.map(k=>COLORS[k].hex),...r.dominant.map(k=>COLORS[k].hex),...KEYS.map(k=>COLORS[k].hex),'#ffffff'];
+  const P=Array.from({length:150},()=>({
+    x:w/2+(Math.random()-.5)*w*.25, y:h*.28, vx:(Math.random()-.5)*16*dpr, vy:(-Math.random()*13-4)*dpr,
+    s:(Math.random()*7+5)*dpr, rot:Math.random()*6.28, vr:(Math.random()-.5)*.35,
+    c:palette[Math.floor(Math.random()*palette.length)], round:Math.random()<.35
+  }));
+  const t0=performance.now();
+  (function frame(t){
+    ctx.clearRect(0,0,w,h);
+    let alive=0;
+    P.forEach(p=>{
+      p.vy+=.28*dpr; p.vx*=.992; p.x+=p.vx; p.y+=p.vy; p.rot+=p.vr;
+      if(p.y<h+30){ alive++; ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot); ctx.fillStyle=p.c;
+        if(p.round){ctx.beginPath();ctx.arc(0,0,p.s/2,0,6.28);ctx.fill();} else ctx.fillRect(-p.s/2,-p.s/3,p.s,p.s*.6);
+        ctx.restore(); }
+    });
+    if(alive&&t-t0<6000) requestAnimationFrame(frame); else ctx.clearRect(0,0,w,h);
+  })(t0);
+}
+
+/* ============================================================
+   EYLEMLER
+   ============================================================ */
+$('#retryBtn').addEventListener('click',()=>{ try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){} startQuiz(); });
+$('#printBtn').addEventListener('click',()=>{
+  document.querySelectorAll('.reveal').forEach(e=>e.classList.add('in'));
+  document.querySelectorAll('.track i').forEach(i=>i.style.width=i.dataset.w+'%');
+  document.querySelectorAll('.tile .num span').forEach(s=>s.textContent=s.dataset.to);
+  if(!$('#hl').getAttribute('d')){ wheelPlayed=true; playMarker(); }
+  setTimeout(()=>window.print(), reduce?0:2200);
+});
+$('#copyBtn').addEventListener('click',async()=>{
+  const url=location.href.split('#')[0]+'#c='+state.answers.join('');
+  try{ await navigator.clipboard.writeText(url); toast('Bağlantı kopyalandı'); }
+  catch(e){
+    const ta=document.createElement('textarea'); ta.value=url; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); toast('Bağlantı kopyalandı'); }catch(_){ toast('Kopyalanamadı: adres çubuğundan alabilirsin'); }
+    ta.remove();
+  }
+});
+
+/* Paylaşılan bağlantıdan doğrudan sonuç */
+(function boot(){
+  const m=location.hash.match(/^#c=([ABCD]{20})$/);
+  if(m && m[1].length===QUESTIONS.length) showResult(m[1]);
+})();
+</script>
+</body>
+</html>
