@@ -25,3 +25,4 @@ from app.models.inventory import InventoryItem, InventoryEmailSchedule  # noqa: 
 from app.models.patch import CustomerPatch  # noqa: F401
 from app.models.responsibility import ResponsibilityGroup, ResponsibilityMember  # noqa: F401
 from app.models.release import Release, ReleasePhase, ReleaseMilestone  # noqa: F401
+from app.models.oauth import OAuthClient, OAuthAuthorizationCode, OAuthGrant  # noqa: F401

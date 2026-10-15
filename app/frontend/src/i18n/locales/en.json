@@ -1258,5 +1258,24 @@
     "ms_internal_control": "Ready for Internal Control",
     "ms_internal_acceptance": "Internal Acceptance",
     "ms_general_available": "Release General Available"
+  },
+  "ai_connections": {
+    "title": "AI app connections (MCP)",
+    "description": "Connect AI apps such as Claude Code, Claude Desktop, Cursor or VS Code to your account to query data and create, update or delete records. The app acts only with your permissions and cannot see inventory passwords.",
+    "server_url": "MCP server URL",
+    "setup": "Setup instructions",
+    "claude_code_hint": "Run in a terminal, then choose \"Authenticate\" with the /mcp command inside Claude Code.",
+    "claude_desktop_hint": "Add via Settings → Developer → Edit config (claude_desktop_config.json); requires Node.js. Restart Claude Desktop.",
+    "cursor_hint": "Add to ~/.cursor/mcp.json.",
+    "vscode_hint": "Add to .vscode/mcp.json in your workspace.",
+    "login_hint": "On first connect a browser opens; log in with your username and password for this app and approve.",
+    "connected": "Connected apps",
+    "none": "No AI apps connected yet.",
+    "connected_at": "Connected: {{date}}",
+    "last_used": "Last used: {{date}}",
+    "revoke": "Disconnect",
+    "revoke_confirm": "Disconnect \"{{name}}\"? The app will lose access to your account.",
+    "revoked": "Connection removed.",
+    "copy": "Copy"
   }
 }

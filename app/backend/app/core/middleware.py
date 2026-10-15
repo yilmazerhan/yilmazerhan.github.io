@@ -15,6 +15,13 @@ EXCLUDED_PREFIXES = (
     "/api/v1/auth/refresh",
     "/api/v1/auth/logout",
     "/api/v1/public",
+    # OAuth protocol traffic (the login itself is audited as "login"), and the
+    # MCP endpoint, whose tool calls are audited individually as the API
+    # requests they make.
+    "/api/v1/oauth/register",
+    "/api/v1/oauth/token",
+    "/api/v1/oauth/authorize",
+    "/api/v1/mcp",
 )
 _UUID_RE = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I

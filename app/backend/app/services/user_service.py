@@ -385,6 +385,8 @@ class UserService:
         await self.db.execute(
             sa_update(RefreshToken).where(RefreshToken.user_id == user.id).values(revoked=True)
         )
+        from app.services.oauth_service import revoke_all_grants
+        await revoke_all_grants(self.db, user.id)
         await self.db.flush()
 
     async def admin_set_password(self, target_user_id: uuid.UUID, new_password: str, requester: User) -> None:
@@ -423,6 +425,8 @@ class UserService:
         await self.db.execute(
             sa_update(RefreshToken).where(RefreshToken.user_id == target.id).values(revoked=True)
         )
+        from app.services.oauth_service import revoke_all_grants
+        await revoke_all_grants(self.db, target.id)
         await self.db.flush()
 
     async def resend_activation(self, user_id: uuid.UUID) -> tuple[User, str]:

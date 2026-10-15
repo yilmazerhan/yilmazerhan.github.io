@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/authStore'
 import { useUpdateMyProfile } from '@/api/users'
 import { toast } from '@/store/toastStore'
 import ChangePasswordModal from '@/components/users/ChangePasswordModal'
+import AiConnectionsCard from '@/components/profile/AiConnectionsCard'
 import i18n from '@/i18n'
 
 function getInitials(name: string) {
@@ -135,6 +136,8 @@ export default function ProfilePage() {
             {t('auth.change_password')}
           </button>
         </div>
+
+        <AiConnectionsCard />
       </div>
 
       {changePwOpen && <ChangePasswordModal onClose={() => setChangePwOpen(false)} />}

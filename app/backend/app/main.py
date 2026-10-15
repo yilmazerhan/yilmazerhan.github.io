@@ -21,6 +21,8 @@ from app.routers.patch import router as patch_router
 from app.routers.team_tasks import router as team_tasks_router
 from app.routers.responsibility import router as responsibility_router
 from app.routers.release import router as release_router
+from app.routers import oauth as oauth_routes
+from app.routers.mcp import router as mcp_router
 
 logger = logging.getLogger(__name__)
 
@@ -230,6 +232,12 @@ app.include_router(patch_router, prefix="/api/v1")
 app.include_router(team_tasks_router, prefix="/api/v1")
 app.include_router(responsibility_router, prefix="/api/v1")
 app.include_router(release_router, prefix="/api/v1")
+# MCP interface: OAuth discovery at the site root, OAuth endpoints and the MCP
+# endpoint itself under /api/v1 (see docs/MCP.md).
+app.include_router(oauth_routes.well_known_router)
+app.include_router(oauth_routes.router, prefix="/api/v1")
+app.include_router(oauth_routes.connections_router, prefix="/api/v1")
+app.include_router(mcp_router)
 
 
 # ─── Health check ─────────────────────────────────────────────────────────

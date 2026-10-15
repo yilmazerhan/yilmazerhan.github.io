@@ -122,6 +122,33 @@ class AuthService:
         user_agent: Optional[str] = None,
     ) -> tuple[User, str, str]:
         """Returns (user, access_token, raw_refresh_token)."""
+        user = await self.authenticate(username, password, ip=ip, user_agent=user_agent)
+
+        raw_refresh, refresh_hash = generate_refresh_token()
+        session_expires_at = datetime.now(timezone.utc) + timedelta(hours=settings.SESSION_MAX_DURATION_HOURS)
+        refresh_record = RefreshToken(
+            user_id=user.id,
+            token_hash=refresh_hash,
+            expires_at=session_expires_at,
+        )
+        self.db.add(refresh_record)
+        await self.db.flush()
+
+        # Fire-and-forget in a separate session — must not block or fail login
+        asyncio.ensure_future(_write_auth_audit(user.id, "login", ip, user_agent))
+
+        access_token = create_access_token(user.id, user.role)
+        return user, access_token, raw_refresh
+
+    async def authenticate(
+        self,
+        username: str,
+        password: str,
+        ip: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> User:
+        """Verify credentials and account state; shared by the web login and the
+        OAuth (MCP) login page. Creates no session."""
         result = await self.db.execute(
             select(User).where(User.username == username.lower(), User.is_deleted == False)
         )
@@ -154,22 +181,7 @@ class AuthService:
             user.hashed_password = hash_password(password)
 
         user.last_login_at = datetime.now(timezone.utc)
-
-        raw_refresh, refresh_hash = generate_refresh_token()
-        session_expires_at = datetime.now(timezone.utc) + timedelta(hours=settings.SESSION_MAX_DURATION_HOURS)
-        refresh_record = RefreshToken(
-            user_id=user.id,
-            token_hash=refresh_hash,
-            expires_at=session_expires_at,
-        )
-        self.db.add(refresh_record)
-        await self.db.flush()
-
-        # Fire-and-forget in a separate session — must not block or fail login
-        asyncio.ensure_future(_write_auth_audit(user.id, "login", ip, user_agent))
-
-        access_token = create_access_token(user.id, user.role)
-        return user, access_token, raw_refresh
+        return user
 
     async def refresh_access_token(self, raw_refresh_token: str) -> tuple[str, str]:
         """Returns (new_access_token, new_raw_refresh_token). Old token is revoked."""
@@ -291,9 +303,11 @@ class AuthService:
         user.hashed_password = hash_password(new_password)
         record.used = True
 
-        # Revoke all refresh tokens for security
+        # Revoke all refresh tokens and connected AI apps for security
         await self.db.execute(
             update(RefreshToken).where(RefreshToken.user_id == user.id).values(revoked=True)
         )
+        from app.services.oauth_service import revoke_all_grants
+        await revoke_all_grants(self.db, user.id)
         await self.db.flush()
         return user

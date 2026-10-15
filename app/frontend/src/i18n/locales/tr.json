@@ -1258,5 +1258,24 @@
     "ms_internal_control": "İç Kontrole Hazır",
     "ms_internal_acceptance": "İç Kabul",
     "ms_general_available": "Genel Kullanıma Açık"
+  },
+  "ai_connections": {
+    "title": "Yapay zekâ bağlantıları (MCP)",
+    "description": "Claude Code, Claude Desktop, Cursor veya VS Code gibi yapay zekâ uygulamalarını hesabınıza bağlayarak verileri sorgulayabilir, kayıt ekleyip güncelleyebilir ve silebilirsiniz. Uygulama yalnızca sizin yetkilerinizle işlem yapar; envanterdeki şifreleri göremez.",
+    "server_url": "MCP sunucu adresi",
+    "setup": "Kurulum talimatları",
+    "claude_code_hint": "Terminalde çalıştırın, ardından Claude Code içinde /mcp komutuyla \"Authenticate\" seçin.",
+    "claude_desktop_hint": "Ayarlar → Geliştirici → Yapılandırmayı düzenle (claude_desktop_config.json) ile ekleyin; Node.js gerekir. Claude Desktop'ı yeniden başlatın.",
+    "cursor_hint": "~/.cursor/mcp.json dosyasına ekleyin.",
+    "vscode_hint": "Çalışma alanınızdaki .vscode/mcp.json dosyasına ekleyin.",
+    "login_hint": "İlk bağlantıda tarayıcı açılır; bu uygulamanın kullanıcı adı ve şifrenizle giriş yapıp izin verin.",
+    "connected": "Bağlı uygulamalar",
+    "none": "Henüz bağlı bir yapay zekâ uygulaması yok.",
+    "connected_at": "Bağlantı: {{date}}",
+    "last_used": "Son kullanım: {{date}}",
+    "revoke": "Bağlantıyı kaldır",
+    "revoke_confirm": "\"{{name}}\" bağlantısı kaldırılsın mı? Uygulama hesabınıza erişemez hale gelir.",
+    "revoked": "Bağlantı kaldırıldı.",
+    "copy": "Kopyala"
   }
 }
