@@ -168,3 +168,14 @@ async def test_tools_list():
     r = await mcp_router._handle(CTX, {"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
     names = {t["name"] for t in r["result"]["tools"]}
     assert {"whoami", "list_tasks", "create_worklog", "api_request"} <= names
+
+
+async def test_unauthenticated_get_points_to_login_metadata():
+    from httpx import ASGITransport, AsyncClient
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="https://proddy.example") as c:
+        r = await c.get("/api/v1/mcp")
+        assert r.status_code == 401
+        assert 'resource_metadata="https://proddy.example/.well-known/oauth-protected-resource/api/v1/mcp"' \
+            in r.headers["www-authenticate"]
+        r = await c.get("/api/v1/mcp", headers={"Authorization": "Bearer x"})
+        assert r.status_code == 405

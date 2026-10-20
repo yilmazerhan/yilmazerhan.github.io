@@ -59,7 +59,12 @@ def _rpc_result(msg_id: Any, result: dict) -> dict:
 
 @router.get(MCP_PATH)
 @router.delete(MCP_PATH)
-async def mcp_not_allowed():
+async def mcp_not_allowed(request: Request):
+    # Clients probe with an unauthenticated GET to discover the login metadata,
+    # so authentication is checked before the method.
+    auth = request.headers.get("authorization") or ""
+    if not auth.lower().startswith("bearer "):
+        return _unauthorized(request)
     # No server-initiated SSE stream and no sessions to terminate.
     return Response(status_code=405, headers={"Allow": "POST"})
 
