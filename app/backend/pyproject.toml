@@ -9,7 +9,7 @@ requires-python = ">=3.12"
 dependencies = [
     # Web framework
     "fastapi>=0.115.5",
-    "starlette>=0.49.1",
+    "starlette>=1.3.1",  # CVE-2026-54283 (unbounded urlencoded forms), CVE-2026-54282
     "uvicorn[standard]==0.32.1",
 
     # Database
@@ -19,18 +19,18 @@ dependencies = [
 
     # Auth & Security
     "argon2-cffi==23.1.0",
-    "PyJWT>=2.13.0",
+    "PyJWT>=2.15.0",
     "itsdangerous==2.2.0",
-    "cryptography>=46.0.6",
+    "cryptography>=50.0.0",
 
     # HTTP & Validation
     "pydantic==2.10.3",
+    "email-validator>=2.3.0",  # required by pydantic EmailStr
     "pydantic-settings==2.7.0",
     "python-multipart>=0.0.27",
     "httpx==0.28.1",
 
     # Email
-    "fastapi-mail==1.4.1",
     "jinja2==3.1.6",
 
     # Background tasks

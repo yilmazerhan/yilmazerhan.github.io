@@ -104,7 +104,7 @@ services:
       - web
 
   nginx:
-    image: nginx:1.25-alpine
+    image: nginx:1.30-alpine
     restart: unless-stopped
     # Run the cert reload-watcher in the background, then nginx in the foreground.
     command: sh -c "sh /reload-watcher.sh & exec nginx -g 'daemon off;'"

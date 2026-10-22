@@ -24,7 +24,7 @@ COPY . .
 RUN pnpm run build
 
 # ─── Production stage ────────────────────────────────────────────────────────
-FROM nginxinc/nginx-unprivileged:1.25-alpine AS production
+FROM nginxinc/nginx-unprivileged:1.30-alpine AS production
 
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
