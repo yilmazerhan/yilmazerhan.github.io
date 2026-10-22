@@ -11,7 +11,7 @@ from app.schemas.auth import (
 )
 from app.services.auth_service import AuthService
 from app.core.dependencies import get_current_user
-from app.core.rate_limit import limiter
+from app.core.rate_limit import limiter, _get_real_ip
 from app.config import settings
 from app.models.user import User
 from app.tasks.email_tasks import send_auth_email_direct
@@ -81,14 +81,15 @@ async def activate_account(request: Request, token: str, db: Annotated[AsyncSess
 
 
 @router.post("/login", response_model=TokenResponse)
-@limiter.limit(settings.AUTH_LOGIN_RATE_LIMIT)
+# Shared with the MCP OAuth login page so it is not a second guessing channel.
+@limiter.shared_limit(settings.AUTH_LOGIN_RATE_LIMIT, scope="password-login")
 async def login(
     request: Request,
     body: LoginRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = AuthService(db)
-    ip = request.client.host if request.client else None
+    ip = _get_real_ip(request)
     ua = request.headers.get("user-agent")
     user, access_token, raw_refresh = await svc.login(
         body.username, body.password, ip=ip, user_agent=ua
@@ -134,7 +135,7 @@ async def logout(
 ):
     if refresh_token:
         svc = AuthService(db)
-        ip = request.client.host if request.client else None
+        ip = _get_real_ip(request)
         ua = request.headers.get("user-agent")
         await svc.logout(refresh_token, ip=ip, user_agent=ua)
 

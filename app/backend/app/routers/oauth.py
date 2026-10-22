@@ -21,10 +21,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.core.dependencies import get_current_user
 from app.core.exceptions import AuthenticationError, ForbiddenError, NotFoundError
-from app.core.rate_limit import limiter
+from app.core.rate_limit import limiter, _get_real_ip
 from app.database import get_db
 from app.models.user import User
-from app.services.oauth_service import OAuthError, OAuthService, redirect_uri_matches
+from app.services.oauth_service import (
+    OAuthError, OAuthService, is_loopback_redirect, redirect_uri_matches,
+)
 
 MCP_PATH = "/api/v1/mcp"
 OAUTH_PREFIX = "/api/v1/oauth"
@@ -90,6 +92,11 @@ async def authorization_server_metadata(request: Request):
 
 # ─── Registration & token ─────────────────────────────────────────────────
 
+def _form_str(form, key: str) -> Optional[str]:
+    value = form.get(key)
+    return value if isinstance(value, str) and value else None
+
+
 def _oauth_error(e: OAuthError) -> JSONResponse:
     return JSONResponse(
         status_code=e.status_code,
@@ -118,19 +125,19 @@ async def register_client(request: Request, db: Annotated[AsyncSession, Depends(
 @limiter.limit("60/minute")
 async def token(request: Request, db: Annotated[AsyncSession, Depends(get_db)]):
     form = await request.form()
-    grant_type = form.get("grant_type")
+    grant_type = _form_str(form, "grant_type")
     svc = OAuthService(db)
     try:
         if grant_type == "authorization_code":
             result = await svc.exchange_code(
-                code=form.get("code"),
-                client_id=form.get("client_id"),
-                redirect_uri=form.get("redirect_uri"),
-                code_verifier=form.get("code_verifier"),
-                resource=form.get("resource"),
+                code=_form_str(form, "code"),
+                client_id=_form_str(form, "client_id"),
+                redirect_uri=_form_str(form, "redirect_uri"),
+                code_verifier=_form_str(form, "code_verifier"),
+                resource=_form_str(form, "resource"),
             )
         elif grant_type == "refresh_token":
-            result = await svc.refresh(form.get("refresh_token"), form.get("client_id"))
+            result = await svc.refresh(_form_str(form, "refresh_token"), _form_str(form, "client_id"))
         else:
             raise OAuthError("unsupported_grant_type", "Desteklenmeyen grant_type.")
     except OAuthError as e:
@@ -226,12 +233,23 @@ def _consent_page(company: str, color: str, client_name: str, redirect_uri: str,
                   params: dict, username: str = "", error: Optional[str] = None,
                   status_code: int = 200) -> HTMLResponse:
     target = urlsplit(redirect_uri)
-    target_label = f"{target.scheme}://{target.netloc}" if target.netloc else f"{target.scheme}:"
+    host = target.hostname or ""
+    try:
+        host = host.encode("idna").decode("ascii")  # show homoglyph hosts as punycode
+    except UnicodeError:
+        pass
+    if is_loopback_redirect(redirect_uri):
+        target_label = "bu bilgisayardaki uygulama (localhost)"
+    else:
+        target_label = f"{target.scheme}://{host}" if host else f"{target.scheme}:"
     hidden = "".join(
         f'<input type="hidden" name="{f}" value="{html.escape(params.get(f) or "")}">'
         for f in _AUTH_FIELDS
     )
     err = f'<div class="err">{html.escape(error)}</div>' if error else ""
+    if not is_loopback_redirect(redirect_uri):
+        err += (f'<div class="err">Onaylarsanız erişim <b>{html.escape(target_label)}</b> adresine gönderilecek. '
+                'Bu bağlantıyı kendiniz başlatmadıysanız veya adresi tanımıyorsanız <b>Reddet</b>\'e basın.</div>')
     body = f"""
 <h1>{html.escape(company)}</h1>
 <p class="sub">Yapay zekâ uygulaması bağlantı isteği</p>
@@ -239,7 +257,7 @@ def _consent_page(company: str, color: str, client_name: str, redirect_uri: str,
 <div class="app"><b>{html.escape(client_name)}</b> hesabınıza bağlanmak istiyor.
 <div class="muted">Dönüş adresi: {html.escape(target_label)}</div>
 <ul><li>Sizin adınıza, <b>yalnızca sizin yetkileriniz dahilinde</b> kayıtları sorgulayabilir, ekleyebilir, güncelleyebilir ve silebilir.</li>
-<li>Envanterdeki şifre ve gizli anahtarları göremez.</li>
+<li>Envanterdeki şifreleri göremez; kullanıcı, yetki, entegrasyon ve e-posta ayarlarını değiştiremez.</li>
 <li>Bağlantıyı istediğiniz an Profil sayfasından kaldırabilirsiniz.</li></ul></div>
 <form method="post" action="{OAUTH_PREFIX}/authorize" autocomplete="on">
 {hidden}
@@ -293,10 +311,10 @@ async def authorize_page(request: Request, db: Annotated[AsyncSession, Depends(g
 
 
 @router.post("/authorize")
-@limiter.limit(settings.AUTH_LOGIN_RATE_LIMIT)
+@limiter.shared_limit(settings.AUTH_LOGIN_RATE_LIMIT, scope="password-login")
 async def authorize_submit(request: Request, db: Annotated[AsyncSession, Depends(get_db)]):
     form = await request.form()
-    params = {f: (form.get(f) or None) for f in _AUTH_FIELDS}
+    params = {f: _form_str(form, f) for f in _AUTH_FIELDS}
     company, color = await _branding(db)
     svc = OAuthService(db)
     try:
@@ -313,16 +331,16 @@ async def authorize_submit(request: Request, db: Annotated[AsyncSession, Depends
     params["redirect_uri"] = redirect_uri
     iss = public_base_url(request)
 
-    if form.get("decision") != "approve":
+    if _form_str(form, "decision") != "approve":
         return _redirect_page(_redirect_target(redirect_uri, {
             "error": "access_denied", "error_description": "Kullanıcı bağlantıyı reddetti.",
             "state": params.get("state"), "iss": iss,
         }), color, "Bağlantı reddedildi")
 
-    username = str(form.get("username") or "").strip()
-    password = str(form.get("password") or "")
+    username = (_form_str(form, "username") or "").strip()
+    password = _form_str(form, "password") or ""
     from app.services.auth_service import AuthService, _write_auth_audit
-    ip = request.client.host if request.client else None
+    ip = _get_real_ip(request)
     try:
         user = await AuthService(db).authenticate(username, password, ip=ip,
                                                   user_agent=request.headers.get("user-agent"))

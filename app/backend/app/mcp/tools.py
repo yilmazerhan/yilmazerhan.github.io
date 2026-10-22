@@ -30,6 +30,20 @@ _SEGMENT = r"[A-Za-z0-9_\-:]+"
 
 
 # ─── Operations the AI must never reach ───────────────────────────────────
+# Read-only over MCP: who can log in and with what rights (users, team
+# membership, permissions), integration credentials and destinations (Jira,
+# SMTP, Teams webhooks), and every outbound e-mail/report channel (templates,
+# workflows, scheduled reports and inventory mails). A prompt-injected agent
+# with an admin's rights could otherwise take over accounts (change a user's
+# e-mail, then reset the password), point Jira/SMTP at its own host and run
+# the connection test to collect the stored secret, or mail data out.
+_READ_ONLY_PREFIXES = (
+    "/users", "/teams", "/permissions",
+    "/jira/configs", "/email", "/admin", "/inventory/schedules",
+)
+_READ_ONLY_EXCEPTIONS = {("PATCH", "/users/me/profile")}  # own name and language
+
+
 def _is_excluded(method: str, path: str, op: dict) -> bool:
     if path.startswith("/auth/") and not (method == "GET" and path == "/auth/me"):
         return True  # login/refresh/register/reset flows
@@ -41,6 +55,9 @@ def _is_excluded(method: str, path: str, op: dict) -> bool:
         return True  # would send stored secrets to the AI provider
     if path.startswith(("/admin/ssl", "/backup", "/admin/backup")):
         return True  # infrastructure: TLS certificates, database restore
+    if (method != "GET" and path.startswith(_READ_ONLY_PREFIXES)
+            and (method, path) not in _READ_ONLY_EXCEPTIONS):
+        return True
     if path.endswith(("/download", "/export")) or path.startswith("/export/"):
         return True  # binary / file downloads
     content = (op.get("requestBody") or {}).get("content") or {}
@@ -186,8 +203,9 @@ async def call_api(
 
     headers = {
         "Authorization": f"Bearer {create_access_token(ctx.user.id, ctx.user.role)}",
-        # Audit log rows show the request came through an AI client.
-        "User-Agent": f"MCP ({ctx.client_name})"[:300],
+        # Audit log rows show the request came through an AI client. Header
+        # values must be ASCII without control characters.
+        "User-Agent": "MCP (" + re.sub(r"[^\x20-\x7e]", "?", ctx.client_name)[:200] + ")",
         "X-Real-IP": ctx.client_ip,
         "Accept": "application/json",
     }

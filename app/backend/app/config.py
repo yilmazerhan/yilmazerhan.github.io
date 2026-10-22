@@ -40,6 +40,11 @@ class Settings(BaseSettings):
     AUTH_FORGOT_PASSWORD_RATE_LIMIT: str = "3/hour"
     AUTH_REFRESH_RATE_LIMIT: str = "60/minute"
 
+    # MCP / OAuth: extra non-loopback redirect URIs AI clients may use, comma
+    # separated, on top of the built-in list in oauth_service. An entry ending
+    # in "://" allows a whole app scheme (e.g. "windsurf://").
+    MCP_OAUTH_EXTRA_REDIRECT_URIS: str = ""
+
     # SuperAdmin seed
     SUPERADMIN_EMAIL: str = "admin@example.com"
     SUPERADMIN_PASSWORD: str = ""

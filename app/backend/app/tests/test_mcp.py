@@ -23,6 +23,7 @@ from app.services.oauth_service import (
     "http://127.0.0.1:5000/cb",
     "http://[::1]:8080/cb",
     "https://vscode.dev/redirect",
+    "https://claude.ai/api/mcp/auth_callback",
     "cursor://anysphere.cursor-mcp/oauth/callback",
 ])
 def test_redirect_uri_accepted(uri):
@@ -37,6 +38,13 @@ def test_redirect_uri_accepted(uri):
     "https://ok.example/cb#frag",       # fragments are not allowed
     "relative/path",
     "",
+    # Consent phishing: arbitrary https callbacks and look-alikes are refused.
+    "https://evil.example/cb",
+    "https://claude.ai@evil.example/api/mcp/auth_callback",
+    "http://localhost@evil.example/cb",
+    "https://claude.ai.evil.example/api/mcp/auth_callback",
+    "https://claude.ai:444/api/mcp/auth_callback",
+    "ms-msdt:/id",
 ])
 def test_redirect_uri_rejected(uri):
     with pytest.raises(OAuthError):
@@ -179,3 +187,74 @@ async def test_unauthenticated_get_points_to_login_metadata():
             in r.headers["www-authenticate"]
         r = await c.get("/api/v1/mcp", headers={"Authorization": "Bearer x"})
         assert r.status_code == 405
+
+
+def test_extra_redirect_uris_setting(monkeypatch):
+    from app.config import settings
+    with pytest.raises(OAuthError):
+        validate_redirect_uri("https://ai.internal.example/callback")
+    monkeypatch.setattr(settings, "MCP_OAUTH_EXTRA_REDIRECT_URIS", "https://ai.internal.example/callback, windsurf://")
+    validate_redirect_uri("https://ai.internal.example/callback")
+    validate_redirect_uri("windsurf://oauth/cb")
+
+
+def test_client_name_is_sanitized():
+    from app.services.oauth_service import sanitize_client_name
+    assert sanitize_client_name("Claude\u202eedoC\r\nX") == "ClaudeedoCX"
+    assert sanitize_client_name("Türkçe İstemci") == "Türkçe İstemci"
+    assert sanitize_client_name(None) == "MCP istemcisi"
+
+
+def test_admin_areas_are_read_only_over_mcp():
+    ops = {(o.method, o.path) for o in mcp_tools.catalog().operations}
+    for op in [
+        ("POST", "/users"), ("PATCH", "/users/{user_id}"),
+        ("PUT", "/permissions/users/{user_id}"), ("POST", "/teams/{team_id}/members"),
+        ("PATCH", "/jira/configs/{config_id}"), ("POST", "/jira/configs/{config_id}/test"),
+        ("PATCH", "/email/smtp/{config_id}"), ("POST", "/email/smtp/{config_id}/test"),
+        ("PATCH", "/email/templates/{template_id}"), ("POST", "/email/workflows"),
+        ("POST", "/admin/reports/schedules"), ("POST", "/inventory/schedules"),
+    ]:
+        assert op not in ops, op
+    for op in [("GET", "/users"), ("PATCH", "/users/me/profile"), ("GET", "/email/workflows"),
+               ("POST", "/worklogs"), ("PATCH", "/kanban/tasks/{task_id}")]:
+        assert op in ops, op
+
+
+async def test_non_ascii_client_name_does_not_break_tool_calls(monkeypatch):
+    # Regression: a Turkish client name used to crash every call (non-ASCII header).
+    captured = {}
+
+    class FakeClient:
+        def __init__(self, *a, **kw): pass
+        async def __aenter__(self): return self
+        async def __aexit__(self, *a): pass
+        async def request(self, method, url, params=None, headers=None, json=None):
+            captured.update(headers)
+            import httpx
+            return httpx.Response(200, json={"ok": True})
+
+    monkeypatch.setattr(mcp_tools.httpx, "AsyncClient", FakeClient)
+    ctx = mcp_tools.CallContext(user=SimpleNamespace(id=uuid.uuid4(), role="user"),
+                                client_name="Çalışma İstemcisi\r\nX-Evil: 1",
+                                base_url="https://h", client_ip="127.0.0.1")
+    is_error, _ = await mcp_tools.call_api(ctx, "GET", "/auth/me")
+    assert not is_error
+    ua = captured["User-Agent"]
+    assert ua.isascii() and "\r" not in ua and "\n" not in ua
+
+
+async def test_mcp_rejects_oversized_batches():
+    from httpx import ASGITransport, AsyncClient
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="https://h") as c:
+        # unauthenticated requests are refused before the body is parsed
+        r = await c.post("/api/v1/mcp", json=[{"jsonrpc": "2.0", "id": i, "method": "ping"} for i in range(50)])
+        assert r.status_code == 401
+    assert mcp_router.MAX_BATCH == 10
+
+
+async def test_bad_code_verifier_is_invalid_grant_not_500():
+    from app.services.oauth_service import OAuthService
+    with pytest.raises(OAuthError) as e:
+        await OAuthService(db=None).exchange_code("c", "cid", "http://localhost/cb", "ş" * 43, None)
+    assert e.value.code == "invalid_grant"

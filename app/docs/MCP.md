@@ -52,22 +52,40 @@ registration and password flows; password changes; revealing stored inventory se
 backups and restore; file uploads and binary downloads/exports; the OAuth and MCP endpoints
 themselves.
 
+**Read-only over MCP** (`_READ_ONLY_PREFIXES`): users, teams and team membership,
+permissions, Jira configurations, everything under `/email` (SMTP, templates, workflows,
+Teams webhooks), everything under `/admin` (branding, report schedules, ...) and inventory
+mail schedules. These can be listed but not changed, so a prompt-injected agent running with
+an admin's rights cannot change a user's e-mail and then reset their password, point Jira or
+SMTP at its own host and run the connection test to collect the stored secret, or set up a
+channel that mails data out. The one exception is `PATCH /users/me/profile` (own name and
+language).
+
 ## Security model
 
 - OAuth 2.1 authorization code flow with PKCE (S256) and dynamic client registration
   (RFC 7591); public clients only. Discovery: `/.well-known/oauth-protected-resource` and
   `/.well-known/oauth-authorization-server` (nginx routes them to the backend).
-- Redirect URIs: `https://`, `http://` on loopback only (any port, RFC 8252), or an app
-  scheme such as `cursor://`. Never `javascript:`, `data:`, `file:` and the like.
+- Redirect URIs: `http://` on loopback (any port, RFC 8252) — what Claude Code, Codex,
+  `mcp-remote` and VS Code use — or a known AI-app callback (`BUILTIN_REDIRECT_URIS` in
+  `app/services/oauth_service.py`: claude.ai, chatgpt.com, vscode.dev, `cursor://`,
+  `vscode://`). Anything else is refused at registration: otherwise anyone could register
+  a fake "Claude Code" pointing at their own server and phish a user into approving it.
+  Add more with `MCP_OAUTH_EXTRA_REDIRECT_URIS` (comma separated; an entry ending in
+  `://` allows a whole app scheme). The consent page shows only the target host, in
+  punycode, and warns whenever the code would go to a website.
 - Access tokens: JWT, 1 hour, audience = the MCP endpoint URL, type `mcp`. The REST API
   rejects them and the MCP endpoint rejects regular web tokens.
-- Refresh tokens: opaque, rotated on every use, valid 30 days from last use.
+- Refresh tokens: opaque, rotated on every use, valid 30 days from last use; a connection
+  ends 90 days after the login regardless, and presenting a used authorization code again
+  revokes what it issued.
 - Each approval is a *connection* (`oauth_grants`). It is checked on every request, so
-  removing it on the Profile page cuts the client off at once. A password change or reset
-  removes all of the user's connections; deactivating or deleting the user blocks them too.
-- The consent page is rate-limited like the web login and sends no secrets to the client
-  except through the redirect. Browser requests to `/api/v1/mcp` with a foreign `Origin`
-  are refused (DNS rebinding protection).
+  removing it on the Profile page cuts the client off at once. A password change or reset,
+  an e-mail change, deactivation and deletion remove all of the user's connections.
+- The consent page shares the web login's rate-limit counter, so it is not a second
+  password-guessing channel. Browser requests to `/api/v1/mcp` with a foreign `Origin`
+  are refused (DNS rebinding protection). Request bodies are capped at 1 MB and JSON-RPC
+  batches at 10 messages.
 
 ## Endpoints
 

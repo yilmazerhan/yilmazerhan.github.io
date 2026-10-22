@@ -8,6 +8,8 @@ accepts type "access") and REST tokens are rejected by the MCP endpoint.
 import base64
 import hashlib
 import ipaddress
+import logging
+import re
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -15,7 +17,7 @@ from typing import Optional
 from urllib.parse import urlsplit
 
 import jwt
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, exists, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -26,9 +28,26 @@ from app.models.user import User
 AUTH_CODE_TTL = timedelta(minutes=5)
 MCP_ACCESS_TOKEN_TTL = timedelta(hours=1)
 MCP_REFRESH_TOKEN_TTL = timedelta(days=30)  # sliding: renewed on every refresh
+MCP_GRANT_MAX_AGE = timedelta(days=90)      # absolute: the user logs in again after this
 MCP_TOKEN_TYPE = "mcp"
 
-_FORBIDDEN_SCHEMES = {"javascript", "data", "file", "vbscript", "about", "blob"}
+# Besides loopback (native apps, any port), a client may only send codes to
+# these known AI-app callbacks. Accepting any https URL would let anyone
+# register a fake "Claude Code" that delivers a phished user's code to their
+# own server. Entries ending in "://" allow a whole app-claimed scheme.
+BUILTIN_REDIRECT_URIS = (
+    "https://claude.ai/api/mcp/auth_callback",
+    "https://claude.com/api/mcp/auth_callback",
+    "https://chatgpt.com/connector_platform_oauth_redirect",
+    "https://vscode.dev/redirect",
+    "https://insiders.vscode.dev/redirect",
+    "cursor://",
+    "vscode://",
+    "vscode-insiders://",
+)
+_CODE_VERIFIER_RE = re.compile(r"[A-Za-z0-9\-._~]{43,128}")  # RFC 7636 §4.1
+# Control characters and bidi/zero-width marks that could disguise a client name.
+_NAME_STRIP_RE = re.compile(r"[\x00-\x1f\x7f-\x9f\u200b-\u200f\u202a-\u202e\u2066-\u2069]")
 
 
 class OAuthError(Exception):
@@ -50,21 +69,40 @@ def _is_loopback(host: str) -> bool:
         return False
 
 
+def _allowed_redirects() -> tuple[str, ...]:
+    extra = [u.strip() for u in settings.MCP_OAUTH_EXTRA_REDIRECT_URIS.split(",") if u.strip()]
+    return BUILTIN_REDIRECT_URIS + tuple(extra)
+
+
+def is_loopback_redirect(uri: str) -> bool:
+    parts = urlsplit(uri)
+    return parts.scheme == "http" and _is_loopback(parts.hostname or "")
+
+
 def validate_redirect_uri(uri: str) -> None:
-    """Accept https URLs, http only on loopback (native apps, RFC 8252), and
-    private-use app schemes such as cursor:// or vscode://."""
+    """Accept http on loopback (native apps, RFC 8252) and the allowlisted
+    AI-app callbacks; nothing else."""
     if not isinstance(uri, str) or not uri or len(uri) > 2000:
         raise OAuthError("invalid_redirect_uri", "Geçersiz redirect_uri.")
     parts = urlsplit(uri)
-    scheme = parts.scheme.lower()
-    if not scheme or parts.fragment:
-        raise OAuthError("invalid_redirect_uri", "redirect_uri mutlak bir URI olmalı ve fragment içermemeli.")
-    if scheme in _FORBIDDEN_SCHEMES:
-        raise OAuthError("invalid_redirect_uri", f"'{scheme}' şeması kullanılamaz.")
-    if scheme == "http" and not _is_loopback(parts.hostname or ""):
-        raise OAuthError("invalid_redirect_uri", "http yalnızca localhost için kullanılabilir; https kullanın.")
-    if scheme == "https" and not parts.hostname:
-        raise OAuthError("invalid_redirect_uri", "Geçersiz redirect_uri.")
+    if not parts.scheme or parts.fragment or parts.username is not None or parts.password is not None:
+        raise OAuthError("invalid_redirect_uri", "redirect_uri mutlak olmalı; fragment veya kullanıcı bilgisi içermemeli.")
+    if is_loopback_redirect(uri):
+        return
+    for allowed in _allowed_redirects():
+        if allowed.endswith("://"):
+            if parts.scheme.lower() == allowed[:-3].lower():
+                return
+        else:
+            a = urlsplit(allowed)
+            if (parts.scheme.lower(), (parts.hostname or "").lower(), parts.port, parts.path) == \
+                    (a.scheme.lower(), (a.hostname or "").lower(), a.port, a.path):
+                return
+    raise OAuthError(
+        "invalid_redirect_uri",
+        "Bu dönüş adresine izin verilmiyor. Yalnızca localhost ve tanınan AI uygulamaları desteklenir; "
+        "yönetici MCP_OAUTH_EXTRA_REDIRECT_URIS ile ekleyebilir.",
+    )
 
 
 def redirect_uri_matches(registered: list[str], requested: str) -> bool:
@@ -79,6 +117,11 @@ def redirect_uri_matches(registered: list[str], requested: str) -> bool:
         if (reg.scheme, reg.hostname, reg.path, reg.query) == (req.scheme, req.hostname, req.path, req.query):
             return True
     return False
+
+
+def sanitize_client_name(name) -> str:
+    name = _NAME_STRIP_RE.sub("", name).strip() if isinstance(name, str) else ""
+    return (name or "MCP istemcisi")[:200]
 
 
 def _pkce_s256(verifier: str) -> str:
@@ -123,14 +166,21 @@ class OAuthService:
             except OAuthError as e:
                 raise OAuthError("invalid_redirect_uri", e.description)
         grant_types = body.get("grant_types") or ["authorization_code", "refresh_token"]
-        if "authorization_code" not in grant_types:
+        if not isinstance(grant_types, list) or "authorization_code" not in grant_types:
             raise OAuthError("invalid_client_metadata", "authorization_code grant tipi gerekli.")
-        name = body.get("client_name")
-        name = (name.strip() if isinstance(name, str) else "") or "MCP istemcisi"
 
+        # Registrations that never led to a connection are dropped after a day
+        # so unauthenticated registration cannot grow the table without bound.
+        await self.db.execute(
+            delete(OAuthClient).where(
+                OAuthClient.created_at < datetime.now(timezone.utc) - timedelta(days=1),
+                ~exists().where(OAuthGrant.client_id == OAuthClient.client_id),
+                ~exists().where(OAuthAuthorizationCode.client_id == OAuthClient.client_id),
+            )
+        )
         client = OAuthClient(
             client_id=secrets.token_urlsafe(24),
-            client_name=name[:200],
+            client_name=sanitize_client_name(body.get("client_name")),
             redirect_uris=redirect_uris,
         )
         self.db.add(client)
@@ -186,12 +236,19 @@ class OAuthService:
     ) -> dict:
         if not code or not client_id or not code_verifier or not redirect_uri:
             raise OAuthError("invalid_request", "code, client_id, redirect_uri ve code_verifier gerekli.")
+        if not _CODE_VERIFIER_RE.fullmatch(code_verifier):
+            raise OAuthError("invalid_grant", "Geçersiz code_verifier.")
         result = await self.db.execute(
             select(OAuthAuthorizationCode)
             .where(OAuthAuthorizationCode.code_hash == hash_token(code))
             .with_for_update()
         )
         record = result.scalar_one_or_none()
+        if record and record.used and record.client_id == client_id:
+            # A code presented twice was probably intercepted: cut off what it
+            # issued (RFC 6749 §4.1.2). Committed separately because the error
+            # response rolls this request's transaction back.
+            await _revoke_grants_committed(record.user_id, record.client_id)
         if (
             not record
             or record.used
@@ -247,6 +304,7 @@ class OAuthService:
             not grant
             or grant.revoked
             or grant.refresh_expires_at < now
+            or grant.created_at + MCP_GRANT_MAX_AGE < now
             or (client_id and client_id != grant.client_id)
         ):
             raise OAuthError("invalid_grant", "Refresh token geçersiz, süresi dolmuş veya iptal edilmiş.")
@@ -275,7 +333,12 @@ class OAuthService:
         except (jwt.InvalidTokenError, KeyError, ValueError, TypeError):
             return None
         grant = await self.db.get(OAuthGrant, grant_id)
-        if not grant or grant.revoked or grant.user_id != user_id:
+        if (
+            not grant
+            or grant.revoked
+            or grant.user_id != user_id
+            or grant.created_at + MCP_GRANT_MAX_AGE < datetime.now(timezone.utc)
+        ):
             return None
         user = await self._active_user(user_id)
         if not user:
@@ -290,6 +353,7 @@ class OAuthService:
                 OAuthGrant.user_id == user_id,
                 OAuthGrant.revoked == False,
                 OAuthGrant.refresh_expires_at > datetime.now(timezone.utc),
+                OAuthGrant.created_at > datetime.now(timezone.utc) - MCP_GRANT_MAX_AGE,
             )
             .order_by(OAuthGrant.created_at.desc())
         )
@@ -310,9 +374,24 @@ class OAuthService:
         return result.scalar_one_or_none()
 
 
+async def _revoke_grants_committed(user_id: uuid.UUID, client_id: str) -> None:
+    from app.database import AsyncSessionLocal
+    try:
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                update(OAuthGrant)
+                .where(OAuthGrant.user_id == user_id, OAuthGrant.client_id == client_id)
+                .values(revoked=True)
+            )
+            await db.commit()
+    except Exception as exc:
+        logging.getLogger(__name__).warning("Revoking grants after code reuse failed: %s", exc)
+
+
 async def revoke_all_grants(db: AsyncSession, user_id: uuid.UUID) -> None:
     """Disconnect every AI app of a user — called wherever web sessions are
-    revoked for security reasons (password change/reset)."""
+    revoked for security reasons (password change/reset, deactivation,
+    deletion, email change)."""
     await db.execute(
         update(OAuthGrant).where(OAuthGrant.user_id == user_id).values(revoked=True)
     )

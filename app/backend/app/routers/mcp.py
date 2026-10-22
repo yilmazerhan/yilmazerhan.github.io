@@ -32,6 +32,9 @@ INSTRUCTIONS = (
     "api_list_operations, api_describe_operation and api_request."
 )
 
+MAX_BODY_BYTES = 1_000_000
+MAX_BATCH = 10  # batches were dropped from the spec in 2025-06-18; kept small for older clients
+
 PARSE_ERROR, INVALID_REQUEST, METHOD_NOT_FOUND, INVALID_PARAMS, INTERNAL_ERROR = (
     -32700, -32600, -32601, -32602, -32603,
 )
@@ -88,14 +91,17 @@ async def mcp_endpoint(request: Request):
     if ctx is None:
         return _unauthorized(request, "invalid_token")
 
+    body = await request.body()
+    if len(body) > MAX_BODY_BYTES:
+        return JSONResponse(status_code=413, content=_rpc_error(None, INVALID_REQUEST, "Request too large"))
     try:
-        payload = json.loads(await request.body())
-    except (ValueError, UnicodeDecodeError):
+        payload = json.loads(body)
+    except (ValueError, UnicodeDecodeError, RecursionError):
         return JSONResponse(content=_rpc_error(None, PARSE_ERROR, "Parse error"))
 
     if isinstance(payload, list):
-        if not payload:
-            return JSONResponse(content=_rpc_error(None, INVALID_REQUEST, "Empty batch"))
+        if not payload or len(payload) > MAX_BATCH:
+            return JSONResponse(content=_rpc_error(None, INVALID_REQUEST, f"Batch must have 1-{MAX_BATCH} messages"))
         replies = [r for r in [await _handle(ctx, m) for m in payload] if r is not None]
         return JSONResponse(content=replies) if replies else Response(status_code=202)
     reply = await _handle(ctx, payload)

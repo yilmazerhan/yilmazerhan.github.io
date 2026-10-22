@@ -1261,7 +1261,7 @@
   },
   "ai_connections": {
     "title": "Yapay zekâ bağlantıları (MCP)",
-    "description": "Claude Code, Claude Desktop, Cursor veya VS Code gibi yapay zekâ uygulamalarını hesabınıza bağlayarak verileri sorgulayabilir, kayıt ekleyip güncelleyebilir ve silebilirsiniz. Uygulama yalnızca sizin yetkilerinizle işlem yapar; envanterdeki şifreleri göremez.",
+    "description": "Claude Code, Claude Desktop, Cursor veya VS Code gibi yapay zekâ uygulamalarını hesabınıza bağlayarak verileri sorgulayabilir, kayıt ekleyip güncelleyebilir ve silebilirsiniz. Uygulama yalnızca sizin yetkilerinizle işlem yapar; envanterdeki şifreleri göremez, kullanıcı, yetki, entegrasyon ve e-posta ayarlarını değiştiremez.",
     "server_url": "MCP sunucu adresi",
     "setup": "Kurulum talimatları",
     "claude_code_hint": "Terminalde çalıştırın, ardından Claude Code içinde /mcp komutuyla \"Authenticate\" seçin.",

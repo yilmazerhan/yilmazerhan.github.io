@@ -1261,7 +1261,7 @@
   },
   "ai_connections": {
     "title": "AI app connections (MCP)",
-    "description": "Connect AI apps such as Claude Code, Claude Desktop, Cursor or VS Code to your account to query data and create, update or delete records. The app acts only with your permissions and cannot see inventory passwords.",
+    "description": "Connect AI apps such as Claude Code, Claude Desktop, Cursor or VS Code to your account to query data and create, update or delete records. The app acts only with your permissions; it cannot see inventory passwords or change user, permission, integration or e-mail settings.",
     "server_url": "MCP server URL",
     "setup": "Setup instructions",
     "claude_code_hint": "Run in a terminal, then choose \"Authenticate\" with the /mcp command inside Claude Code.",

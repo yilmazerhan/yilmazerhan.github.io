@@ -184,3 +184,99 @@ All Round-1 fixes were spot-checked and confirmed **still intact** (no regressio
 - **UI smoke test**: all pages render for all three roles with no JS errors, after the axios/react-router upgrades.
 - **Frontend**: production build clean, 19/19 unit tests pass.
 - **Backend test suite**: `66 failed / 89 passed / 96 errors` both **before and after** these changes — byte-identical counts, confirming the pre-existing suite breakage is unrelated to this work (it is a test-isolation problem in the suite itself, not a product regression).
+
+---
+
+# Security Audit Round 3 — dependency CVEs, container images, MCP/OAuth
+
+Scope: known vulnerabilities in every dependency and container image as of 2026-10-22
+(pip-audit against PyPI advisories, `pnpm audit`, Docker Hub tag history), plus an
+adversarial review of the MCP/OAuth interface added after Round 2.
+
+## Container images
+
+| Image | Finding | Fix |
+|---|---|---|
+| `nginx:1.25-alpine` (TLS-terminating reverse proxy), `nginxinc/nginx-unprivileged:1.25-alpine` (frontend) | The 1.25 tag was last built **2024-05-15**; nginx, OpenSSL, zlib and musl in both images were 2.5 years unpatched | `1.30-alpine` (stable, 1.30.6). Both configs validated with the real 1.30.6 binaries and the full MCP E2E suite run through it |
+| `redis:7-alpine`, `alpine/openssl:latest` | Tags are current, but `update.sh` never pulled image-only services, so the server kept whatever it downloaded first (Redis was 7 weeks old) | `update.sh` now runs `compose pull redis nginx ssl_init` and `build --pull` |
+| `python:3.12-slim`, `node:22-alpine` | Current; refreshed on every `--no-cache` build | — |
+
+`update.sh` also validates `nginx.conf` with the new image (`nginx -t`) before restarting, so
+a bad config can no longer take the site down.
+
+## Backend dependencies (32 advisories → 0)
+
+- `starlette 0.52.1 → 1.9.0` (with `fastapi 0.136.3 → 0.159.1`): **CVE-2026-54283** — limits
+  were not applied to `application/x-www-form-urlencoded` bodies, and the unauthenticated
+  OAuth `/token` and `/authorize` endpoints parse exactly those (verified: a 5000-field or
+  2 MB form is now rejected with 400); CVE-2026-54282 / CVE-2026-48710 (`request.url` host
+  confusion); CVE-2026-48817/48818.
+- `PyJWT 2.13.0 → 2.15.1`: 14 advisories. Most are algorithm-confusion and JWKS issues that
+  do not apply (HMAC-only with a raw secret), but malformed-token parsing does.
+  PYSEC-2026-4146 (no fix released) needs a reused `options` dict with
+  `verify_signature=False`, which the app never does.
+- `cryptography 49 → 50.0.2` (PKCS#7 Bleichenbacher oracle — not used), `anyio 4.13 → 4.14.2`,
+  `certifi → 2026.10.19` (compromised eMudhra intermediates — affects outgoing TLS to Jira,
+  SMTP and Teams).
+- `fastapi-mail` removed: never imported (mail goes through `smtplib`), and it pulled in
+  `aiosmtplib 2.0.2` (CRLF command injection CVE-2026-53533, STARTTLS buffer CVE-2026-55558).
+  `email-validator`, which it had provided transitively for pydantic `EmailStr`, is now a
+  direct dependency.
+
+## Frontend dependencies (51 advisories → 2, 0 in shipped code)
+
+Shipped to browsers: `axios 1.18.1 → 1.20.0` (prototype-pollution gadgets, header injection,
+redirect SSRF), `react-router-dom → 7.18.4`, `dompurify` override → `^3.4.16` (two XSS fixes).
+Build/dev tooling: `vite 6.4.5`, `vitest 4.1.12`, `@hey-api/openapi-ts 0.97.3`, `postcss 8.5.31`,
+plus version-scoped overrides for `brace-expansion` (1.x and 5.x lines separately), `js-yaml`,
+`browserslist`, `nanoid`, `@babel/core`, `postcss-selector-parser@6`, `source-map-js`,
+`follow-redirects`, `baseline-browser-mapping`.
+
+Remaining, build-time only: `braces <=3.0.3` (no patched release exists) and
+`postcss-selector-parser <7.1.6` (Tailwind 3 requires 6.x; needs a Tailwind 4 migration).
+Both are reached only by Tailwind's CLI during the build. `pnpm audit --prod`: 0.
+
+## MCP / OAuth review
+
+| Sev | Finding | Fix |
+|---|---|---|
+| HIGH | Consent phishing: unauthenticated registration accepted **any** https redirect URI, so an attacker could register "Claude Code" → `https://evil/cb`, send a user the real login page, and receive their code | Redirects limited to loopback + known AI-app callbacks (`BUILTIN_REDIRECT_URIS`, extendable via `MCP_OAUTH_EXTRA_REDIRECT_URIS`); userinfo refused; the consent page shows only the punycode host and warns for web targets |
+| MED | A superadmin's AI session could exfiltrate the Jira token / SMTP password (repoint `base_url`/`host`, run `/test`) | Integration configs read-only over MCP |
+| MED | …or take over accounts (change a user's e-mail → reset password, create superadmins, rewrite permissions or reset-mail templates) | Users, teams, permissions, `/email`, `/admin`, inventory schedules read-only over MCP |
+| MED | Unbounded JSON-RPC batches multiplied load past the rate limit | Body ≤ 1 MB, batch ≤ 10 |
+| MED | Open redirect through pre-consent error redirects | Neutralised by the redirect allowlist (errors can only go to loopback or known apps) |
+| LOW | No absolute connection lifetime; code replay did not revoke | 90-day absolute lifetime; a replayed code revokes what it issued |
+| LOW | Audit rows / failed-login warnings recorded nginx's IP (`/auth/login` too) | `_get_real_ip` |
+| LOW | Grants survived deactivation, soft delete and e-mail change | Revoked in all three |
+| LOW | Consent page had its own login rate-limit counter (doubling guesses) | Shared counter with `/auth/login` |
+| LOW | Registrations never pruned | Unused registrations dropped after a day |
+| BUG | A non-ASCII client name (e.g. Turkish) made **every** tool call fail; CR/LF reached audit rows | ASCII-sanitised User-Agent; control/bidi characters stripped from client names |
+| BUG | Non-ASCII `code_verifier`, multipart form values, deeply nested JSON → 500 | Validated → 400 / JSON-RPC parse error |
+
+Deferred: refresh-token **reuse** detection (needs a `previous_refresh_token_hash` column and
+migration; rotation already makes stolen tokens race the real client) and a configured host
+allowlist for advertised URLs (the server is internal-only and every endpoint needs a token).
+
+## Host
+
+Outside the repository: `security-update.sh` reports pending OS security packages, the
+Docker Engine and `runc` versions (warns below 1.2.8 / 1.3.3 — CVE-2025-31133/52565/52881
+container escapes), image ages and the versions actually running in each container; with
+`--host` it also applies `apt-get upgrade`.
+
+## Verification
+
+- pip-audit: 0 known vulnerabilities. `pnpm audit --prod`: 0.
+- MCP E2E (official MCP client + Playwright login): 69/69, directly and through the real
+  nginx 1.30.6 binary with TLS/HTTP2. Codex CLI login and `mcp-remote` flows re-tested.
+- Framework-upgrade smoke: every parameter-less GET endpoint (49) without 5xx, cookie
+  refresh, multipart uploads (attachment, logo, favicon), attachment download, CSV export.
+- UI: 24 routes as superadmin, 0 console/page errors; frontend build, type-check, 19/19 tests.
+- Unit tests: `test_mcp.py` 44/44. Existing suite: 147 passed / 8 failed / 96 errors vs.
+  148 / 7 / 96 before; the one difference is
+  `test_second_scheduler_call_skips_due_to_dedup`, which is clock-dependent (it fakes 07:00
+  Istanbul but the record gets the real time, so it fails whenever the suite runs before
+  07:00 Istanbul) — unrelated to these changes.
+- `security-update.sh` exercised against stubbed docker/apt/runc in four scenarios:
+  report-only (changes nothing), app update (correct order, post-checks), invalid nginx
+  config (stops before restart), `--host`.

@@ -276,6 +276,10 @@ class UserService:
                         )
                     raise ConflictError("Bu email adresi başka bir kullanıcı tarafından kullanılıyor.")
                 user.email = new_email
+                # Whoever controls the new address can reset the password;
+                # AI connections made under the old identity must not carry over.
+                from app.services.oauth_service import revoke_all_grants
+                await revoke_all_grants(self.db, user.id)
 
         if full_name is not None:
             user.full_name = full_name
@@ -294,6 +298,10 @@ class UserService:
                 .on_conflict_do_nothing()
             )
         if is_active is not None:
+            if user.is_active and not is_active:
+                # Otherwise reactivating the account would revive old AI connections.
+                from app.services.oauth_service import revoke_all_grants
+                await revoke_all_grants(self.db, user.id)
             user.is_active = is_active
         if preferred_language is not None:
             if preferred_language not in ("tr", "en"):
@@ -373,6 +381,8 @@ class UserService:
 
         user.is_deleted = True
         user.is_active = False
+        from app.services.oauth_service import revoke_all_grants
+        await revoke_all_grants(self.db, user.id)
         await self.db.flush()
 
     async def change_own_password(self, user: User, old_password: str, new_password: str) -> None:
